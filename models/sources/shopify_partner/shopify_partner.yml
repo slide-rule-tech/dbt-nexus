@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: shopify_partner
+    database: sliderule-analytics
+    schema: shopify_partner
+    tables:
+      - name: shopify_app_events

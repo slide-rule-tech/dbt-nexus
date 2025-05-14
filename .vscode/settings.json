@@ -1,0 +1,6 @@
+{
+  "python.defaultInterpreterPath": "/Users/kevinmclaughlin/projects/sliderule/sra-python/bin/python",
+  "python.experiments.enabled": false,
+  "dbt.dbtPythonPathOverride": "/Users/kevinmclaughlin/projects/sliderule/sra-python/bin/python",
+  "dbt.enableNewLineagePanel": true
+}

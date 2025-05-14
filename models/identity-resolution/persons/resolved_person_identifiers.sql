@@ -1,0 +1,1 @@
+{{ nexus_resolve_identifiers('group', 'group_identifiers', 'group_identifiers_edges') }}

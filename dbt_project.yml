@@ -1,0 +1,59 @@
+# Name your project! Project names should contain only lowercase characters
+# and underscores. A good package name should reflect your organization's
+# name or the intended use of these models
+name: "nexus"
+version: "1.0.0"
+config-version: 2
+
+# This setting configures which "profile" dbt uses for this project.
+profile: "nexus"
+
+# These configurations specify where dbt should look for different types of files.
+# The `model-paths` config, for example, states that models in this project can be
+# found in the "models/" directory. You probably won't need to change these!
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets: # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+# Configuring models
+# Full documentation: https://docs.getdbt.com/docs/configuring-models
+
+# In this example config, we tell dbt to build all models in the example/
+# directory as views. These settings can be overridden in the individual model
+# files using the `{{ config(...) }}` macro.
+models:
+  nexus:
+    # Config indicated by + and applies to all files under models/example/
+    example:
+      +materialized: view
+
+vars:
+  override_incremental: false # true for alway full refresh in dev. false for use incremental in dev.
+  realtime_event_model: "manual_events"
+  realtime_person_identifiers_model: "manual_person_identifiers"
+  realtime_person_traits_model: "manual_person_traits"
+  realtime_group_identifiers_model: "manual_group_identifiers"
+  realtime_group_traits_model: "manual_group_traits"
+  realtime_membership_identifiers_model: "manual_membership_identifiers"
+  # realtime_event_id: ("db47cc76-ec1b-4eb3-bb8d-3bbe6d7324b9")
+  sources:
+    - name: manual
+      events: true
+      groups: true
+      persons: true
+      memberships: true
+    - name: shopify_partner
+      events: true
+      groups: true
+    - name: gadget
+      events: true
+      groups: true
+      persons: true
+      memberships: true

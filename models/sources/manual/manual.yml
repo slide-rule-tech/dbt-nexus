@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: manual
+    database: sliderule-analytics
+    schema: manual
+    tables:
+      - name: events
+      - name: persons
+      - name: groups
+      - name: memberships
