@@ -1,4 +1,4 @@
-{% macro nexus_create_identifier_edges(identifiers_table) %}
+{% macro create_identifier_edges(identifiers_table) %}
 
 with unpivoted as (
   select * from {{ ref(identifiers_table) }}

@@ -4,7 +4,7 @@
 with groups_count as (
     select
         count(*) as total_groups
-    from {{ ref('groups') }}
+    from {{ ref('nexus_groups') }}
 ),
 
 distinct_shop_ids_count as (

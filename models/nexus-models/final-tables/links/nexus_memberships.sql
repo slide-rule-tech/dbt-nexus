@@ -1,16 +1,16 @@
 {{ config(materialized='table', tags=['identity-resolution', 'memberships']) }}
 
 with membership_identifiers as (
-    select * from {{ ref('membership_identifiers') }}
+    select * from {{ ref('nexus_membership_identifiers') }}
 ),
 
 -- Person and group resolved identifiers
 person_identifiers as (
-    select * from {{ ref('resolved_person_identifiers') }}
+    select * from {{ ref('nexus_resolved_person_identifiers') }}
 ),
 
 group_identifiers as (
-    select * from {{ ref('resolved_group_identifiers') }}
+    select * from {{ ref('nexus_resolved_group_identifiers') }}
 ),
 
 -- Join person identifiers to membership

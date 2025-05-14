@@ -1,4 +1,0 @@
-No data found in alasql table 'manual_person_identifiers' for injection (source: source_person_identifiers)
-Available alasql tables: manual_events_base, manual_events, manual_persons_base, manual_person_identifiers, manual_person_traits, manual_groups_base, manual_group_identifiers, manual_group_traits, manual_memberships_base, manual_membership_identifiers, real_time_events
-No data found in alasql table 'manual_person_traits' for injection (source: source_person_traits)
-Available alasql tables: manual_events_base, manual_events, manual_persons_base, manual_person_identifiers, manual_person_traits, manual_groups_base, manual_group_identifiers, manual_group_traits, manual_memberships_base, manual_membership_identifiers, real_time_events, realtime_resolved_person_identifiers

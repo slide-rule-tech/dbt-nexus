@@ -1,4 +1,4 @@
-{% macro nexus_resolve_identifiers(entity_type, identifiers_table, edges_table) %}
+{% macro resolve_identifiers(entity_type, identifiers_table, edges_table) %}
 
 with recursive recursive_components as (
     -- Base case : start from every identifier that appears in the raw table.
