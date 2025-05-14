@@ -2,14 +2,14 @@ with timeline as (
     -- First get the person ID for the specified email
     with person as (
         select person_id
-        from {{ ref('persons') }}
+        from {{ ref('nexus_persons') }}
         where email = 'kevin@kevincmclaughlin.com'
     ),
     
     -- Get all event IDs this person participated in
     person_events as (
         select pp.event_id
-        from {{ ref('person_participants') }} pp
+        from {{ ref('nexus_person_participants') }} pp
         inner join person p on pp.person_id = p.person_id
     )
     
@@ -23,7 +23,7 @@ with timeline as (
         e.value_unit,
         e.event_type,
         e.source
-    from {{ ref('events') }} e
+    from {{ ref('nexus_events') }} e
     inner join person_events pe on e.id = pe.event_id
     order by e.occurred_at desc
 )

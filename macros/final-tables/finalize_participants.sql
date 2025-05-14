@@ -1,13 +1,13 @@
-{% macro nexus_finalize_participants(entity_type) %}
+{% macro finalize_participants(entity_type) %}
 
 with resolved_identifiers as (
-  select * from {{ ref('resolved_' ~ entity_type ~ '_identifiers') }}
+  select * from {{ ref('nexus_resolved_' ~ entity_type ~ '_identifiers') }}
 ),
 
 entity_identifiers as (
   select
     *
-  from {{ref(entity_type ~ '_identifiers')}}
+  from {{ref('nexus_' ~ entity_type ~ '_identifiers')}}
 ),
 
 joined as (

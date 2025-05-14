@@ -1,9 +1,9 @@
 with group_participants as (
-  select * from {{ ref('group_participants') }}
+  select * from {{ ref('nexus_group_participants') }}
 ),
 
 final_groups as (
-  select * from {{ ref('groups') }}
+  select * from {{ ref('nexus_groups') }}
 ),
 
 linked as (
@@ -24,7 +24,7 @@ linked as (
   from group_participants p
   left join final_groups g
     on p.group_id = g.group_id
-  left join {{ ref('events') }} e
+  left join {{ ref('nexus_events') }} e
     on p.event_id = e.id
   limit 10
 )

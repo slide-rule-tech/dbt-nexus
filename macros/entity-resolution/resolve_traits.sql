@@ -1,9 +1,9 @@
-{% macro nexus_resolve_traits(entity_type) %}
+{% macro resolve_traits(entity_type) %}
 
 with traits as (
     select
         *
-    from {{ ref(entity_type ~ '_traits') }}
+    from {{ ref('nexus_' ~ entity_type ~ '_traits') }}
 ),
 
 entity_identifiers as (
@@ -11,7 +11,7 @@ entity_identifiers as (
         identifier_type,
         identifier_value,
         {{ entity_type }}_id
-    from {{ ref('resolved_' ~ entity_type ~ '_identifiers') }}
+    from {{ ref('nexus_resolved_' ~ entity_type ~ '_identifiers') }}
 ),
 
 joined_traits as (
