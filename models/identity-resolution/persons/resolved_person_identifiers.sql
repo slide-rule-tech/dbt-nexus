@@ -1,1 +1,7 @@
-{{ nexus_resolve_identifiers('group', 'group_identifiers', 'group_identifiers_edges') }}
+{{ config(
+    materialized='table', 
+    tags=['identity-resolution', 'persons'],
+) }}
+
+
+{{ nexus_resolve_identifiers('person', 'person_identifiers', 'person_identifiers_edges') }}
