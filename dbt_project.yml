@@ -2,7 +2,7 @@
 # and underscores. A good package name should reflect your organization's
 # name or the intended use of these models
 name: "nexus"
-version: "1.0.0"
+version: "0.1.0"
 config-version: 2
 
 # This setting configures which "profile" dbt uses for this project.
@@ -30,30 +30,6 @@ clean-targets: # directories to be removed by `dbt clean`
 # files using the `{{ config(...) }}` macro.
 models:
   nexus:
-    # Config indicated by + and applies to all files under models/example/
-    example:
-      +materialized: view
+    +schema: nexus
 
 vars:
-  override_incremental: false # true for alway full refresh in dev. false for use incremental in dev.
-  realtime_event_model: "manual_events"
-  realtime_person_identifiers_model: "manual_person_identifiers"
-  realtime_person_traits_model: "manual_person_traits"
-  realtime_group_identifiers_model: "manual_group_identifiers"
-  realtime_group_traits_model: "manual_group_traits"
-  realtime_membership_identifiers_model: "manual_membership_identifiers"
-  # realtime_event_id: ("db47cc76-ec1b-4eb3-bb8d-3bbe6d7324b9")
-  sources:
-    - name: manual
-      events: true
-      groups: true
-      persons: true
-      memberships: true
-    - name: shopify_partner
-      events: true
-      groups: true
-    - name: gadget
-      events: true
-      groups: true
-      persons: true
-      memberships: true
