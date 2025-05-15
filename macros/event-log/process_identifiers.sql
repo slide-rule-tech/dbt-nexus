@@ -26,7 +26,7 @@
                 -- Normalize identifier values based on type
                 case
                     when identifier_type = 'email' then lower(identifier_value)
-                    when identifier_type = 'phone' then regexp_replace(identifier_value, r'[^0-9]', '') -- Keep only digits
+                    when identifier_type = 'phone' then regexp_replace(identifier_value, '[^0-9]', '') -- Keep only digits
                     when identifier_type = 'domain' then lower(identifier_value)
                     else identifier_value
                 end as normalized_value,
