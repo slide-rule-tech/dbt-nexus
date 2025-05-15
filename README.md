@@ -43,7 +43,26 @@ groups) and their interactions.
 To use the Nexus package, you need to configure certain variables in your own
 dbt project's `dbt_project.yml` file.
 
-### 1. Define `sources` Variable
+### 1. Recursion Control (`nexus_max_recursion`)
+
+The Nexus package uses recursive CTEs for entity resolution. To prevent runaway
+recursion and improve performance, you can control the maximum recursion depth
+using the `nexus_max_recursion` variable.
+
+- **Default:** The package sets `nexus_max_recursion: 5` by default.
+- **Override:** You can override this value in your own project's
+  `dbt_project.yml`:
+
+```yaml
+vars:
+  nexus_max_recursion: 5 # Set to your preferred recursion limit
+```
+
+This variable is used in all identity resolution models and macros that perform
+recursive CTEs, such as `nexus_resolved_person_identifiers` and
+`nexus_resolved_group_identifiers`.
+
+### 2. Define `sources` Variable
 
 The Nexus package is designed to be source-agnostic. You must tell it what data
 sources it should process and what kinds of entities each source provides. This
@@ -84,7 +103,7 @@ potentially `salesforce_person_traits` (or similar, depending on the specific
 macros in the Nexus package). Ensure your project includes these source-specific
 staging models with the expected columns.
 
-### 2. Model Configuration (Optional)
+### 3. Model Configuration (Optional)
 
 You can configure models from the `nexus` package in your own `dbt_project.yml`
 as well. For example, to change the materialization of all models in the `nexus`
@@ -130,6 +149,53 @@ If you are contributing to the Nexus package itself:
 - When developing the package locally, you may need to define dummy `vars` in
   your local `dbt_project.yml` or use command-line `--vars` to allow models to
   compile, as the package itself will not define specific sources.
+
+### Git Workflow
+
+When making changes to the package:
+
+1. **Create a Feature Branch**
+
+   ```bash
+   cd external_libs/dbt-nexus
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make Your Changes**
+
+   - Make your code changes
+   - Test your changes locally
+   - Update documentation as needed
+
+3. **Commit and Push**
+
+   ```bash
+   git add .
+   git commit -m "Your descriptive commit message"
+   git push origin feature/your-feature-name
+   ```
+
+4. **Create a Pull Request**
+
+   - Create a PR on the dbt-nexus repository
+   - Request review from team members
+   - Address any feedback
+
+5. **After PR Merge**
+   - Update the submodule reference in the main project:
+   ```bash
+   cd ../..  # back to main project
+   git submodule update --remote external_libs/dbt-nexus
+   git add external_libs/dbt-nexus
+   git commit -m "Update dbt-nexus submodule to latest main"
+   git push
+   ```
+
+This will:
+
+1. Pull the latest changes from the dbt-nexus repository
+2. Update your main project's reference to point to the latest commit
+3. Commit and push this reference update
 
 ---
 

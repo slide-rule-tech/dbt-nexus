@@ -1,5 +1,13 @@
 {{ config(materialized='table', tags=['identity-resolution', 'memberships']) }}
 
+{% set relations_to_union = [] %}
+{% for source in var('sources') %}
+    {% if source.memberships %}
+        {% do relations_to_union.append(ref(source.name ~ '_membership_identifiers')) %}
+    {% endif %}
+{% endfor %}
+
+{% if relations_to_union %}
 with membership_identifiers as (
     select * from {{ ref('nexus_membership_identifiers') }}
 ),
@@ -65,6 +73,7 @@ latest_memberships as (
     from resolved_memberships
 )
 
+-- Return normal membership results
 select
     {{ dbt_utils.generate_surrogate_key(['person_id', 'group_id']) }} as membership_id,
     person_id,
@@ -75,3 +84,16 @@ select
     false as realtime_processed
 from latest_memberships
 where row_num = 1
+
+{% else %}
+-- Return empty result when no membership sources are configured
+select
+    cast(null as string) as membership_id,
+    cast(null as string) as person_id,
+    cast(null as string) as group_id,
+    cast(null as string) as role,
+    cast(null as string) as source,
+    cast(null as timestamp) as occurred_at,
+    cast(false as boolean) as realtime_processed
+where 1 = 0
+{% endif %}

@@ -3,5 +3,4 @@
     tags=['identity-resolution', 'persons'],
 ) }}
 
-
-{{ resolve_identifiers('person', 'nexus_person_identifiers', 'nexus_person_identifiers_edges') }}
+{{ resolve_identifiers('person', 'nexus_person_identifiers', 'nexus_person_identifiers_edges', var('nexus_max_recursion')) }}
