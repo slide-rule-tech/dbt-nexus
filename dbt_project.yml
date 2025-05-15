@@ -33,3 +33,4 @@ models:
     +schema: nexus
 
 vars:
+  nexus_max_recursion: 5

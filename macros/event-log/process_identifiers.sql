@@ -26,12 +26,12 @@
                 -- Normalize identifier values based on type
                 case
                     when identifier_type = 'email' then lower(identifier_value)
-                    when identifier_type = 'phone' then regexp_replace(identifier_value, r'[^0-9]', '') -- Keep only digits
+                    when identifier_type = 'phone' then regexp_replace(identifier_value, '[^0-9]', '') -- Keep only digits
                     when identifier_type = 'domain' then lower(identifier_value)
                     else identifier_value
                 end as normalized_value,
                 source,
-                occurred_at,
+                occurred_at
             from unioned
         )
 
@@ -42,7 +42,7 @@
             identifier_value,
             normalized_value,
             source,
-            occurred_at,
+            occurred_at
         from normalized
     {% else %}
         {# Return empty result if no relations found #}
@@ -53,7 +53,7 @@
             cast(null as string) as identifier_value,
             cast(null as string) as normalized_value,
             cast(null as string) as source,
-            cast(null as timestamp) as occurred_at,
+            cast(null as timestamp) as occurred_at
         where 1=0
     {% endif %}
 {% endmacro %}
