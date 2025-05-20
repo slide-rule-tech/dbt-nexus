@@ -1,4 +1,4 @@
-{{ config(materialized = 'table', tags=['states']))}}
+{{ config(materialized = 'table', tags=['states']) }}
 
 WITH unioned AS (
 
