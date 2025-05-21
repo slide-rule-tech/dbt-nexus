@@ -8,6 +8,7 @@
     event_description,
     event_value,
     value_unit,
+    event_significance,
     -- Metadata for lineage
     event_type,
     source,
