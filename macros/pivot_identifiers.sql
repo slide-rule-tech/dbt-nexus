@@ -20,12 +20,14 @@
   {%- set _ = identifier_type_counts.update({ row[0]: row[1] | int }) %}
 {%- endfor %}
 
+-- Single scan approach for better performance on large tables
 with filtered_identifiers as (
   select
     {{ entity_id_column }},
     identifier_type,
     identifier_value
   from {{ ref(identifiers_model) }}
+  where identifier_value is not null  -- Add basic filtering
 ),
 
 ranked_identifiers as (
