@@ -1,4 +1,4 @@
-{% macro unpivot_identifiers(model_name, columns=[], additional_exclude=[], additional_columns=[], event_id_field='event_id', row_id_field='row_id', column_to_identifier_type={}) %}
+{% macro unpivot_identifiers(model_name, columns=[], additional_exclude=[], additional_columns=[], event_id_field='event_id', row_id_field='row_id', column_to_identifier_type={}, limit=none) %}
 {% set cols = adapter.get_columns_in_relation(ref(model_name)) %}
 
 {# If no specific columns are provided, determine them from the model #}
@@ -25,12 +25,23 @@
   {% set identifier_cols = columns %}
 {% endif %}
 
-{# Set up the CTE for the source #}
+{# Single scan approach for better performance on large tables #}
 with source_data as (
-  select * from {{ ref(model_name) }}
+  select 
+    {{ event_id_field }},
+    {{ row_id_field }},
+    {% for add_col in additional_columns %}
+    {{ add_col }},
+    {% endfor %}
+    {% for col in identifier_cols %}
+    {{ col }}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  from {{ ref(model_name) }}
+  {% if target.name != 'prod' and limit is not none %}
+  limit {{ limit }}
+  {% endif %}
 )
 
-{# Generate the UNION ALL for each identifier column #}
 {% for col in identifier_cols %}
   {% if not loop.first %}union all{% endif %}
   select
@@ -43,7 +54,7 @@ with source_data as (
     {% endif %}
     cast({{ col }} as string) as identifier_value
     {% for add_col in additional_columns %}
-    , {{ add_col }}
+    , {{ add_col.split(' as ')[1] if ' as ' in add_col else add_col }}
     {% endfor %}
   from source_data
   where {{ col }} is not null

@@ -1,4 +1,4 @@
-{% macro unpivot_traits(model_name, columns=[], identifier_column='identifier_value', identifier_type=none, additional_exclude=[], additional_columns=[], column_to_trait_name={}, event_id_field='event_id') %}
+{% macro unpivot_traits(model_name, columns=[], identifier_column='identifier_value', identifier_type=none, additional_exclude=[], additional_columns=[], column_to_trait_name={}, event_id_field='event_id', limit=none) %}
 {% set cols = adapter.get_columns_in_relation(ref(model_name)) %}
 
 {# If no specific columns are provided, determine them from the model #}
@@ -24,22 +24,33 @@
   {% set trait_cols = columns %}
 {% endif %}
 
-{# Set up the CTE for the source #}
+{# Single scan approach for better performance on large tables #}
 with source_data as (
-  select * from {{ ref(model_name) }}
+  select 
+    {{ event_id_field }} as event_id,
+    {{ identifier_column }} as identifier_column,
+    {% for add_col in additional_columns %}
+    {{ add_col }},
+    {% endfor %}
+    {% for col in trait_cols %}
+    {{ col }}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  from {{ ref(model_name) }}
+  {% if target.name != 'prod' and limit is not none %}
+  limit {{ limit }}
+  {% endif %}
 )
 
-{# Generate the UNION ALL for each trait column #}
 {% for col in trait_cols %}
   {% if not loop.first %}union all{% endif %}
   select
-    {{ event_id_field }} as event_id,
+    event_id,
     {% if identifier_type is not none %}
     '{{ identifier_type }}' as identifier_type,
     {% else %}
     '{{ identifier_column }}' as identifier_type,
     {% endif %}
-    {{ identifier_column }} as identifier_value,
+    identifier_column as identifier_value,
     {% if col in column_to_trait_name %}
     '{{ column_to_trait_name[col] }}' as trait_name,
     {% else %}
@@ -47,9 +58,9 @@ with source_data as (
     {% endif %}
     cast({{ col }} as string) as trait_value
     {% for add_col in additional_columns %}
-    , {{ add_col }}
+    , {{ add_col.split(' as ')[1] if ' as ' in add_col else add_col }}
     {% endfor %}
   from source_data
   where {{ col }} is not null
 {% endfor %}
-{% endmacro %} 
+{% endmacro %}
