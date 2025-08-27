@@ -14,13 +14,25 @@ platforms with powerful identity resolution and state management capabilities.
 
 ## What is dbt-nexus?
 
-dbt-nexus is a dbt package that helps you:
+dbt-nexus is a way of structuring all company data in your data warehouse so
+it's **operationally** useful, not just good for dashboards. It's designed to
+help you actually close sales, speed up customer support, and reduce churn.
+
+Specifically, it's a dbt package that lets data engineers quickly merge and
+organize **any** data source into a combined view of **people**, **companies**,
+and **events** - creating a complete timeline of everything you know about your
+customers.
+
+dbt-nexus helps you:
 
 - **🔗 Resolve identities** across multiple data sources and systems
-- **📊 Track events** with standardized event logging
+- **📊 Track events** with standardized event logging that creates actionable
+  timelines
 - **👥 Manage entities** including persons, groups, and their relationships
 - **🏷️ Handle states** with timeline-based state management
 - **⚡ Scale efficiently** with incremental processing and optimized queries
+- **🎯 Drive operations** - support teams, sales teams, and AI tools get
+  complete customer context
 
 ## Quick Start
 
@@ -47,8 +59,8 @@ configurable matching rules and recursive algorithms.
 
 ### 📋 Event Logging
 
-Standardized event, identifier, and trait tracking with support for real-time
-and batch processing.
+Standardized event, identifier, and trait tracking with batch processing
+workflows.
 
 ### 🏷️ State Management
 
@@ -97,15 +109,29 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 | **[Reference](reference/)**       | Look up details         | You need technical specifications |
 | **[Explanations](explanations/)** | Understand concepts     | You want to learn how it works    |
 
+## Real-World Applications
+
+See how dbt-nexus enables operational data use beyond just dashboards:
+
+- **Timeline Apps**: Get complete customer context for support and sales teams
+- **Daily Updates**: Automated summaries of key events across your business
+- **Email Marketing**: Always up-to-date customer lists and segmentation
+- **AI Integration**: Power AI tools with complete customer context
+- **Abandon Setup Notifications**: Automated outreach for incomplete onboarding
+
+Read the full story:
+[**Dbt-Nexus - Data Beyond Dashboards**](https://www.slideruleanalytics.com/blog/dbt-nexus-data-beyond-dashboards)
+
 ## Community & Support
 
 - 📖 **Documentation**: You're here!
-- 🐛 **Issues**:
-  [GitHub Issues](https://github.com/your-organization/dbt-nexus/issues)
+- 📝 **Blog**:
+  [SlideRule Analytics Blog](https://www.slideruleanalytics.com/blog/)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/sliderule/dbt-nexus/issues)
 - 💬 **Discussions**:
-  [GitHub Discussions](https://github.com/your-organization/dbt-nexus/discussions)
+  [GitHub Discussions](https://github.com/sliderule/dbt-nexus/discussions)
 - 📧 **Contact**:
-  [team@your-organization.com](mailto:team@your-organization.com)
+  [hello@slideruleanalytics.com](mailto:hello@slideruleanalytics.com)
 
 ## License
 

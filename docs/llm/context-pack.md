@@ -10,12 +10,17 @@ summary:
 
 ## Mission
 
-The dbt-nexus package provides a standardized, source-agnostic framework for
-building unified customer data platforms with advanced identity resolution,
-event tracking, and state management. It enables organizations to consolidate
-person and group entities from multiple data sources, resolve identities across
-systems, track entity states over time, and maintain relationships between
-entities—all while supporting both real-time and batch processing workflows.
+The dbt-nexus package provides a way of structuring all company data in your
+data warehouse so it's **operationally useful**, not just good for dashboards.
+It's designed to help close sales, speed up customer support, and reduce churn
+by creating complete customer timelines from any data source.
+
+Specifically, it's a standardized, source-agnostic dbt framework that lets data
+engineers quickly merge and organize **any** data source into a combined view of
+**people**, **companies**, and **events**. This enables organizations to
+consolidate scattered customer data (Gmail, Stripe, Shopify, etc.) into unified
+timelines that support teams, sales teams, and AI tools can actually use
+operationally.
 
 ## Core Concepts
 
@@ -70,7 +75,7 @@ entities—all while supporting both real-time and batch processing workflows.
 - **Identity Resolution**: `resolve_identifiers()`, `resolve_traits()`,
   `create_edges()`
 - **Event Processing**: `process_identifiers()`, `process_traits()`,
-  `real_time_event_filter()`
+  `event_filter()`
 - **State Management**: `derived_state()`, `common_state_fields()`
 - **Utilities**: `unpivot_identifiers()`, `pivot_identifiers()`,
   `get_first_or_last_row()`, `finalize_entity()`
@@ -121,7 +126,7 @@ logic.
 - Source models must exactly match expected schema (column names, types)
 - Identity resolution assumes transitivity (A=B, B=C → A=C)
 - State models require manual addition to `nexus_states` union
-- Real-time event filtering depends on proper `_ingested_at` timestamps
+- Event filtering depends on proper `_ingested_at` timestamps
 
 ### Incremental Model Behavior
 
@@ -151,10 +156,31 @@ logic.
 
 ## Links & References
 
+- **Blog Post**:
+  [Data Beyond Dashboards](https://www.slideruleanalytics.com/blog/dbt-nexus-data-beyond-dashboards)
 - **Documentation**: `/docs/index.md`
+- **Use Cases**: `/docs/explanations/use-cases.md`
 - **Model Reference**: `/docs/reference/models/`
 - **Macro Reference**: `/docs/reference/macros/`
 - **State Naming Guide**: `/models/nexus-models/states/STATES.md`
 - **Derived State Macro**: `/macros/states/DERIVED_STATE_MACRO.md`
 - **Configuration Guide**: `/docs/getting-started/configuration.md`
 - **Architecture Deep Dive**: `/docs/explanations/architecture.md`
+
+## Real-World Applications (SlideRule Analytics)
+
+### Operational Use Cases
+
+- **Timeline Apps**: Complete customer context for support/sales teams
+- **Daily Updates**: Automated summaries of key business events
+- **Email Marketing**: Up-to-date customer lists and segmentation
+- **Abandoned Setup Notifications**: Automated onboarding outreach
+- **AI Integration**: Complete customer context for AI tools
+- **Metrics & Dashboards**: Consistent business metrics across all tools
+
+### Business Value
+
+- Faster customer support (complete context in one view)
+- Higher sales conversion (full customer timeline)
+- Reduced churn (proactive engagement based on events)
+- Operational flexibility (add/change tools without rebuilding integrations)

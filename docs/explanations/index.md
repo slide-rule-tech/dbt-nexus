@@ -55,7 +55,7 @@ No vendor lock-in. Connect any data source through standardized adapters.
 
 ### Incremental by Design
 
-Handle both batch and real-time data with efficient incremental processing.
+Handle batch data processing with efficient incremental workflows.
 
 ### Identity-First
 

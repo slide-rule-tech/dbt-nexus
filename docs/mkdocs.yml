@@ -152,6 +152,7 @@ nav:
           - Variables: reference/configuration/variables.md
           - Sources Setup: reference/configuration/sources.md
           - Model Configuration: reference/configuration/models.md
+      - Database Schema: reference/database-schema.md
       - Data Contracts:
           - Schema Requirements: reference/data-contracts/schema.md
           - Source Adapter Interface: reference/data-contracts/source-adapters.md
@@ -159,6 +160,7 @@ nav:
 
   - Architecture & Concepts:
       - explanations/index.md
+      - Real-World Use Cases: explanations/use-cases.md
       - Package Architecture: explanations/architecture.md
       - Identity Resolution Logic: explanations/identity-resolution.md
       - State Management Concepts: explanations/state-management.md

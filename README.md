@@ -5,6 +5,13 @@ process, resolve, and model customer identity and event data from various
 sources. It helps in creating a unified view of entities (like persons and
 groups) and their interactions.
 
+## 📖 Documentation
+
+**📚 Complete Documentation**:
+[https://sliderule.github.io/dbt-nexus](https://sliderule.github.io/dbt-nexus)  
+**📖 Blog Post**:
+[Dbt-Nexus - Data Beyond Dashboards](https://www.slideruleanalytics.com/blog/dbt-nexus-data-beyond-dashboards)
+
 ## Prerequisites
 
 - dbt version >= 1.0.0 (Update if necessary based on features used)

@@ -24,7 +24,7 @@ Active development tasks, improvements, and future enhancements for dbt-nexus.
 ### 🔧 Features
 
 - Enhanced cross-database compatibility
-- Real-time processing improvements
+- Processing performance improvements
 - Advanced state management patterns
 
 ## Completed Items
@@ -49,7 +49,7 @@ Active development tasks, improvements, and future enhancements for dbt-nexus.
 
 - GraphQL API for entity exploration
 - Machine learning-based entity matching
-- Real-time streaming support
+- Streaming data source support
 - Multi-tenant architecture patterns
 
 ## Contributing

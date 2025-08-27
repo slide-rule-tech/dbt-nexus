@@ -118,7 +118,7 @@ Releases follow semantic versioning:
 
 - **Questions**: Use GitHub Discussions
 - **Issues**: Create a GitHub Issue
-- **Real-time chat**: [Community Slack](https://your-workspace.slack.com)
+- **Community chat**: [Community Slack](https://your-workspace.slack.com)
 
 ## 🏆 Recognition
 

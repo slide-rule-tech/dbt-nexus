@@ -53,7 +53,7 @@ and this project adheres to
 - `resolve_identifiers()` - Core identity resolution logic
 - `derived_state()` - Derived state creation
 - `process_identifiers()` - Identifier extraction and normalization
-- `real_time_event_filter()` - Incremental event filtering
+- `event_filter()` - Incremental event filtering
 
 ---
 
