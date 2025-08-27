@@ -1,0 +1,160 @@
+---
+title: dbt-nexus LLM Context Pack
+tags: [llm, context, nexus, identity-resolution]
+summary:
+  Compact briefing for LLMs that need to answer questions about the dbt-nexus
+  package.
+---
+
+# dbt-nexus LLM Context Pack
+
+## Mission
+
+The dbt-nexus package provides a standardized, source-agnostic framework for
+building unified customer data platforms with advanced identity resolution,
+event tracking, and state management. It enables organizations to consolidate
+person and group entities from multiple data sources, resolve identities across
+systems, track entity states over time, and maintain relationships between
+entities—all while supporting both real-time and batch processing workflows.
+
+## Core Concepts
+
+### Primary Entities
+
+- **Persons**: Individual entities with identifiers (email, phone, etc.) and
+  traits (name, age, etc.)
+- **Groups**: Organizational entities (companies, accounts) with their own
+  identifiers and traits
+- **Events**: Timestamped actions/occurrences that generate identifiers, traits,
+  and state changes
+- **Memberships**: Relationships connecting persons to groups with optional
+  roles
+
+### Key Processes
+
+- **Identity Resolution**: Recursive CTE-based deduplication using configurable
+  matching rules
+- **State Management**: Timeline-based state tracking with derived state
+  capabilities
+- **Event Processing**: Standardized event logging with identifier and trait
+  extraction
+- **Source Integration**: Adapter pattern for connecting any data source
+
+## Architecture Layers
+
+1. **Source Adapters**: Transform source data into standardized formats
+2. **Event Log**: Core models for events, identifiers, traits (`nexus_events`,
+   `nexus_person_identifiers`, etc.)
+3. **Identity Resolution**: Deduplication logic producing resolved entities
+   (`nexus_resolved_person_identifiers`)
+4. **State Management**: Timeline tracking with derived states (`nexus_states`)
+5. **Final Tables**: Production-ready resolved entities (`nexus_persons`,
+   `nexus_groups`)
+
+## Canonical Entry Points
+
+### Key Models
+
+- **Event Log**: `nexus_events`, `nexus_person_identifiers`,
+  `nexus_person_traits`, `nexus_group_identifiers`, `nexus_group_traits`,
+  `nexus_membership_identifiers`
+- **Identity Resolution**: `nexus_resolved_person_identifiers`,
+  `nexus_resolved_person_traits`, `nexus_resolved_group_identifiers`,
+  `nexus_resolved_group_traits`
+- **Final Tables**: `nexus_persons`, `nexus_groups`, `nexus_memberships`,
+  `nexus_person_participants`, `nexus_group_participants`
+- **States**: `nexus_states` (union of all state models)
+
+### Essential Macros
+
+- **Identity Resolution**: `resolve_identifiers()`, `resolve_traits()`,
+  `create_edges()`
+- **Event Processing**: `process_identifiers()`, `process_traits()`,
+  `real_time_event_filter()`
+- **State Management**: `derived_state()`, `common_state_fields()`
+- **Utilities**: `unpivot_identifiers()`, `pivot_identifiers()`,
+  `get_first_or_last_row()`, `finalize_entity()`
+
+### Critical Configuration
+
+- **`nexus_max_recursion`**: Controls recursive CTE depth for identity
+  resolution (default: 5)
+- **`sources`**: List defining which source systems provide which entity types
+- **`nexus` model configs**: Schema, materialization, and tag settings
+
+## Source Integration Pattern
+
+Sources must provide models following naming convention
+`{source_name}_{entity_type}_{data_type}`:
+
+- Events: `{source}_events`
+- Identifiers: `{source}_person_identifiers`, `{source}_group_identifiers`
+- Traits: `{source}_person_traits`, `{source}_group_traits`
+- Memberships: `{source}_membership_identifiers`
+
+## State Management
+
+States follow format `{namespace}_{subject}[_{qualifier}]` (e.g.,
+`billing_lifecycle`, `sliderule_app_installation`). Each state model tracks
+timeline changes with `state_entered_at`, `state_exited_at`, and `is_current`
+fields. Derived states combine multiple base states using timeline merging
+logic.
+
+## Gotchas & Important Notes
+
+### Database Compatibility
+
+- **Primary support**: Snowflake (uses Snowflake-specific SQL patterns)
+- **Secondary**: BigQuery (has adapter-specific macros like
+  `bigquery__resolve_identifiers`)
+- Recursive CTEs behave differently across warehouses
+
+### Performance Considerations
+
+- Recursive identity resolution can be expensive; tune `nexus_max_recursion`
+  carefully
+- Incremental models require careful handling of late-arriving data
+- Large identity graphs may need partitioning strategies
+
+### Common Pitfalls
+
+- Source models must exactly match expected schema (column names, types)
+- Identity resolution assumes transitivity (A=B, B=C → A=C)
+- State models require manual addition to `nexus_states` union
+- Real-time event filtering depends on proper `_ingested_at` timestamps
+
+### Incremental Model Behavior
+
+- Event log models use `_ingested_at` for incremental filtering
+- Identity resolution models may need full refresh when logic changes
+- State models track changes over time, not point-in-time snapshots
+
+## Quick Reference
+
+### Common Tasks
+
+- **Add new source**: Define in `sources` var, create `{source}_{entity}_{type}`
+  models
+- **Create custom state**: Make individual state model, add to `nexus_states`
+  union
+- **Debug identity resolution**: Check `nexus_{entity}_identifiers_edges` for
+  edge creation
+- **Performance tuning**: Adjust `nexus_max_recursion`, review incremental
+  strategies
+
+### Troubleshooting
+
+- **Missing identities**: Verify source model naming and schema compliance
+- **Recursive CTE errors**: Check `nexus_max_recursion` setting and data quality
+- **State timeline gaps**: Ensure events have proper `occurred_at` timestamps
+- **Incremental issues**: Review `_ingested_at` values and watermark logic
+
+## Links & References
+
+- **Documentation**: `/docs/index.md`
+- **Model Reference**: `/docs/reference/models/`
+- **Macro Reference**: `/docs/reference/macros/`
+- **State Naming Guide**: `/models/nexus-models/states/STATES.md`
+- **Derived State Macro**: `/macros/states/DERIVED_STATE_MACRO.md`
+- **Configuration Guide**: `/docs/getting-started/configuration.md`
+- **Architecture Deep Dive**: `/docs/explanations/architecture.md`
