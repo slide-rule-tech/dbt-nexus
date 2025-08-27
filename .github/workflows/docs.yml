@@ -61,6 +61,8 @@ jobs:
           pip install mkdocs-git-committers-plugin-2
           pip install mkdocs-awesome-pages-plugin
           pip install mkdocs-redirects
+          pip install mkdocs-autorefs
+          pip install mkdocs-section-index
           pip install pyyaml
 
       - name: Auto-generate documentation
@@ -72,7 +74,7 @@ jobs:
 
       - name: Setup Pages
         id: pages
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         uses: actions/configure-pages@v4
 
       - name: Build documentation
@@ -80,14 +82,14 @@ jobs:
           mkdocs build --verbose --clean --config-file docs/mkdocs.yml
 
       - name: Upload Pages artifact
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
-  # Deploy job (only on main branch)
+  # Deploy job (only on master branch)
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

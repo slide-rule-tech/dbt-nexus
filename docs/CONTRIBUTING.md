@@ -136,5 +136,5 @@ same license as the project (MIT License).
 ---
 
 **Ready to contribute?** Start by checking our
-[good first issues](https://github.com/sliderule/dbt-nexus/labels/good%20first%20issue)
+[good first issues](https://github.com/sliderule-analytics/dbt-nexus/labels/good%20first%20issue)
 or reviewing our [development to-dos](docs/to-dos/index.md)!

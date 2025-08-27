@@ -33,7 +33,7 @@ For public repositories or Git-based installations:
 ```yaml
 # packages.yml
 packages:
-  - git: "https://github.com/sliderule/dbt-nexus.git"
+  - git: "https://github.com/sliderule-analytics/dbt-nexus.git"
     version: 0.1.0 # Use specific version or branch
 ```
 
@@ -387,7 +387,8 @@ If you encounter issues:
 1. Check the [Troubleshooting Guide](../ai-context/troubleshooting.md)
 2. Review [Common Tasks](../ai-context/common-tasks.md)
 3. Consult [package documentation](https://sliderule.github.io/dbt-nexus)
-4. Open an issue on [GitHub](https://github.com/sliderule/dbt-nexus/issues)
+4. Open an issue on
+   [GitHub](https://github.com/sliderule-analytics/dbt-nexus/issues)
 
 ## Next Steps
 

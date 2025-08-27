@@ -65,5 +65,5 @@ Items are tracked using:
 - **GitHub Projects** for development milestones
 - **This documentation** for high-level roadmap items
 
-Visit our [GitHub repository](https://github.com/sliderule/dbt-nexus) to see the
-full project status.
+Visit our [GitHub repository](https://github.com/sliderule-analytics/dbt-nexus)
+to see the full project status.

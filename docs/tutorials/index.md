@@ -50,9 +50,9 @@ tutorials.
 ## Need Help?
 
 - 🐛 **Issues with tutorials**:
-  [GitHub Issues](https://github.com/sliderule/dbt-nexus/issues)
+  [GitHub Issues](https://github.com/sliderule-analytics/dbt-nexus/issues)
 - 💬 **Questions**:
-  [GitHub Discussions](https://github.com/sliderule/dbt-nexus/discussions)
+  [GitHub Discussions](https://github.com/sliderule-analytics/dbt-nexus/discussions)
 - 📖 **Reference docs**: [Reference section](../reference/)
 
 Ready to start? Begin with [Basic Setup](basic-setup.md)!

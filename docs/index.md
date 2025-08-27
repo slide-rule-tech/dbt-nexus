@@ -127,9 +127,10 @@ Read the full story:
 - 📖 **Documentation**: You're here!
 - 📝 **Blog**:
   [SlideRule Analytics Blog](https://www.slideruleanalytics.com/blog/)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/sliderule/dbt-nexus/issues)
+- 🐛 **Issues**:
+  [GitHub Issues](https://github.com/sliderule-analytics/dbt-nexus/issues)
 - 💬 **Discussions**:
-  [GitHub Discussions](https://github.com/sliderule/dbt-nexus/discussions)
+  [GitHub Discussions](https://github.com/sliderule-analytics/dbt-nexus/discussions)
 - 📧 **Contact**:
   [hello@slideruleanalytics.com](mailto:hello@slideruleanalytics.com)
 

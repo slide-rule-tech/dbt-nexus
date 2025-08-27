@@ -3,11 +3,11 @@ site_description:
   A dbt package for customer identity resolution and event tracking with support
   for persons, groups, and state management
 site_author: Kevin McLaughlin
-site_url: https://sliderule.github.io/dbt-nexus
+site_url: https://sliderule-analytics.github.io/dbt-nexus
 
 # Repository information
 repo_name: dbt-nexus
-repo_url: https://github.com/sliderule/dbt-nexus
+repo_url: https://github.com/sliderule-analytics/dbt-nexus
 edit_uri: edit/main/docs/
 
 # Copyright
