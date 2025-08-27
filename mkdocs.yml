@@ -123,6 +123,7 @@ nav:
 
   - How-to Guides:
       - Update Documentation: how-to/update-docs.md
+      - Create Source Models: how-to/create-source-models.md
 
   - Reference:
       - Database Schema: reference/database-schema.md
