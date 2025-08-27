@@ -11,6 +11,9 @@ summary:
 This package uses **MkDocs + Material** with a Diátaxis-style layout. All docs
 live in the `/docs/` directory and are auto-published to GitHub Pages.
 
+**Important**: The `mkdocs.yml` configuration file is located in the **project
+root directory**, not in the docs folder.
+
 Follow this guide to add new docs or update existing ones.
 
 ---
@@ -46,7 +49,8 @@ summary: Step-by-step to register a new data source in this package.
 
 ## 4. Update Navigation
 
-Edit mkdocs.yml and add your new page to the nav section. Example:
+Edit `mkdocs.yml` (located in the **project root directory**) and add your new
+page to the nav section. Example:
 
 ```yaml
 nav:
@@ -54,7 +58,20 @@ nav:
       - Add a new source: how-to/add-new-source.md
 ```
 
-## 5. Writing Guidelines
+## 5. Testing Your Changes
+
+To test your documentation changes locally:
+
+```bash
+# From the project root directory (where mkdocs.yml is located):
+mkdocs build --verbose --clean    # Build the site
+mkdocs serve                      # Start development server at http://127.0.0.1:8000
+```
+
+**Note**: Always run MkDocs commands from the project root directory, not from
+the docs folder.
+
+## 6. Writing Guidelines
 
 - Keep pages small (300–700 words) and focused on a single concept.
 - Use headings liberally for easy skimming and chunking.

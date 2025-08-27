@@ -79,7 +79,7 @@ jobs:
 
       - name: Build documentation
         run: |
-          mkdocs build --verbose --clean --config-file docs/mkdocs.yml
+          mkdocs build --verbose --clean
 
       - name: Upload Pages artifact
         if: github.ref == 'refs/heads/master'
