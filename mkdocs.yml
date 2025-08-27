@@ -1,0 +1,162 @@
+site_name: dbt-nexus Documentation
+site_description:
+  A dbt package for customer identity resolution and event tracking with support
+  for persons, groups, and state management
+site_author: Kevin McLaughlin
+site_url: https://sliderule-analytics.github.io/dbt-nexus
+
+# Repository information
+repo_name: dbt-nexus
+repo_url: https://github.com/sliderule-analytics/dbt-nexus
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; 2025 Kevin McLaughlin
+
+# Directory configuration
+docs_dir: docs
+
+# Theme configuration
+theme:
+  name: material
+  language: en
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+  - autorefs
+  - section-index
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+      emoji_index: !!python/name:pymdownx.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: your-organization
+      repo: dbt-nexus
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Extra CSS
+extra_css:
+  - stylesheets/extra.css
+
+# Extra JavaScript
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+# Navigation structure - only existing files
+nav:
+  - Home: index.md
+
+  - Getting Started:
+      - Overview: getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+
+  - How-to Guides:
+      - Update Documentation: how-to/update-docs.md
+
+  - Reference:
+      - Database Schema: reference/database-schema.md
+      - State Models: reference/models/states.md
+
+  - Architecture & Concepts:
+      - explanations/index.md
+      - Real-World Use Cases: explanations/use-cases.md
+      - Package Architecture: explanations/architecture.md
+
+  - AI Context:
+      - LLM Context Pack: llm/context-pack.md
+
+  - Development:
+      - Changelog: changelog.md
+      - Contributing: CONTRIBUTING.md
+      - To-Do Items: to-dos/index.md
+
+# Extra configuration
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-organization/dbt-nexus
+    - icon: fontawesome/brands/slack
+      link: https://your-workspace.slack.com
+  generator: false
+
+# Watch additional files during development
+watch:
+  - README.md
+  - models/
+  - macros/
+
+# Validation
+strict: false

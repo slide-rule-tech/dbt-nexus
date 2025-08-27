@@ -1,0 +1,220 @@
+site_name: dbt-nexus Documentation
+site_description:
+  A dbt package for customer identity resolution and event tracking with support
+  for persons, groups, and state management
+site_author: Kevin McLaughlin
+site_url: https://sliderule-analytics.github.io/dbt-nexus
+
+# Repository information
+repo_name: dbt-nexus
+repo_url: https://github.com/sliderule-analytics/dbt-nexus
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; 2025 Kevin McLaughlin
+
+# Directory configuration
+docs_dir: .
+site_dir: ../site
+
+# Theme configuration
+theme:
+  name: material
+  language: en
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+  - autorefs
+  - section-index
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+      emoji_index: !!python/name:pymdownx.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: your-organization
+      repo: dbt-nexus
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Extra CSS
+extra_css:
+  - stylesheets/extra.css
+
+# Extra JavaScript
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+# Navigation structure following Diátaxis framework
+nav:
+  - Home: index.md
+
+  - Getting Started:
+      - Overview: getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quick-start.md
+      - Configuration: getting-started/configuration.md
+
+  - Tutorials:
+      - tutorials/index.md
+      - Basic Setup: tutorials/basic-setup.md
+      - Your First Event Log: tutorials/first-event-log.md
+      - Identity Resolution Walkthrough: tutorials/identity-resolution.md
+      - State Management Tutorial: tutorials/state-management.md
+
+  - How-to Guides:
+      - how-to/index.md
+      - Update Documentation: how-to/update-docs.md
+      - Add New Source: how-to/add-new-source.md
+      - Configure Identity Resolution: how-to/configure-identity-resolution.md
+      - Create Custom States: how-to/create-custom-states.md
+      - Handle Multiple Entity Types: how-to/handle-multiple-entities.md
+      - Optimize Performance: how-to/optimize-performance.md
+      - Troubleshoot Common Issues: how-to/troubleshoot.md
+
+  - Reference:
+      - reference/index.md
+      - Models:
+          - Event Log Models: reference/models/event-log.md
+          - Identity Resolution Models: reference/models/identity-resolution.md
+          - Final Table Models: reference/models/final-tables.md
+          - State Models: reference/models/states.md
+      - Macros:
+          - Entity Resolution: reference/macros/entity-resolution.md
+          - Event Processing: reference/macros/event-processing.md
+          - State Management: reference/macros/state-management.md
+          - Utility Functions: reference/macros/utilities.md
+      - Configuration:
+          - Variables: reference/configuration/variables.md
+          - Sources Setup: reference/configuration/sources.md
+          - Model Configuration: reference/configuration/models.md
+      - Database Schema: reference/database-schema.md
+      - Data Contracts:
+          - Schema Requirements: reference/data-contracts/schema.md
+          - Source Adapter Interface: reference/data-contracts/source-adapters.md
+          - Output Schema: reference/data-contracts/output-schema.md
+
+  - Architecture & Concepts:
+      - explanations/index.md
+      - Real-World Use Cases: explanations/use-cases.md
+      - Package Architecture: explanations/architecture.md
+      - Identity Resolution Logic: explanations/identity-resolution.md
+      - State Management Concepts: explanations/state-management.md
+      - Data Flow: explanations/data-flow.md
+      - Design Decisions: explanations/design-decisions.md
+      - Performance Considerations: explanations/performance.md
+
+  - Advanced Topics:
+      - advanced/index.md
+      - Custom Entity Types: advanced/custom-entity-types.md
+      - Cross-Database Compatibility: advanced/cross-database.md
+      - Testing Strategy: advanced/testing.md
+      - Contributing: advanced/contributing.md
+      - Package Development: advanced/package-development.md
+
+  - FAQ & Glossary:
+      - faq/index.md
+      - Frequently Asked Questions: faq/faq.md
+      - Glossary: faq/glossary.md
+      - Common Patterns: faq/common-patterns.md
+
+  - AI Context Pack:
+      - ai-context/index.md
+      - Package Overview: ai-context/package-overview.md
+      - Quick Reference: ai-context/quick-reference.md
+      - Common Tasks: ai-context/common-tasks.md
+      - Troubleshooting Guide: ai-context/troubleshooting.md
+
+  - Development:
+      - Changelog: changelog.md
+      - Contributing: CONTRIBUTING.md
+      - Documentation Process: how-to/update-docs.md
+      - To-Do Items: to-dos/index.md
+
+# Extra configuration
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-organization/dbt-nexus
+    - icon: fontawesome/brands/slack
+      link: https://your-workspace.slack.com
+  generator: false
+
+# Watch additional files during development
+watch:
+  - ../README.md
+  - ../models/
+  - ../macros/
+
+# Validation
+strict: true
