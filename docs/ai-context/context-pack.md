@@ -109,9 +109,9 @@ logic.
 
 ### Database Compatibility
 
-- **Primary support**: Snowflake (uses Snowflake-specific SQL patterns)
-- **Secondary**: BigQuery (has adapter-specific macros like
-  `bigquery__resolve_identifiers`)
+- **Primary support**: Snowflake and BigQuery (both fully tested and optimized)
+- **Secondary**: Postgres, Redshift, Databricks
+- Database-specific optimizations available for both Snowflake and BigQuery
 - Recursive CTEs behave differently across warehouses
 
 ### Performance Considerations

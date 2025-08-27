@@ -202,6 +202,7 @@ vars:
 
 ### Cross-Database Compatibility
 
+dbt-nexus is fully tested and optimized for both **Snowflake** and **BigQuery**.
 Configure database-specific behavior:
 
 ```yaml

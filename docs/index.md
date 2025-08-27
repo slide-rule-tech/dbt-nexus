@@ -50,97 +50,167 @@ dbt deps
 
 [→ Follow the complete installation guide](getting-started/installation.md)
 
-## Core Features
-
-### 🔍 Identity Resolution
-
-Automatically resolve and deduplicate entities across data sources using
-configurable matching rules and recursive algorithms.
-
-### 📋 Event Logging
-
-Standardized event, identifier, and trait tracking with batch processing
-workflows.
-
-### 🏷️ State Management
-
-Timeline-based state tracking with derived state capabilities for complex
-business logic.
-
-### 🔧 Source Agnostic
-
-Connect any data source through a simple adapter interface - no vendor lock-in.
-
 ## Architecture Overview
+
+### Image
+
+![Database Schema Diagram](images/database-diagram.png)
+
+### Mermaid
+
+#### Final Tables
+
+```mermaid
+erDiagram
+    events {
+        string id PK
+        timestamp occurred_at
+        string type
+        string name
+        string source
+    }
+
+    persons {
+        string id PK
+        string email
+        string name
+        string phone
+    }
+
+    groups {
+        string id PK
+        string domain
+        string name
+        string shopify_id
+    }
+
+    memberships {
+        string id PK
+        string person_id FK
+        string group_id FK
+        string role
+    }
+
+    person_participants {
+        string person_id FK
+        string event_id FK
+    }
+
+    group_participants {
+        string group_id FK
+        string event_id FK
+    }
+
+    %% Relationships
+    persons ||--o{ memberships : "has"
+    groups ||--o{ memberships : "has"
+    persons ||--o{ person_participants : "participates in"
+    events ||--o{ person_participants : "has participants"
+    groups ||--o{ group_participants : "participates in"
+    events ||--o{ group_participants : "has participants"
+```
+
+#### Full
 
 ```mermaid
 graph TD
-    A[Source Systems] --> B[Source Adapters]
-    B --> C[Event Log Layer]
-    C --> D[Identity Resolution]
-    D --> E[Final Tables]
-    C --> F[State Management]
-    F --> E
+    %% Raw Data Layer
+    subgraph RawData["🔵 Raw Data"]
+        RSD[raw_source_data<br/>• id: string PK<br/>• ...: string]
+    end
 
-    style A fill:#e1f5fe
-    style B fill:#f3e5f5
-    style C fill:#e8f5e8
-    style D fill:#fff3e0
-    style E fill:#fce4ec
-    style F fill:#f1f8e9
+    %% Source Event Log Layer
+    subgraph SourceLog["🟠 Source Event Log"]
+        SPT[source_person_traits<br/>• id: string PK<br/>• event_id: string FK<br/>• name: string]
+        SPI[source_person_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• email: string]
+        SE[source_events<br/>• id: string PK<br/>• event_id: string FK<br/>• event_name: string<br/>• ...: string]
+        SGI[source_group_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• domain: string]
+        SGT[source_group_traits<br/>• id: string PK<br/>• event_id: string FK<br/>• name: string]
+        MI[membership_identifiers<br/>• event_id: string FK<br/>• occurred_at: timestamp<br/>• person_identifier: string<br/>• person_identifier_type: string<br/>• group_identifier: string<br/>• group_identifier_type: string<br/>• role: string]
+    end
+
+    %% Core Event Log Layer
+    subgraph CoreLog["🔴 Core Event Log"]
+        E[events<br/>• id: string PK<br/>• occurred_at: timestamp<br/>• type: string<br/>• name: string<br/>• source: string]
+        PID[person_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• email: string<br/>• user_id: string<br/>• phone: string]
+        GID[group_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• domain: string<br/>• myshopify_domain: string<br/>• shop_id: string]
+        MID[membership_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• person_identifier_id: string FK<br/>• group_identifier_id: string FK<br/>• role: string]
+    end
+
+    %% Identity Resolution Layer
+    subgraph Identity["🟣 Identity Resolution"]
+        RPI[resolved_person_identifiers<br/>• identifier_type: string<br/>• identifier_value: string<br/>• person_id: string]
+        RGI[resolved_group_identifiers<br/>• identifier_type: string<br/>• identifier_value: string<br/>• group_id: string]
+        RMI[resolved_membership_identifiers<br/>• id: string PK<br/>• membership_identifier_id: string FK<br/>• person_id: string FK<br/>• group_id: string FK<br/>• role: string]
+        RPT[resolved_person_traits<br/>• trait_name: string<br/>• trait_value: string<br/>• person_id: string<br/>• occurred_at: timestamp]
+        RGT[resolved_group_traits<br/>• trait_name: string<br/>• trait_value: string<br/>• group_id: string<br/>• occurred_at: timestamp]
+    end
+
+    %% Final Tables Layer
+    subgraph Final["🟢 Final Tables"]
+        P[persons<br/>• id: string PK<br/>• email: string<br/>• name: string<br/>• phone: string]
+        G[groups<br/>• id: string PK<br/>• domain: string<br/>• name: string<br/>• shopify_id: string]
+        M[memberships<br/>• id: string PK<br/>• person_id: string FK<br/>• group_id: string FK<br/>• role: string]
+        PP[person_participants<br/>• group_id: string FK<br/>• event_id: string FK]
+        GP[group_participants<br/>• group_id: string FK<br/>• event_id: string FK]
+    end
+
+    %% Data Flow Connections
+    RSD -->|derives| SPT
+    RSD -->|derives| SPI
+    RSD -->|derives| SE
+    RSD -->|derives| SGI
+    RSD -->|derives| SGT
+    RSD -->|derives| MI
+
+    SPT -->|unions all sources to| RPT
+    SPI -->|unions all sources to| PID
+    SE -->|unions all sources to| E
+    SGI -->|unions all sources to| GID
+    SGT -->|unions all sources to| RGT
+    MI -->|unions all sources to| MID
+
+    E -->|has many| PID
+    E -->|has many| GID
+    E -->|has many| MID
+
+    PID -->|resolves| RPI
+    GID -->|resolves| RGI
+    MID -->|resolves| RMI
+
+    RPI -->|belongs to| P
+    RGI -->|belongs to| G
+    RMI -->|deduplicates to| M
+
+    RPT -->|Most Recent| P
+    RGT -->|Most Recent| G
+
+    M -->|connects| P
+    M -->|connects| G
+
+    PP -->|references| P
+    PP -->|references| E
+    GP -->|references| G
+    GP -->|references| E
+
+    %% Styling
+    classDef rawData fill:#dae8fc,stroke:#6c8ebf
+    classDef sourceLog fill:#ffe6cc,stroke:#d79b00
+    classDef coreLog fill:#f8cecc,stroke:#b85450
+    classDef identity fill:#e1d5e7,stroke:#9673a6
+    classDef finalTables fill:#d5e8d4,stroke:#82b366
+
+    class RSD rawData
+    class SPT,SPI,SE,SGI,SGT,MI sourceLog
+    class E,PID,GID,MID coreLog
+    class RPI,RGI,RMI,RPT,RGT identity
+    class P,G,M,PP,GP finalTables
 ```
 
-The package follows a layered architecture:
+_Interactive database schema diagram showing the dbt-nexus data model structure
+with the five-layer architecture: Raw Data, Source Event Log, Core Event Log,
+Identity Resolution, and Final Tables._
 
-1. **Source Adapters**: Transform your data into standardized formats
-2. **Event Log Layer**: Core event, identifier, and trait models
-3. **Identity Resolution**: Advanced algorithms for entity deduplication
-4. **State Management**: Timeline-based state tracking and derived states
-5. **Final Tables**: Production-ready, resolved entity tables
-
-## Navigation Guide
-
-This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
-
-| Section                           | Purpose                 | When to Use                       |
-| --------------------------------- | ----------------------- | --------------------------------- |
-| **[Tutorials](tutorials/)**       | Learn by doing          | You're new to dbt-nexus           |
-| **[How-to Guides](how-to/)**      | Solve specific problems | You need to accomplish a task     |
-| **[Reference](reference/)**       | Look up details         | You need technical specifications |
-| **[Explanations](explanations/)** | Understand concepts     | You want to learn how it works    |
-
-## Real-World Applications
-
-See how dbt-nexus enables operational data use beyond just dashboards:
-
-- **Timeline Apps**: Get complete customer context for support and sales teams
-- **Daily Updates**: Automated summaries of key events across your business
-- **Email Marketing**: Always up-to-date customer lists and segmentation
-- **AI Integration**: Power AI tools with complete customer context
-- **Abandon Setup Notifications**: Automated outreach for incomplete onboarding
-
-Read the full story:
-[**Dbt-Nexus - Data Beyond Dashboards**](https://www.slideruleanalytics.com/blog/dbt-nexus-data-beyond-dashboards)
-
-## Community & Support
-
-- 📖 **Documentation**: You're here!
-- 📝 **Blog**:
-  [SlideRule Analytics Blog](https://www.slideruleanalytics.com/blog/)
-- 🐛 **Issues**:
-  [GitHub Issues](https://github.com/sliderule-analytics/dbt-nexus/issues)
-- 💬 **Discussions**:
-  [GitHub Discussions](https://github.com/sliderule-analytics/dbt-nexus/discussions)
-- 📧 **Contact**:
-  [hello@slideruleanalytics.com](mailto:hello@slideruleanalytics.com)
-
-## License
-
-This project is licensed under the
-[MIT License](https://github.com/your-organization/dbt-nexus/blob/main/LICENSE).
-
----
-
-**Ready to get started?** Check out our
-[Quick Start Guide](getting-started/quick-start.md) or dive into the
-[tutorials](tutorials/).
+> **Note**: To view the original diagram, open
+> `docs/images/database-diagram.xml` in
+> [diagrams.net](https://app.diagrams.net).

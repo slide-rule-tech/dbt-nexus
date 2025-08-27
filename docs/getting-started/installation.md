@@ -15,8 +15,8 @@ Before installing dbt-nexus, ensure you have:
 
 - **dbt version >= 1.0.0** (Update if necessary based on features used)
 - A supported data warehouse:
-  - Snowflake ✅
-  - BigQuery ✅
+  - **Snowflake** ✅ (Primary support)
+  - **BigQuery** ✅ (Primary support)
   - Postgres ✅
   - Redshift ✅
   - Databricks ✅

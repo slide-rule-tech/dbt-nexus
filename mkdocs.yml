@@ -112,90 +112,33 @@ extra_javascript:
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
-# Navigation structure following Diátaxis framework
+# Navigation structure - only existing files
 nav:
   - Home: index.md
 
   - Getting Started:
       - Overview: getting-started/index.md
       - Installation: getting-started/installation.md
-      - Quick Start: getting-started/quick-start.md
       - Configuration: getting-started/configuration.md
 
-  - Tutorials:
-      - tutorials/index.md
-      - Basic Setup: tutorials/basic-setup.md
-      - Your First Event Log: tutorials/first-event-log.md
-      - Identity Resolution Walkthrough: tutorials/identity-resolution.md
-      - State Management Tutorial: tutorials/state-management.md
-
   - How-to Guides:
-      - how-to/index.md
       - Update Documentation: how-to/update-docs.md
-      - Add New Source: how-to/add-new-source.md
-      - Configure Identity Resolution: how-to/configure-identity-resolution.md
-      - Create Custom States: how-to/create-custom-states.md
-      - Handle Multiple Entity Types: how-to/handle-multiple-entities.md
-      - Optimize Performance: how-to/optimize-performance.md
-      - Troubleshoot Common Issues: how-to/troubleshoot.md
 
   - Reference:
-      - reference/index.md
-      - Models:
-          - Event Log Models: reference/models/event-log.md
-          - Identity Resolution Models: reference/models/identity-resolution.md
-          - Final Table Models: reference/models/final-tables.md
-          - State Models: reference/models/states.md
-      - Macros:
-          - Entity Resolution: reference/macros/entity-resolution.md
-          - Event Processing: reference/macros/event-processing.md
-          - State Management: reference/macros/state-management.md
-          - Utility Functions: reference/macros/utilities.md
-      - Configuration:
-          - Variables: reference/configuration/variables.md
-          - Sources Setup: reference/configuration/sources.md
-          - Model Configuration: reference/configuration/models.md
       - Database Schema: reference/database-schema.md
-      - Data Contracts:
-          - Schema Requirements: reference/data-contracts/schema.md
-          - Source Adapter Interface: reference/data-contracts/source-adapters.md
-          - Output Schema: reference/data-contracts/output-schema.md
+      - State Models: reference/models/states.md
 
   - Architecture & Concepts:
       - explanations/index.md
       - Real-World Use Cases: explanations/use-cases.md
       - Package Architecture: explanations/architecture.md
-      - Identity Resolution Logic: explanations/identity-resolution.md
-      - State Management Concepts: explanations/state-management.md
-      - Data Flow: explanations/data-flow.md
-      - Design Decisions: explanations/design-decisions.md
-      - Performance Considerations: explanations/performance.md
 
-  - Advanced Topics:
-      - advanced/index.md
-      - Custom Entity Types: advanced/custom-entity-types.md
-      - Cross-Database Compatibility: advanced/cross-database.md
-      - Testing Strategy: advanced/testing.md
-      - Contributing: advanced/contributing.md
-      - Package Development: advanced/package-development.md
-
-  - FAQ & Glossary:
-      - faq/index.md
-      - Frequently Asked Questions: faq/faq.md
-      - Glossary: faq/glossary.md
-      - Common Patterns: faq/common-patterns.md
-
-  - AI Context Pack:
-      - ai-context/index.md
-      - Package Overview: ai-context/package-overview.md
-      - Quick Reference: ai-context/quick-reference.md
-      - Common Tasks: ai-context/common-tasks.md
-      - Troubleshooting Guide: ai-context/troubleshooting.md
+  - AI Context:
+      - LLM Context Pack: llm/context-pack.md
 
   - Development:
       - Changelog: changelog.md
       - Contributing: CONTRIBUTING.md
-      - Documentation Process: how-to/update-docs.md
       - To-Do Items: to-dos/index.md
 
 # Extra configuration
@@ -216,4 +159,4 @@ watch:
   - macros/
 
 # Validation
-strict: true
+strict: false

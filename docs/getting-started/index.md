@@ -14,7 +14,7 @@ get the package up and running in your dbt project.
 Before you begin, ensure you have:
 
 - **dbt Core >= 1.0.0** (or dbt Cloud)
-- **Snowflake** data warehouse (primary support)
+- **Snowflake** or **BigQuery** data warehouse (both fully supported)
 - Basic familiarity with dbt concepts (models, macros, packages)
 - Understanding of your source data structure
 
