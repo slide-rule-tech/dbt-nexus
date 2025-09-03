@@ -125,6 +125,7 @@ nav:
 
   - Tutorials:
       - tutorials/index.md
+      - Demo Data: tutorials/demo-data.md
       - Basic Setup: tutorials/basic-setup.md
       - Your First Event Log: tutorials/first-event-log.md
       - Identity Resolution Walkthrough: tutorials/identity-resolution.md
