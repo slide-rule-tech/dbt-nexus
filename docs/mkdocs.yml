@@ -117,6 +117,11 @@ extra_javascript:
 nav:
   - Home: index.md
 
+  - Quickstart:
+      - Overview: quickstart/index.md
+      - Initialize dbt Project: quickstart/dbt-init.md
+      - Setup dbt-nexus: quickstart/dbt-nexus-setup.md
+
   - Getting Started:
       - Overview: getting-started/index.md
       - Installation: getting-started/installation.md

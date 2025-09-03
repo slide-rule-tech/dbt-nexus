@@ -7,6 +7,7 @@
 # MCPs (Model Context Protocol)
 mcps/
 *.mcp
+mcp.json
 
 ### dbt ###
 target/

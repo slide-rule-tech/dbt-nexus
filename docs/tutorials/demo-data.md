@@ -15,54 +15,52 @@ like Shopify, Gmail, Google Calendar, and Stripe.
 
 ## Quick Start
 
-### 1. Navigate to the Nexus Package
+### 1. Build Demo Data from Main Project
 
-From your consumer project, navigate to the dbt-nexus package directory:
-
-```bash
-cd dbt_packages/nexus
-```
-
-### 2. Build the Demo Data
-
-Run the demo data models:
+The demo data builds automatically when you run `dbt build` from your main
+project directory because the nexus package includes its own default demo data
+configuration.
 
 ```bash
+# From your main project directory (e.g., slide-rule-tech/slide_rule_tech/)
 dbt build
 ```
 
-This will create all the demo data models in your target schema.
+This will create all the demo data models using the package's default schema
+configuration.
+
+### 2. Alternative: Build from Package Directory
+
+You can also build the demo data directly from the package directory:
+
+```bash
+# Navigate to the nexus package directory
+cd dbt_packages/nexus
+
+# Run the demo data models
+dbt build
+```
+
+**Note**: The demo data builds automatically because the nexus package has its
+own `vars` configuration in its `dbt_project.yml` that defines the demo sources.
+If you want to override this with your own data sources, you would add your own
+`vars` section to your main project's `dbt_project.yml`.
 
 ## Schema Organization
 
-The demo data gets compiled to the `nexus_demo_data` schema in your data
-warehouse. This schema contains:
+The demo data uses a structured schema approach with multiple schemas for
+different layers of the transformation pipeline:
 
-- **Raw demo data tables** (from seeds)
-- **Source event log models** (transformed from raw data)
-- **Core event log models** (unified across sources)
-- **Identity resolution models** (resolved entities)
-- **Final tables** (persons, groups, events, memberships)
+- **`demo_raw`** - Raw seed data (CSV files)
+- **`sources_demo`** - Source event log models (transformed from raw data)
+- **`event_log_demo`** - Core event log models (unified across sources)
+- **`identity_resolution_demo`** - Identity resolution models (resolved
+  entities)
+- **`final_tables_demo`** - Final unified tables (persons, groups, events,
+  states)
 
-## Consumer Project Configuration
-
-To enable demo data in your consumer project, add the following configuration to
-your `dbt_project.yml`:
-
-```yaml
-models:
-  nexus:
-    +schema: nexus
-    demo-data:
-      +schema: demo_data
-      +tags: ["nexus"]
-```
-
-This configuration:
-
-- Places the main nexus models in the `nexus` schema
-- Places demo data models in the `demo_data` schema
-- Tags demo data models for selective running
+This organization separates different layers of the data transformation pipeline
+into distinct schemas for better organization and clarity.
 
 ## Demo Data Structure
 
@@ -173,25 +171,35 @@ dbt run --models tag:nexus --select source:gadget
 
 ### Query Demo Data
 
-Once built, you can explore the demo data:
+Once built, you can explore the demo data using the appropriate schema names:
 
 ```sql
--- View all demo events
-SELECT * FROM nexus_demo_data.events
+-- View all demo events (using final_tables_demo schema)
+SELECT * FROM final_tables_demo.nexus_events
 ORDER BY occurred_at DESC;
 
--- View resolved persons
-SELECT * FROM nexus_demo_data.persons;
+-- View resolved persons (using final_tables_demo schema)
+SELECT * FROM final_tables_demo.nexus_persons;
 
--- View group memberships
+-- View group memberships (using final_tables_demo schema)
 SELECT
     p.name as person_name,
     g.name as group_name,
     m.role
-FROM nexus_demo_data.memberships m
-JOIN nexus_demo_data.persons p ON m.person_id = p.id
-JOIN nexus_demo_data.groups g ON m.group_id = g.id;
+FROM final_tables_demo.nexus_memberships m
+JOIN final_tables_demo.nexus_persons p ON m.person_id = p.id
+JOIN final_tables_demo.nexus_groups g ON m.group_id = g.id;
+
+-- View events by source
+SELECT
+    source,
+    COUNT(*) as event_count
+FROM final_tables_demo.nexus_events
+GROUP BY source;
 ```
+
+**Note**: If you've customized the schema configuration, replace
+`final_tables_demo` with your custom schema name (e.g., `nexus_final_tables`).
 
 ## Customizing Demo Data
 
