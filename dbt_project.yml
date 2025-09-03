@@ -30,13 +30,26 @@ clean-targets: # directories to be removed by `dbt clean`
 # files using the `{{ config(...) }}` macro.
 models:
   nexus:
-    +schema: demo_data
     +tags: ["nexus"]
+    demo:
+      sources:
+        +schema: sources_demo
+    nexus-models:
+      final-tables:
+        +schema: final_tables_demo
+      states:
+        +schema: final_tables_demo
+      identity-resolution:
+        +schema: identity_resolution_demo
+      event-log:
+        +schema: event_log_demo
+        nexus_events:
+          +schema: final_tables_demo
 
 seeds:
   nexus:
-    demo-data:
-      +schema: demo_data
+    demo-raw:
+      +schema: demo_raw
 
 vars:
   nexus_max_recursion: 5

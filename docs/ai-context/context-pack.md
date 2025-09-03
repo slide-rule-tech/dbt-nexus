@@ -1,9 +1,10 @@
 ---
 title: dbt-nexus LLM Context Pack
-tags: [llm, context, nexus, identity-resolution]
+tags: [llm, context, nexus, identity-resolution, ai-context]
 summary:
   Compact briefing for LLMs that need to answer questions about the dbt-nexus
-  package.
+  package. Essential context for AI assistants working with customer identity
+  resolution and event tracking.
 ---
 
 # dbt-nexus LLM Context Pack
