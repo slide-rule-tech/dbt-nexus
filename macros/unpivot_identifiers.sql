@@ -29,7 +29,9 @@
 with source_data as (
   select 
     {{ event_id_field }},
+    {% if event_id_field != row_id_field %}
     {{ row_id_field }},
+    {% endif %}
     {% for add_col in additional_columns %}
     {{ add_col }},
     {% endfor %}

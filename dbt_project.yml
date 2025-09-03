@@ -30,8 +30,37 @@ clean-targets: # directories to be removed by `dbt clean`
 # files using the `{{ config(...) }}` macro.
 models:
   nexus:
-    +schema: nexus
+    +schema: demo_data
     +tags: ["nexus"]
+
+seeds:
+  nexus:
+    demo-data:
+      +schema: demo_data
 
 vars:
   nexus_max_recursion: 5
+  # Demo sources configuration
+  sources:
+    - name: gadget
+      events: true
+      groups: true
+      persons: true
+      memberships: true
+    - name: gmail
+      events: true
+      groups: true
+      persons: true
+      memberships: true
+    - name: google_calendar
+      events: true
+      groups: true
+      persons: true
+      memberships: true
+  # Internal domains for demo
+  internal_domains:
+    - sliderule.com
+    - hollywoodfarms.com
+  # Test emails for demo
+  test_emails:
+    - test@example.com

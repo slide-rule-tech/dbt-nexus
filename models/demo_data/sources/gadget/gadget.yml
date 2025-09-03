@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: gadget
+    database: sliderule-analytics
+    schema: gadget
+    tables:
+      - name: shopify_shops
+      - name: google_connections
+      - name: google_analytics_connections

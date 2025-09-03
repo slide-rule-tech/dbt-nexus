@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: google_calendar
+    description: "Google Calendar events synced via Nango integration"
+    tables:
+      - name: calendar_events
+        description: "Raw Google Calendar events from Nango sync"
+        columns:
+          - name: record
+            description: "JSON record from Google Calendar API"
+            data_type: json
+          - name: synced_at
+            description: "Timestamp when the record was synced"
+            data_type: timestamp
