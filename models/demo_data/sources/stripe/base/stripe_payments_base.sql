@@ -1,6 +1,6 @@
 {{ config(
     materialized='table',
-    tags=['event-processing', 'realtime']
+    tags=['event-processing']
 ) }}
 
 WITH source_data AS (
@@ -14,7 +14,6 @@ event_filter AS (
     SELECT
         *
     FROM source_data
-    {{ real_time_event_filter('payment_intent_id') }}
 ),
 
 extracted AS (

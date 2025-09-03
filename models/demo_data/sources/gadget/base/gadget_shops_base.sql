@@ -1,6 +1,6 @@
 {{ config(
     materialized='table',
-    tags=['event-processing', 'realtime']
+    tags=['event-processing']
 ) }}
 
 with source_data as (
@@ -24,7 +24,6 @@ with source_data as (
         record as raw_record,
         synced_at
     from {{ ref('shopify_shops_raw_demo') }}
-    {{ real_time_event_filter('id') }}
 ),
 
 with_latest_events as (

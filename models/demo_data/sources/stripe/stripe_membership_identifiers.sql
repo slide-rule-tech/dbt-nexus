@@ -1,4 +1,4 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'membership', 'realtime']) }}
+{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'membership']) }}
 
 -- Stripe memberships connect customers (groups) to their email addresses (persons)
 WITH invoice_memberships AS (

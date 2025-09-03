@@ -1,4 +1,4 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'groups', 'realtime']) }}
+{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'groups']) }}
 
 -- Extract domains from sender emails (using pre-computed domain, excluding generic domains)
 WITH sender_domains AS (

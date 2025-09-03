@@ -1,4 +1,4 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'persons', 'realtime']) }}
+{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'persons']) }}
 
 WITH sender_identifiers AS (
     SELECT 

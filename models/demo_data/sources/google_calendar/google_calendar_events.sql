@@ -1,6 +1,6 @@
 {{ config(
     materialized='table',
-    tags=['event-processing', 'realtime']
+    tags=['event-processing']
 ) }}
 
 WITH source_events AS (
