@@ -1,4 +1,3 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'groups']) }}
 
 WITH invoice_group_identifiers AS (
     {{ nexus.unpivot_identifiers(

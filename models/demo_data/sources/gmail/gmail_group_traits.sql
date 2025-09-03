@@ -1,4 +1,3 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'groups']) }}
 
 -- Extract unique domains from all emails (using pre-computed domain, excluding generic domains)
 WITH all_domains AS (

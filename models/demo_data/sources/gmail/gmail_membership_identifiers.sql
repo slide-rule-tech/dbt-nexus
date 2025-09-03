@@ -1,4 +1,3 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'memberships']) }}
 
 -- Create memberships for senders (using pre-computed domain, excluding generic domains)
 WITH sender_memberships AS (

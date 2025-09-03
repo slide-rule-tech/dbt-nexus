@@ -1,7 +1,3 @@
-{{ config(
-    materialized='table',
-    tags=['event-processing']
-) }}
 
 WITH generic_domains AS (
     SELECT domain FROM UNNEST([

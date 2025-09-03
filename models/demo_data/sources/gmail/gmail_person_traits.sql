@@ -1,4 +1,3 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'persons']) }}
 
 WITH sender_email_traits AS (
     SELECT 

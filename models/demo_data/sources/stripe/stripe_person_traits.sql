@@ -1,4 +1,3 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'persons']) }}
 
 WITH invoice_traits AS (
     {{ nexus.unpivot_traits(

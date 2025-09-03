@@ -1,7 +1,3 @@
-{{ config(
-    materialized='table',
-    tags=['event-processing']
-) }}
 
 WITH organizer_memberships AS (
     SELECT 

@@ -1,7 +1,3 @@
-{{ config(
-    materialized='table',
-    tags=['event-processing']
-) }}
 
 with source_data as (
     select 

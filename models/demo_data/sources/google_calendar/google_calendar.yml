@@ -13,3 +13,63 @@ sources:
           - name: synced_at
             description: "Timestamp when the record was synced"
             data_type: timestamp
+
+models:
+  - name: google_calendar_events_base
+    description:
+      "Base model for Google Calendar events with extracted and standardized
+      fields"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+    columns:
+      - name: nexus_event_id
+        description: "Unique identifier for each calendar event"
+        tests:
+          - unique
+          - not_null
+      - name: calendar_event_id
+        description: "Google Calendar event ID"
+      - name: summary
+        description: "Event summary/title"
+      - name: start_time
+        description: "Event start time"
+      - name: occurred_at
+        description: "When the event occurred"
+
+  - name: google_calendar_events
+    description: "Google Calendar events"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+
+  - name: google_calendar_group_identifiers
+    description: "Group identifiers extracted from Google Calendar data"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+
+  - name: google_calendar_group_traits
+    description: "Group traits extracted from Google Calendar data"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+
+  - name: google_calendar_membership_identifiers
+    description:
+      "Membership relationships between persons and groups in Google Calendar"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+
+  - name: google_calendar_person_identifiers
+    description: "Person identifiers extracted from Google Calendar data"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+
+  - name: google_calendar_person_traits
+    description: "Person traits extracted from Google Calendar data"
+    config:
+      materialized: table
+      tags: ["event-processing"]

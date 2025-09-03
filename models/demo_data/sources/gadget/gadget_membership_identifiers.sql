@@ -1,4 +1,3 @@
-{{ config(materialized='table', tags=['identity-resolution',  'memberships']) }}
 
 WITH shop_memberships AS (
     SELECT

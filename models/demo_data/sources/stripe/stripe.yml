@@ -19,6 +19,9 @@ models:
     description:
       "Base model for Stripe invoice events with extracted and standardized
       fields"
+    config:
+      materialized: table
+      tags: ["event-processing"]
     columns:
       - name: event_id
         description: "Unique identifier for each invoice event"
@@ -40,6 +43,9 @@ models:
     description:
       "Base model for Stripe payment events with extracted and standardized
       fields"
+    config:
+      materialized: table
+      tags: ["event-processing"]
     columns:
       - name: event_id
         description: "Unique identifier for each payment event"
@@ -57,18 +63,36 @@ models:
 
   - name: stripe_events
     description: "Unified Stripe events from invoices and payments"
+    config:
+      materialized: table
+      tags: ["event-processing"]
 
   - name: stripe_person_identifiers
     description: "Person identifiers extracted from Stripe data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "persons"]
 
   - name: stripe_group_identifiers
     description: "Group identifiers extracted from Stripe data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "groups"]
 
   - name: stripe_membership_identifiers
     description: "Membership relationships between persons and groups in Stripe"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "membership"]
 
   - name: stripe_person_traits
     description: "Person traits extracted from Stripe data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "persons"]
 
   - name: stripe_group_traits
     description: "Group traits extracted from Stripe data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "groups"]

@@ -6,3 +6,59 @@ sources:
     schema: gmail
     tables:
       - name: messages
+
+models:
+  - name: gmail_messages_base
+    description:
+      "Base model for Gmail messages with extracted and standardized fields"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+    columns:
+      - name: event_id
+        description: "Unique identifier for each message event"
+        tests:
+          - unique
+          - not_null
+      - name: message_id
+        description: "Gmail message ID"
+      - name: subject
+        description: "Email subject"
+      - name: occurred_at
+        description: "When the message was sent"
+
+  - name: gmail_events
+    description: "Gmail message events"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+
+  - name: gmail_group_identifiers
+    description: "Group identifiers extracted from Gmail data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "groups"]
+
+  - name: gmail_group_traits
+    description: "Group traits extracted from Gmail data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "groups"]
+
+  - name: gmail_membership_identifiers
+    description: "Membership relationships between persons and groups in Gmail"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "memberships"]
+
+  - name: gmail_person_identifiers
+    description: "Person identifiers extracted from Gmail data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "persons"]
+
+  - name: gmail_person_traits
+    description: "Person traits extracted from Gmail data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "persons"]

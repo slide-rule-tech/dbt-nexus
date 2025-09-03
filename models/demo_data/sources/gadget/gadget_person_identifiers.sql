@@ -1,4 +1,3 @@
-{{ config(materialized='table',tags=['identity-resolution', 'event-processing', 'groups']) }}
 
 WITH shops_identifiers AS (
     {{ nexus.unpivot_identifiers(
