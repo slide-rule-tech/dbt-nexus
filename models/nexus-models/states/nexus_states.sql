@@ -26,10 +26,10 @@ ORDER BY state_entered_at DESC
 WITH empty_result AS (
     SELECT
         {{ common_state_fields(return_empty=true) }}
-    WHERE 1 = 0
 )
 
 SELECT 
     {{ common_state_fields() }}
 FROM empty_result
+where 1 = 0
 {% endif %}

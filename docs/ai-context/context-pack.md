@@ -56,6 +56,33 @@ operationally.
 5. **Final Tables**: Production-ready resolved entities (`nexus_persons`,
    `nexus_groups`)
 
+## Demo Data
+
+The package includes comprehensive demo data for exploration and testing:
+
+### Demo Data Sources
+
+- **Gadget Shopify App Data**: Shopify shop information from custom Shopify app
+  built in Gadget
+- **Gmail Messages**: Email records with support tickets, billing communications
+- **Google Calendar**: Calendar events with meetings and appointments
+- **Stripe Data**: Billing and payment records with subscriptions
+
+### Demo Data Usage
+
+- **Location**: `dbt_packages/nexus/` directory
+- **Schema**: Compiles to `nexus_demo_data` schema
+- **Running**: `cd dbt_packages/nexus && dbt build`
+- **Configuration**: Requires `demo-data: +schema: demo_data` in consumer
+  `dbt_project.yml`
+
+### Demo Data Value
+
+- Complete working example of the dbt-nexus data model
+- Multi-source customer journey scenarios
+- Identity resolution examples across sources
+- Realistic event timelines and state management
+
 ## Canonical Entry Points
 
 ### Key Models
@@ -138,6 +165,7 @@ logic.
 
 ### Common Tasks
 
+- **Explore demo data**: `cd dbt_packages/nexus && dbt build` to run demo data
 - **Add new source**: Define in `sources` var, create `{source}_{entity}_{type}`
   models
 - **Create custom state**: Make individual state model, add to `nexus_states`
@@ -159,6 +187,7 @@ logic.
 - **Blog Post**:
   [Data Beyond Dashboards](https://www.slideruleanalytics.com/blog/dbt-nexus-data-beyond-dashboards)
 - **Documentation**: `/docs/index.md`
+- **Demo Data Guide**: `/docs/tutorials/demo-data.md`
 - **Use Cases**: `/docs/explanations/use-cases.md`
 - **Model Reference**: `/docs/reference/models/`
 - **Macro Reference**: `/docs/reference/macros/`

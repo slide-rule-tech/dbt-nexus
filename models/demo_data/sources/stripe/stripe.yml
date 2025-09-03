@@ -1,0 +1,98 @@
+version: 2
+
+sources:
+  - name: stripe
+    database: sliderule-analytics
+    schema: stripe
+    tables:
+      - name: stripe_invoices
+        description: "Stripe invoice webhook events"
+      - name: stripe_payments
+        description: "Stripe payment intent webhook events"
+      - name: stripe_customers
+        description: "Stripe customer data"
+      - name: stripe_subscriptions
+        description: "Stripe subscription data"
+
+models:
+  - name: stripe_invoices_base
+    description:
+      "Base model for Stripe invoice events with extracted and standardized
+      fields"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+    columns:
+      - name: event_id
+        description: "Unique identifier for each invoice event"
+        tests:
+          - unique
+          - not_null
+      - name: invoice_id
+        description: "Stripe invoice ID"
+      - name: customer_id
+        description: "Stripe customer ID"
+      - name: customer_email
+        description: "Customer email address"
+      - name: customer_name
+        description: "Customer name"
+      - name: occurred_at
+        description: "When the invoice event occurred"
+
+  - name: stripe_payments_base
+    description:
+      "Base model for Stripe payment events with extracted and standardized
+      fields"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+    columns:
+      - name: event_id
+        description: "Unique identifier for each payment event"
+        tests:
+          - unique
+          - not_null
+      - name: payment_intent_id
+        description: "Stripe payment intent ID"
+      - name: customer_id
+        description: "Stripe customer ID"
+      - name: invoice_id
+        description: "Associated Stripe invoice ID"
+      - name: occurred_at
+        description: "When the payment event occurred"
+
+  - name: stripe_events
+    description: "Unified Stripe events from invoices and payments"
+    config:
+      materialized: table
+      tags: ["event-processing"]
+
+  - name: stripe_person_identifiers
+    description: "Person identifiers extracted from Stripe data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "persons"]
+
+  - name: stripe_group_identifiers
+    description: "Group identifiers extracted from Stripe data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "groups"]
+
+  - name: stripe_membership_identifiers
+    description: "Membership relationships between persons and groups in Stripe"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "membership"]
+
+  - name: stripe_person_traits
+    description: "Person traits extracted from Stripe data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "persons"]
+
+  - name: stripe_group_traits
+    description: "Group traits extracted from Stripe data"
+    config:
+      materialized: table
+      tags: ["identity-resolution", "event-processing", "groups"]

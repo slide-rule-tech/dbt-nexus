@@ -4,6 +4,10 @@
 .commands
 .cursorrules
 
+# MCPs (Model Context Protocol)
+mcps/
+*.mcp
+
 ### dbt ###
 target/
 dbt_modules/
