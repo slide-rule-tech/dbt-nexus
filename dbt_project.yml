@@ -2,7 +2,7 @@
 # and underscores. A good package name should reflect your organization's
 # name or the intended use of these models
 name: "nexus"
-version: "0.1.0"
+version: "0.2.0"
 config-version: 2
 
 # This setting configures which "profile" dbt uses for this project.
@@ -31,20 +31,6 @@ clean-targets: # directories to be removed by `dbt clean`
 models:
   nexus:
     +tags: ["nexus"]
-    demo:
-      sources:
-        +schema: sources_demo
-    nexus-models:
-      final-tables:
-        +schema: final_tables_demo
-      states:
-        +schema: final_tables_demo
-      identity-resolution:
-        +schema: identity_resolution_demo
-      event-log:
-        +schema: event_log_demo
-        nexus_events:
-          +schema: final_tables_demo
 
 seeds:
   nexus:
@@ -53,27 +39,68 @@ seeds:
 
 vars:
   nexus_max_recursion: 5
-  # Demo sources configuration
-  sources:
-    - name: gadget
-      events: true
-      groups: true
-      persons: true
-      memberships: true
-    - name: gmail
-      events: true
-      groups: true
-      persons: true
-      memberships: true
-    - name: google_calendar
-      events: true
-      groups: true
-      persons: true
-      memberships: true
-  # Internal domains for demo
+
+  # Nexus source configuration
+  nexus:
+    gmail:
+      enabled: false
+      location:
+        schema: gmail
+        table: messages
+      capabilities:
+        events: true
+        persons: true
+        groups: true
+        memberships: true
+
+    google_calendar:
+      enabled: false
+      location:
+        schema: google_calendar
+        table: calendar_events
+      capabilities:
+        events: true
+        persons: true
+        groups: true
+        memberships: true
+
+    stripe:
+      enabled: false
+      location:
+        schema: stripe
+        tables:
+          invoices: stripe_invoices
+          payments: stripe_payments
+          customers: stripe_customers
+          subscriptions: stripe_subscriptions
+      capabilities:
+        events: true
+        persons: true
+        groups: true
+        memberships: true
+
+    shopify:
+      enabled: false
+      location:
+        schema: shopify_partner
+        table: app_events
+      capabilities:
+        events: true
+        persons: false
+        groups: true
+        memberships: false
+
+  # Global configuration
   internal_domains:
     - sliderule.com
     - hollywoodfarms.com
-  # Test emails for demo
   test_emails:
     - test@example.com
+
+# Test configurations
+tests:
+  nexus:
+    nexus-models:
+      event-log:
+        test_nexus_events_required_fields:
+          severity: error

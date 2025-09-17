@@ -125,8 +125,12 @@ nav:
   - Getting Started:
       - Overview: getting-started/index.md
       - Installation: getting-started/installation.md
-      - Quick Start: getting-started/quick-start.md
       - Configuration: getting-started/configuration.md
+
+  - Template Sources:
+      - Overview: template-sources/index.md
+      - Gmail Integration: template-sources/gmail/index.md
+      - Google Calendar Integration: template-sources/google_calendar/index.md
 
   - Tutorials:
       - tutorials/index.md

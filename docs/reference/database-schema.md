@@ -253,6 +253,27 @@ The diagram is organized into color-coded sections:
 | `established_at` | TIMESTAMP | When relationship was first identified | ✅       | Business timestamp     |
 | `_last_updated`  | TIMESTAMP | When relationship was last updated     | ✅       | System timestamp       |
 
+#### Person Participants
+
+**Purpose**: Links between persons and events with role context
+
+| Column                  | Type   | Description                          | Required | Notes                                                                       |
+| ----------------------- | ------ | ------------------------------------ | -------- | --------------------------------------------------------------------------- |
+| `person_participant_id` | STRING | Unique person-event participation ID | ✅       | Primary key                                                                 |
+| `event_id`              | STRING | Event identifier                     | ✅       | Foreign key to events                                                       |
+| `person_id`             | STRING | Person identifier                    | ✅       | Foreign key to persons                                                      |
+| `role`                  | STRING | Person's role in the event           | ❌       | e.g., 'sender', 'recipient', 'organizer', 'attendee', 'contact', 'assignee' |
+
+#### Group Participants
+
+**Purpose**: Links between groups and events
+
+| Column                 | Type   | Description                         | Required | Notes                 |
+| ---------------------- | ------ | ----------------------------------- | -------- | --------------------- |
+| `group_participant_id` | STRING | Unique group-event participation ID | ✅       | Primary key           |
+| `event_id`             | STRING | Event identifier                    | ✅       | Foreign key to events |
+| `group_id`             | STRING | Group identifier                    | ✅       | Foreign key to groups |
+
 ## Relationships and Constraints
 
 ### Primary Relationships
@@ -277,6 +298,10 @@ erDiagram
 
     PERSONS ||--o{ MEMBERSHIPS : belongs_to
     GROUPS ||--o{ MEMBERSHIPS : contains
+    PERSONS ||--o{ PERSON_PARTICIPANTS : participates_in
+    GROUPS ||--o{ GROUP_PARTICIPANTS : participates_in
+    EVENTS ||--o{ PERSON_PARTICIPANTS : has_person_participants
+    EVENTS ||--o{ GROUP_PARTICIPANTS : has_group_participants
 ```
 
 ### Key Constraints

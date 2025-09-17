@@ -14,10 +14,16 @@ possible.
 
 ## What is dbt-nexus?
 
-The [dbt-nexus package](https://github.com/sliderule-analytics/dbt-nexus)
-provides a standardized set of models and macros to process, resolve, and model
-customer identity and event data from various sources. It helps create a unified
-view of entities (like persons and groups) and their interactions.
+dbt-nexus is a comprehensive dbt package that helps you:
+
+- **🔗 Resolve identities** across multiple data sources and systems
+- **📊 Track events** with standardized event logging that creates actionable
+  timelines
+- **👥 Manage entities** including persons, groups, and their relationships
+- **🏷️ Handle states** with timeline-based state management
+- **⚡ Scale efficiently** with incremental processing and optimized queries
+- **🎯 Drive operations** - support teams, sales teams, and AI tools get
+  complete customer context
 
 ## Quickstart Path
 
@@ -39,9 +45,9 @@ practices:
 dbt-nexus package:
 
 - Installation methods (submodule vs GitHub)
-- Demo data setup and exploration
-- Schema configuration
-- Alias setup for easy access
+- Template sources configuration (Gmail, Google Calendar)
+- Schema configuration and final table aliases
+- Demo data exploration
 
 ## What You'll Learn
 
@@ -50,10 +56,12 @@ By following these quickstart guides, you'll:
 - ✅ **Set up a production-ready dbt project** with proper virtual environments
   and security
 - ✅ **Install the dbt-nexus package** using the method that fits your workflow
-- ✅ **Explore demo data** to understand the package's capabilities
+- ✅ **Configure template sources** like Gmail and Google Calendar with simple
+  variables
+- ✅ **Set up final table aliases** for easy model referencing
 - ✅ **Configure schemas** for organized data warehouse structure
-- ✅ **Create aliases** for easy access to nexus models
 - ✅ **Understand the data flow** from raw sources to final unified tables
+- ✅ **Explore unified customer data** across all your integrated sources
 
 ## Prerequisites
 
@@ -63,18 +71,21 @@ Before starting, ensure you have:
 - **Git** for version control
 - **Access to a data warehouse** (BigQuery, Snowflake, PostgreSQL, etc.)
 - **Basic familiarity** with dbt concepts
+- **Data sources configured** (optional - can use demo data initially)
 
 ## Next Steps
 
 After completing the quickstart guides:
 
-1. **Configure your data sources** - Set up your own data sources following the
-   package's naming conventions
-2. **Explore the tutorials** - Dive deeper into specific use cases and advanced
-   features
-3. **Read the reference documentation** - Understand all available models,
-   macros, and configuration options
-4. **Join the community** - Get help and share your experiences
+1. **Enable template sources** - Configure Gmail, Google Calendar, or other
+   [template sources](../template-sources/) for instant integration
+2. **Set up your ETL pipeline** - Configure the Nexus ETL pipeline for data
+   syncing
+3. **Build custom models** - Create analytics models using the unified nexus
+   data
+4. **Explore advanced features** - Dive into identity resolution and state
+   management
+5. **Scale to production** - Set up incremental processing and monitoring
 
 ## Getting Help
 

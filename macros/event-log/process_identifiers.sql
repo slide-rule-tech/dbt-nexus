@@ -30,6 +30,7 @@
                     when identifier_type = 'domain' then lower(identifier_value)
                     else identifier_value
                 end as normalized_value,
+                role,
                 source,
                 occurred_at
             from unioned
@@ -41,6 +42,7 @@
             identifier_type,
             identifier_value,
             normalized_value,
+            role,
             source,
             occurred_at
         from normalized
@@ -52,6 +54,7 @@
             cast(null as string) as identifier_type,
             cast(null as string) as identifier_value,
             cast(null as string) as normalized_value,
+            cast(null as string) as role,
             cast(null as string) as source,
             cast(null as timestamp) as occurred_at
         where 1=0
