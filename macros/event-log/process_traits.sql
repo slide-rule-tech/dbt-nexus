@@ -20,7 +20,6 @@
             -- Process and standardize trait values
             select
                 event_id,
-                row_id,
                 identifier_type,
                 identifier_value,
                 trait_name,
@@ -32,7 +31,6 @@
 
         select
             event_id,
-            row_id,
             identifier_type,
             identifier_value,
             trait_name,
@@ -44,7 +42,6 @@
         {# Return empty result if no relations found #}
         select 
             cast(null as string) as event_id,
-            cast(null as string) as row_id,
             cast(null as string) as identifier_type,
             cast(null as string) as identifier_value,
             cast(null as string) as trait_name,

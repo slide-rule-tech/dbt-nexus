@@ -11,8 +11,8 @@ summary:
 
 This guide covers how to install the
 [dbt-nexus package](https://github.com/sliderule-analytics/dbt-nexus) in your
-dbt project, including different installation methods, demo data setup, and
-schema configuration.
+dbt project, including different installation methods, template sources
+configuration, and schema setup with final table aliases.
 
 ---
 
@@ -201,7 +201,52 @@ vars:
   nexus_max_recursion: 5 # Set to your preferred recursion limit
 ```
 
-### Step 2: Alias Final Tables (Recommended)
+### Step 2: Configure Template Sources
+
+dbt-nexus includes ready-to-use template sources for common platforms. Enable
+them with simple configuration:
+
+```yaml
+# dbt_project.yml
+vars:
+  # Enable template sources
+  nexus:
+    gmail:
+      enabled: true
+      location: # Optional: override defaults
+        schema: gmail
+        table: messages
+    google_calendar:
+      enabled: true
+      location: # Optional: override defaults
+        schema: google_calendar
+        table: calendar_events
+
+  # Required: Configure internal domains
+  internal_domains:
+    - "yourcompany.com"
+    - "subsidiary.com"
+```
+
+**Available Template Sources:**
+
+- **[Gmail](../template-sources/gmail/)** - Email events and participant
+  tracking
+- **[Google Calendar](../template-sources/google_calendar/)** - Meeting events
+  and attendee analysis
+
+**Benefits:**
+
+- 🚀 **Instant Integration**: No custom source models needed
+- ⚙️ **Simple Configuration**: Enable with a single variable
+- 📍 **Flexible Locations**: Override source locations per environment
+- 🔧 **Zero Maintenance**: Updates come with package releases
+
+**Prerequisites:** Template sources require the Nexus ETL pipeline (`app/`) for
+data syncing via Nango integrations. The ETL pipeline handles authentication,
+data extraction, and loading into BigQuery before dbt processing begins.
+
+### Step 3: Alias Final Tables (Recommended)
 
 To make the nexus final tables easily accessible in your dbt project, create
 simple alias models that reference the nexus package models. This approach has
@@ -305,6 +350,8 @@ models:
       +tags: ["nexus"]
 
   nexus: # Use the package name, not the submodule name
+    sources:
+      +schema: nexus_sources
     nexus-models:
       final-tables:
         +schema: nexus_final_tables
@@ -316,6 +363,18 @@ models:
         +schema: nexus_event_log
         nexus_events:
           +schema: nexus_final_tables
+
+vars:
+  # Enable template sources
+  nexus:
+    gmail:
+      enabled: true
+    google_calendar:
+      enabled: true
+
+  # Required configuration
+  internal_domains:
+    - "yourcompany.com"
 ```
 
 ### Recommended Schema Organization
@@ -327,7 +386,7 @@ layers shown in the [database schema diagram](../index.md#image):
   states)
 - **`nexus_identity_resolution`** - Identity resolution models
 - **`nexus_event_log`** - Event log models
-- **`nexus_sources`** - Your source models
+- **`nexus_sources`** - Template source models (Gmail, Google Calendar, etc.)
 
 ## Usage Examples
 
@@ -352,12 +411,40 @@ where created_at >= current_date - interval 7 days
 # Run all nexus models
 dbt run --select package:nexus
 
+# Run specific template sources
+dbt run --select gmail_events google_calendar_events
+dbt run --select package:nexus --models tag:event-processing
+
 # Run specific nexus model groups
 dbt run --select package:nexus --models tag:final-tables
 dbt run --select package:nexus --models tag:identity-resolution
 
 # Test nexus models
 dbt test --select package:nexus
+```
+
+### Exploring Template Source Data
+
+```sql
+-- View Gmail events
+SELECT * FROM nexus_events
+WHERE source = 'gmail'
+ORDER BY occurred_at DESC
+LIMIT 10;
+
+-- View Calendar meetings
+SELECT * FROM nexus_events
+WHERE source = 'google_calendar'
+AND event_name = 'external_meeting'
+ORDER BY occurred_at DESC;
+
+-- Check identity resolution across sources
+SELECT
+    source,
+    COUNT(DISTINCT person_id) as unique_persons,
+    COUNT(*) as total_identifiers
+FROM nexus_resolved_person_identifiers
+GROUP BY source;
 ```
 
 ---

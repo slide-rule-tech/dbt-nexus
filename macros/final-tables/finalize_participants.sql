@@ -15,7 +15,8 @@ joined as (
     ri.{{ entity_type }}_id,
     ri.identifier_type,
     ri.identifier_value,
-    ei.event_id
+    ei.event_id,
+    ei.role
   from entity_identifiers ei
   inner join resolved_identifiers ri on ei.identifier_value = ri.identifier_value and ei.identifier_type = ri.identifier_type
 )
@@ -24,7 +25,8 @@ joined as (
 select
   {{ dbt_utils.generate_surrogate_key(['event_id', entity_type ~ '_id']) }} as {{ entity_type }}_participant_id,
   event_id,
-  {{ entity_type }}_id
+  {{ entity_type }}_id,
+  role
 from joined
-group by event_id, {{ entity_type }}_id
+group by event_id, {{ entity_type }}_id, role
 {% endmacro %}

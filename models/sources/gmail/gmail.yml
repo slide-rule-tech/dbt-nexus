@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name:
+      "{{ var('nexus', {}).get('gmail', {}).get('location', {}).get('schema',
+      'gmail') }}"
+    description: "Gmail messages synced via Nango integration"
+    tables:
+      - name:
+          "{{ var('nexus', {}).get('gmail', {}).get('location', {}).get('table',
+          'messages') }}"
+        description: "Raw Gmail messages from Nango sync"
+        columns:
+          - name: record
+            description: "JSON record from Gmail API"
+            data_type: json
+          - name: synced_at
+            description: "Timestamp when the record was synced"
+            data_type: timestamp

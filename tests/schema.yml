@@ -1,0 +1,9 @@
+version: 2
+
+tests:
+  - name: test_nexus_events_required_fields
+    description:
+      "Ensures every event in nexus_events has both event_id and occurred_at
+      fields"
+    config:
+      severity: error

@@ -81,3 +81,27 @@ the docs folder.
 - Prefer Mermaid or ASCII diagrams; include a one-paragraph summary for each.
 - Maintain stable anchors: avoid casually renaming headings, as LLMs and links
   rely on them.
+
+---
+
+## 7. Development Environment Setup
+
+When setting up new dbt projects or troubleshooting development issues, ensure
+proper configuration for the dbt poweruser extension:
+
+### Required Configuration Files
+
+1. **dbt_project.yml** - Must include `config-version: 2`
+2. **.vscode/settings.json** - Configure Python path for dbt extension
+3. **.commands** - Set up virtual environment and aliases
+
+### Common Issues and Solutions
+
+- **Extension not working**: Check `config-version: 2` in dbt_project.yml
+- **ModuleNotFoundError**: Verify `dbt.dbtPythonPathOverride` points to correct
+  Python environment
+- **Virtual environment issues**: Ensure `.commands` file has correct path to
+  activation script
+
+For detailed setup instructions, see the
+[Local Setup Guide](../quickstart/local-setup.md).

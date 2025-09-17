@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: nexus_events
+    description:
+      "Unified events table containing all events from enabled sources"
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description: "Unique identifier for the event"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: occurred_at
+        description: "Timestamp when the event occurred"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: event_name
+        description: "Name/type of the event"
+      - name: event_description
+        description: "Description of the event"
+      - name: source
+        description: "Source system that generated the event"
+      - name: event_type
+        description: "Category of the event"
