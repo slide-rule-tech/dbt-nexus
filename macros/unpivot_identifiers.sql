@@ -1,4 +1,4 @@
-{% macro unpivot_identifiers(model_name, columns=[], additional_exclude=[], additional_columns=[], event_id_field='event_id', edge_id_field='edge_id', column_to_identifier_type={}, limit=none) %}
+{% macro unpivot_identifiers(model_name, columns=[], additional_exclude=[], additional_columns=[], event_id_field='event_id', edge_id_field='edge_id', column_to_identifier_type={}, role_column=none, limit=none) %}
 {% set cols = adapter.get_columns_in_relation(ref(model_name)) %}
 
 {# If no specific columns are provided, determine them from the model #}
@@ -32,6 +32,9 @@ with source_data as (
     {% if event_id_field != edge_id_field %}
     {{ edge_id_field }},
     {% endif %}
+    {% if role_column is not none %}
+    {{ role_column }},
+    {% endif %}
     {% for add_col in additional_columns %}
     {{ add_col }},
     {% endfor %}
@@ -54,7 +57,12 @@ with source_data as (
     {% else %}
     '{{ col }}' as identifier_type,
     {% endif %}
-    cast({{ col }} as string) as identifier_value
+    cast({{ col }} as string) as identifier_value,
+    {% if role_column is not none %}
+    {{ role_column.split(' as ')[1] if ' as ' in role_column else role_column }} as role
+    {% else %}
+    cast(null as string) as role
+    {% endif %}
     {% for add_col in additional_columns %}
     , {{ add_col.split(' as ')[1] if ' as ' in add_col else add_col }}
     {% endfor %}
