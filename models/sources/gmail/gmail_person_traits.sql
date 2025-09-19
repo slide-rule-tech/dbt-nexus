@@ -140,7 +140,7 @@ unioned AS (
 
 SELECT 
     event_id,
-    {{ dbt_utils.generate_surrogate_key(['event_id', 'identifier_value', 'trait_name']) }} as row_id,
+    {{ dbt_utils.generate_surrogate_key(['event_id', 'identifier_value', 'trait_name']) }} as edge_id,
     identifier_type,
     identifier_value,
     trait_name,

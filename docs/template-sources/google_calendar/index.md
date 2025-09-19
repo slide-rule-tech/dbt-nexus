@@ -234,7 +234,7 @@ Extracts email addresses from all meeting participants with role context:
 
 ```sql
 event_id               -- Reference to calendar event
-row_id                 -- Groups related identifiers
+edge_id                 -- Groups related identifiers
 identifier_type        -- "email"
 identifier_value       -- Email address
 role                   -- "organizer", "creator", "attendee", or "optional_attendee"
@@ -253,7 +253,7 @@ Captures participant information:
 
 ```sql
 event_id               -- Reference to calendar event
-row_id                 -- Groups related traits
+edge_id                 -- Groups related traits
 trait_name             -- "email" or "display_name"
 trait_value            -- The trait value
 occurred_at            -- Meeting start time
@@ -273,7 +273,7 @@ Creates groups from email domains (excludes generic domains):
 
 ```sql
 event_id               -- Reference to calendar event
-row_id                 -- Groups related identifiers
+edge_id                 -- Groups related identifiers
 identifier_type        -- "domain"
 identifier_value       -- Email domain
 occurred_at            -- Meeting start time
@@ -286,7 +286,7 @@ Domain information for organizations:
 
 ```sql
 event_id               -- Reference to calendar event
-row_id                 -- Groups related traits
+edge_id                 -- Groups related traits
 trait_name             -- "domain"
 trait_value            -- Domain name
 occurred_at            -- Meeting start time

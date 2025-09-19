@@ -77,7 +77,7 @@ entity_identifiers as (
 
 resolved_identifiers as (
   select
-    u.row_id,
+    u.edge_id,
     u.event_id,
     u.identifier_type,
     u.identifier_value,
@@ -95,11 +95,11 @@ deduplicated_identifiers as (
     identifier_value,
     {{ entity_type }}_id,
     event_id,
-    row_id,
+    edge_id,
     -- Use ROW_NUMBER to identify duplicates
     row_number() over(
       partition by identifier_type, identifier_value
-      order by row_id  -- Keep the earliest occurrence by row_id
+      order by edge_id  -- Keep the earliest occurrence by edge_id
     ) as row_num
   from resolved_identifiers
 )

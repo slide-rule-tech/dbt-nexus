@@ -87,7 +87,7 @@ with unpivoted as (
     model_name='stg_your_source',
     columns=['email', 'phone_number', 'user_id', 'customer_id'],
     event_id_field='event_id',
-    row_id_field=dbt_utils.generate_surrogate_key(['event_id']),
+    edge_id_field=dbt_utils.generate_surrogate_key(['event_id']),
     additional_columns=['occurred_at', "'your_source' as source"],
     column_to_identifier_type={
       'email': 'email',
@@ -124,7 +124,7 @@ with unpivoted as (
     identifier_column='user_id',
     identifier_type='user_id',
     event_id_field='event_id',
-    additional_columns=['occurred_at', "'your_source' as source", "event_id as row_id"],
+    additional_columns=['occurred_at', "'your_source' as source", "event_id as edge_id"],
     column_to_trait_name={}
 ) }}
 )
@@ -147,7 +147,7 @@ with unpivoted as (
     model_name='stg_your_source',
     columns=['domain', 'address', 'company_id'],
     event_id_field='event_id',
-    row_id_field=dbt_utils.generate_surrogate_key(['event_id']),
+    edge_id_field=dbt_utils.generate_surrogate_key(['event_id']),
     additional_columns=['occurred_at', "'your_source' as source"],
     column_to_identifier_type={
       'domain': 'domain',
@@ -183,7 +183,7 @@ with unpivoted as (
     identifier_column='company_id',
     identifier_type='company_id',
     event_id_field='event_id',
-    additional_columns=['occurred_at', "'your_source' as source", "event_id as row_id"],
+    additional_columns=['occurred_at', "'your_source' as source", "event_id as edge_id"],
     column_to_trait_name={}
 ) }}
 )
@@ -207,7 +207,7 @@ with source_data as (
 membership_data as (
     select
         {{ dbt_utils.generate_surrogate_key(['event_id', 'user_id']) }} as event_id,
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'user_id']) }} as row_id,
+        {{ dbt_utils.generate_surrogate_key(['event_id', 'user_id']) }} as edge_id,
         occurred_at,
         'your_source' as source,
 

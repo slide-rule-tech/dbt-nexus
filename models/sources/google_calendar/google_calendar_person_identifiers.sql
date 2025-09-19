@@ -6,7 +6,7 @@
 WITH organizer_identifiers AS (
     SELECT 
         nexus_event_id as event_id,
-        {{ dbt_utils.generate_surrogate_key(['nexus_event_id', 'organizer.email']) }} as row_id,
+        {{ dbt_utils.generate_surrogate_key(['nexus_event_id', 'organizer.email']) }} as edge_id,
         organizer.email as identifier_value,
         'email' as identifier_type,
         'organizer' as role,
@@ -20,7 +20,7 @@ WITH organizer_identifiers AS (
 creator_identifiers AS (
     SELECT 
         nexus_event_id as event_id,
-        {{ dbt_utils.generate_surrogate_key(['nexus_event_id', 'creator.email']) }} as row_id,
+        {{ dbt_utils.generate_surrogate_key(['nexus_event_id', 'creator.email']) }} as edge_id,
         creator.email as identifier_value,
         'email' as identifier_type,
         'creator' as role,
@@ -34,7 +34,7 @@ creator_identifiers AS (
 attendee_identifiers AS (
     SELECT
         base.nexus_event_id as event_id,
-        {{ dbt_utils.generate_surrogate_key(['base.nexus_event_id', 'attendee.email']) }} as row_id,  
+        {{ dbt_utils.generate_surrogate_key(['base.nexus_event_id', 'attendee.email']) }} as edge_id,  
         attendee.email as identifier_value,
         'email' as identifier_type,
         CASE 
@@ -59,7 +59,7 @@ all_identifiers AS (
 
 SELECT 
     event_id,
-    row_id,
+    edge_id,
     identifier_type,
     identifier_value,
     role,

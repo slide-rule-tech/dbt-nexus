@@ -7,7 +7,7 @@
 WITH sender_identifiers AS (
     SELECT 
         event_id,
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'sender.email']) }} as row_id,
+        {{ dbt_utils.generate_surrogate_key(['event_id', 'sender.email']) }} as edge_id,
         'email' as identifier_type,
         sender.email as identifier_value,
         'sender' as role,
@@ -20,7 +20,7 @@ WITH sender_identifiers AS (
 recipient_identifiers AS (
     SELECT 
         event_id,
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'recipient.email']) }} as row_id,
+        {{ dbt_utils.generate_surrogate_key(['event_id', 'recipient.email']) }} as edge_id,
         'email' as identifier_type,
         recipient.email as identifier_value,
         'recipient' as role,
@@ -39,7 +39,7 @@ unioned AS (
 
 SELECT 
     event_id,
-    row_id,
+    edge_id,
     identifier_type,
     identifier_value,
     role,

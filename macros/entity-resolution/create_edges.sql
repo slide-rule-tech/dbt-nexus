@@ -12,7 +12,7 @@ select
   b.identifier_value as identifier_value_b
 from unpivoted a
 join unpivoted b
-  on a.row_id = b.row_id
+  on a.edge_id = b.edge_id
   and (a.identifier_type != b.identifier_type or a.identifier_value != b.identifier_value)
 
 {% endmacro %}

@@ -1,4 +1,4 @@
-{% macro unpivot_identifiers(model_name, columns=[], additional_exclude=[], additional_columns=[], event_id_field='event_id', row_id_field='row_id', column_to_identifier_type={}, limit=none) %}
+{% macro unpivot_identifiers(model_name, columns=[], additional_exclude=[], additional_columns=[], event_id_field='event_id', edge_id_field='edge_id', column_to_identifier_type={}, limit=none) %}
 {% set cols = adapter.get_columns_in_relation(ref(model_name)) %}
 
 {# If no specific columns are provided, determine them from the model #}
@@ -29,8 +29,8 @@
 with source_data as (
   select 
     {{ event_id_field }},
-    {% if event_id_field != row_id_field %}
-    {{ row_id_field }},
+    {% if event_id_field != edge_id_field %}
+    {{ edge_id_field }},
     {% endif %}
     {% for add_col in additional_columns %}
     {{ add_col }},
@@ -48,7 +48,7 @@ with source_data as (
   {% if not loop.first %}union all{% endif %}
   select
     {{ event_id_field }} as event_id,
-    {{ row_id_field }} as row_id,
+    {{ edge_id_field }} as edge_id,
     {% if col in column_to_identifier_type %}
     '{{ column_to_identifier_type[col] }}' as identifier_type,
     {% else %}

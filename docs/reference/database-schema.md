@@ -77,7 +77,7 @@ The diagram is organized into color-coded sections:
 | ------------------ | --------- | ----------------------------- | -------- | --------------------------------- |
 | `id`               | STRING    | Unique identifier record      | ✅       | Primary key                       |
 | `event_id`         | STRING    | Reference to source event     | ✅       | Foreign key to events.id          |
-| `row_id`           | STRING    | Groups related identifiers    | ✅       | Surrogate key for grouping        |
+| `edge_id`          | STRING    | Groups related identifiers    | ✅       | Surrogate key for grouping        |
 | `identifier_type`  | STRING    | Type of identifier            | ✅       | e.g., 'email', 'phone', 'user_id' |
 | `identifier_value` | STRING    | Actual identifier value       | ✅       | e.g., 'john@example.com'          |
 | `source`           | STRING    | Source system                 | ✅       | Source attribution                |
@@ -92,7 +92,7 @@ The diagram is organized into color-coded sections:
 | -------------- | --------- | ------------------------- | -------- | --------------------------------- |
 | `id`           | STRING    | Unique trait record       | ✅       | Primary key                       |
 | `event_id`     | STRING    | Reference to source event | ✅       | Foreign key to events.id          |
-| `row_id`       | STRING    | Groups related traits     | ✅       | Surrogate key for grouping        |
+| `edge_id`      | STRING    | Groups related traits     | ✅       | Surrogate key for grouping        |
 | `trait_name`   | STRING    | Name of the trait         | ✅       | e.g., 'name', 'title', 'timezone' |
 | `trait_value`  | STRING    | Value of the trait        | ✅       | e.g., 'John Smith', 'Manager'     |
 | `source`       | STRING    | Source system             | ✅       | Source attribution                |
@@ -107,7 +107,7 @@ The diagram is organized into color-coded sections:
 | ------------------ | --------- | ----------------------------- | -------- | ------------------------------ |
 | `id`               | STRING    | Unique identifier record      | ✅       | Primary key                    |
 | `event_id`         | STRING    | Reference to source event     | ✅       | Foreign key to events.id       |
-| `row_id`           | STRING    | Groups related identifiers    | ✅       | Surrogate key for grouping     |
+| `edge_id`          | STRING    | Groups related identifiers    | ✅       | Surrogate key for grouping     |
 | `identifier_type`  | STRING    | Type of identifier            | ✅       | e.g., 'domain', 'company_id'   |
 | `identifier_value` | STRING    | Actual identifier value       | ✅       | e.g., 'example.com', 'COMP123' |
 | `source`           | STRING    | Source system                 | ✅       | Source attribution             |
@@ -122,7 +122,7 @@ The diagram is organized into color-coded sections:
 | -------------- | --------- | ------------------------- | -------- | -------------------------------- |
 | `id`           | STRING    | Unique trait record       | ✅       | Primary key                      |
 | `event_id`     | STRING    | Reference to source event | ✅       | Foreign key to events.id         |
-| `row_id`       | STRING    | Groups related traits     | ✅       | Surrogate key for grouping       |
+| `edge_id`      | STRING    | Groups related traits     | ✅       | Surrogate key for grouping       |
 | `trait_name`   | STRING    | Name of the trait         | ✅       | e.g., 'company_name', 'industry' |
 | `trait_value`  | STRING    | Value of the trait        | ✅       | e.g., 'Acme Corp', 'Technology'  |
 | `source`       | STRING    | Source system             | ✅       | Source attribution               |
@@ -321,7 +321,7 @@ erDiagram
 
 #### Business Rules
 
-- Each `row_id` groups related identifiers/traits from the same source record
+- Each `edge_id` groups related identifiers/traits from the same source record
 - Identity resolution preserves earliest occurrence timestamps
 - Trait resolution preserves latest values with source attribution
 - Membership relationships maintain current role information
