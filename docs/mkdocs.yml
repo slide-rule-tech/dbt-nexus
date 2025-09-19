@@ -142,6 +142,8 @@ nav:
 
   - How-to Guides:
       - how-to/index.md
+      - Generate Nexus IDs: how-to/generate-nexus-ids.md
+      - Format Events: how-to/format-nexus-events.md
       - Update Documentation: how-to/update-docs.md
       - Add New Source: how-to/add-new-source.md
       - Configure Identity Resolution: how-to/configure-identity-resolution.md

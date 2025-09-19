@@ -214,3 +214,12 @@ Identity Resolution, and Final Tables._
 > **Note**: To view the original diagram, open
 > `docs/images/database-diagram.xml` in
 > [diagrams.net](https://app.diagrams.net).
+
+## Quick Start Guides
+
+- [How to Generate Nexus IDs](how-to/generate-nexus-ids.md) - Complete guide for
+  creating unique identifiers
+- [How to Format Events](how-to/format-nexus-events.md) - Guide for formatting
+  events for Nexus
+- [Event Schema Quick Reference](reference/event-schema-quick-reference.md) -
+  Quick reference for event schema

@@ -13,17 +13,17 @@ summary: Quick reference for nexus event schema requirements
 | `event_id`    | STRING    | Unique event ID    | `evt_lobbie_abc123`   |
 | `occurred_at` | TIMESTAMP | Business timestamp | `2024-01-15 14:30:00` |
 | `type`        | STRING    | Event category     | `appointment`         |
-| `name`        | STRING    | Specific event     | `appointment.booked`  |
+| `event_name`  | STRING    | Specific event     | `appointment booked`  |
 | `source`      | STRING    | Source system      | `lobbie`              |
 
 ## Optional Fields
 
-| Field          | Type      | Description       | Example               |
-| -------------- | --------- | ----------------- | --------------------- |
-| `description`  | STRING    | Human description | `Appointment booked`  |
-| `value`        | NUMERIC   | Numeric value     | `150.00`              |
-| `value_unit`   | STRING    | Value unit        | `USD`                 |
-| `_ingested_at` | TIMESTAMP | Processing time   | `2024-01-15 14:35:00` |
+| Field               | Type      | Description       | Example               |
+| ------------------- | --------- | ----------------- | --------------------- |
+| `event_description` | STRING    | Human description | `Appointment booked`  |
+| `value`             | NUMERIC   | Numeric value     | `150.00`              |
+| `value_unit`        | STRING    | Value unit        | `USD`                 |
+| `_ingested_at`      | TIMESTAMP | Processing time   | `2024-01-15 14:35:00` |
 
 ## Source-Specific Fields
 
@@ -50,9 +50,9 @@ select
     {{ nexus.create_nexus_id('event', ['id', 'timestamp'], 'source') }} as event_id,
     timestamp_field as occurred_at,
     'category' as type,
-    'event.name' as name,
+    'event name' as event_name,
     'source' as source,
-    'Description' as description,
+    'Description' as event_description,
     null as value,
     null as value_unit,
     current_timestamp() as _ingested_at,
@@ -74,7 +74,7 @@ where timestamp_field is not null
 
 ### Names
 
-- `appointment.booked`, `email.sent`, `payment.completed`
+- `appointment booked`, `email sent`, `payment completed`
 
 ## Common Issues
 

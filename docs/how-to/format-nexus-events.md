@@ -29,17 +29,17 @@ fields:
 | `event_id`    | STRING    | ✅       | Unique event identifier                      | `evt_lobbie_abc123`                                     |
 | `occurred_at` | TIMESTAMP | ✅       | When the event occurred (business timestamp) | `2024-01-15 14:30:00`                                   |
 | `type`        | STRING    | ✅       | Event category/type                          | `appointment`, `communication`, `transaction`           |
-| `name`        | STRING    | ✅       | Specific event name                          | `appointment.booked`, `email.sent`, `payment.completed` |
+| `event_name`  | STRING    | ✅       | Specific event name                          | `appointment booked`, `email sent`, `payment completed` |
 | `source`      | STRING    | ✅       | Source system name                           | `lobbie`, `gmail`, `stripe`                             |
 
 ### Optional Fields
 
-| Field          | Type      | Required | Description                   | Example                               |
-| -------------- | --------- | -------- | ----------------------------- | ------------------------------------- |
-| `description`  | STRING    | ❌       | Human-readable description    | `Appointment booked in Lobbie system` |
-| `value`        | NUMERIC   | ❌       | Numeric value (if applicable) | `150.00`, `5`                         |
-| `value_unit`   | STRING    | ❌       | Unit of the value field       | `USD`, `count`, `hours`               |
-| `_ingested_at` | TIMESTAMP | ❌       | When dbt processed the record | `2024-01-15 14:35:00`                 |
+| Field               | Type      | Required | Description                   | Example                               |
+| ------------------- | --------- | -------- | ----------------------------- | ------------------------------------- |
+| `event_description` | STRING    | ❌       | Human-readable description    | `Appointment booked in Lobbie system` |
+| `value`             | NUMERIC   | ❌       | Numeric value (if applicable) | `150.00`, `5`                         |
+| `value_unit`        | STRING    | ❌       | Unit of the value field       | `USD`, `count`, `hours`               |
+| `_ingested_at`      | TIMESTAMP | ❌       | When dbt processed the record | `2024-01-15 14:35:00`                 |
 
 ### Source-Specific Fields
 
@@ -117,11 +117,11 @@ formatted_events as (
         {{ nexus.create_nexus_id('event', ['unique_id', 'timestamp_field'], '[source_name]') }} as event_id,
         [timestamp_field] as occurred_at,
         '[event_category]' as type,
-        '[event.name]' as name,
+        '[event name]' as event_name,
         '[source_name]' as source,
 
         -- Optional fields
-        '[Human-readable description]' as description,
+        '[Human-readable description]' as event_description,
         [numeric_value] as value,
         '[unit]' as value_unit,
         current_timestamp() as _ingested_at,
@@ -159,8 +159,8 @@ appointment_events as (
         {{ nexus.create_nexus_id('event', ['appointment_id', 'start_datetime'], 'lobbie') }} as event_id,
         start_datetime as occurred_at,
         'appointment' as type,
-        'appointment.booked' as name,
-        'Appointment booked in Lobbie system' as description,
+        'appointment booked' as event_name,
+        'Appointment booked in Lobbie system' as event_description,
         'lobbie' as source,
 
         -- Optional fields
@@ -199,13 +199,13 @@ Use descriptive, hierarchical naming for event types:
 
 ### Event Names
 
-Use dot notation for specific events:
+Use "Object Action" format for specific events:
 
-- `appointment.booked`
-- `email.sent`
-- `payment.completed`
-- `user.registered`
-- `support.ticket.created`
+- `appointment booked`
+- `email sent`
+- `payment completed`
+- `user registered`
+- `support ticket created`
 
 ## Best Practices
 
@@ -284,7 +284,7 @@ SELECT
     COUNT(event_id) as events_with_event_id,
     COUNT(occurred_at) as events_with_timestamp,
     COUNT(type) as events_with_type,
-    COUNT(name) as events_with_name,
+    COUNT(event_name) as events_with_event_name,
     COUNT(source) as events_with_source
 FROM your_schema.your_event_model;
 ```
@@ -352,7 +352,7 @@ CAST(timestamp_field AS TIMESTAMP) as occurred_at
 ```sql
 WHERE occurred_at IS NOT NULL
   AND type IS NOT NULL
-  AND name IS NOT NULL
+  AND event_name IS NOT NULL
   AND source IS NOT NULL
 ```
 
