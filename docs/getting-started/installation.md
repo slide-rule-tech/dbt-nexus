@@ -249,7 +249,7 @@ Each source model must include these required fields:
 
 #### Events Models
 
-- `id` - Unique event identifier
+- `event_id` - Unique event identifier
 - `occurred_at` - Event timestamp
 - `event_name` - Specific event name
 - `event_type` - Event category

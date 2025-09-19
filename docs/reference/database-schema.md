@@ -59,7 +59,7 @@ The diagram is organized into color-coded sections:
 
 | Column              | Type      | Description                   | Required | Notes                                  |
 | ------------------- | --------- | ----------------------------- | -------- | -------------------------------------- |
-| `id`                | STRING    | Unique event identifier       | ✅       | Primary key, UUID format               |
+| `event_id`          | STRING    | Unique event identifier       | ✅       | Primary key, UUID format               |
 | `occurred_at`       | TIMESTAMP | When the event occurred       | ✅       | Business timestamp                     |
 | `event_name`        | STRING    | Specific event name           | ✅       | e.g., 'email_sent', 'app_installed'    |
 | `event_description` | STRING    | Human-readable description    | ❌       | e.g., 'Email sent to john@example.com' |
