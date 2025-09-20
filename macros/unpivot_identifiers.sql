@@ -28,12 +28,10 @@
 {# Single scan approach for better performance on large tables #}
 with source_data as (
   select 
-    {{ event_id_field }},
-    {% if event_id_field != edge_id_field %}
-    {{ edge_id_field }},
-    {% endif %}
+    {{ event_id_field }} as event_id,
+    {{ edge_id_field }} as edge_id,
     {% if role_column is not none %}
-    {{ role_column }},
+    {{ role_column }} as role,
     {% endif %}
     {% for add_col in additional_columns %}
     {{ add_col }},
@@ -50,8 +48,8 @@ with source_data as (
 {% for col in identifier_cols %}
   {% if not loop.first %}union all{% endif %}
   select
-    {{ event_id_field }} as event_id,
-    {{ edge_id_field }} as edge_id,
+    event_id,
+    edge_id,
     {% if col in column_to_identifier_type %}
     '{{ column_to_identifier_type[col] }}' as identifier_type,
     {% else %}
@@ -59,12 +57,12 @@ with source_data as (
     {% endif %}
     cast({{ col }} as string) as identifier_value,
     {% if role_column is not none %}
-    {{ role_column.split(' as ')[1] if ' as ' in role_column else role_column }} as role
+    role,
     {% else %}
-    cast(null as string) as role
+    cast(null as string) as role,
     {% endif %}
     {% for add_col in additional_columns %}
-    , {{ add_col.split(' as ')[1] if ' as ' in add_col else add_col }}
+    {{ add_col.split(' as ')[1] if ' as ' in add_col else add_col }}{% if not loop.last %},{% endif %}
     {% endfor %}
   from source_data
   where {{ col }} is not null
