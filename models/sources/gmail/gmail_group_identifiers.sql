@@ -40,7 +40,7 @@ all_domains AS (
 filtered_domains AS (
     SELECT 
         event_id,
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'domain']) }} as row_id,
+        {{ dbt_utils.generate_surrogate_key(['event_id', 'domain']) }} as edge_id,
         'domain' as identifier_type,
         domain as identifier_value,
         role,
@@ -55,7 +55,7 @@ filtered_domains AS (
 redirected_domains AS (
     SELECT 
         event_id,
-        {{ dbt_utils.generate_surrogate_key(['event_id', redirected_domain('domain')]) }} as row_id,
+        {{ dbt_utils.generate_surrogate_key(['event_id', redirected_domain('domain')]) }} as edge_id,
         'domain' as identifier_type,
         {{ redirected_domain('domain') }} as identifier_value,
         role,
@@ -74,7 +74,7 @@ unioned AS (
 
 SELECT 
     event_id,
-    row_id,
+    edge_id,
     identifier_type,
     identifier_value,
     role,

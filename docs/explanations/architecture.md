@@ -212,7 +212,7 @@ FROM source_data
 SELECT
   id,                    -- Unique identifier record ID
   event_id,              -- Reference to source event
-  row_id,                -- Groups related identifiers
+  edge_id,                -- Groups related identifiers
   identifier_type,       -- Type (email, phone, domain)
   identifier_value,      -- Actual identifier value
   source,                -- Source system
@@ -228,7 +228,7 @@ FROM source_data
 SELECT
   id,                    -- Unique trait record ID
   event_id,              -- Reference to source event
-  row_id,                -- Groups related traits
+  edge_id,                -- Groups related traits
   trait_name,            -- Trait name
   trait_value,           -- Trait value
   source,                -- Source system

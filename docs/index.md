@@ -123,7 +123,7 @@ graph TD
     subgraph SourceLog["🟠 Source Event Log"]
         SPT[source_person_traits<br/>• id: string PK<br/>• event_id: string FK<br/>• name: string]
         SPI[source_person_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• email: string]
-        SE[source_events<br/>• id: string PK<br/>• event_id: string FK<br/>• event_name: string<br/>• ...: string]
+        SE[source_events<br/>• event_id: string PK<br/>• event_name: string<br/>• ...: string]
         SGI[source_group_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• domain: string]
         SGT[source_group_traits<br/>• id: string PK<br/>• event_id: string FK<br/>• name: string]
         MI[membership_identifiers<br/>• event_id: string FK<br/>• occurred_at: timestamp<br/>• person_identifier: string<br/>• person_identifier_type: string<br/>• group_identifier: string<br/>• group_identifier_type: string<br/>• role: string]
@@ -131,7 +131,7 @@ graph TD
 
     %% Core Event Log Layer
     subgraph CoreLog["🔴 Core Event Log"]
-        E[events<br/>• id: string PK<br/>• occurred_at: timestamp<br/>• type: string<br/>• name: string<br/>• source: string]
+        E[events<br/>• event_id: string PK<br/>• occurred_at: timestamp<br/>• type: string<br/>• name: string<br/>• source: string]
         PID[person_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• email: string<br/>• user_id: string<br/>• phone: string]
         GID[group_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• domain: string<br/>• myshopify_domain: string<br/>• shop_id: string]
         MID[membership_identifiers<br/>• id: string PK<br/>• event_id: string FK<br/>• person_identifier_id: string FK<br/>• group_identifier_id: string FK<br/>• role: string]
@@ -214,3 +214,12 @@ Identity Resolution, and Final Tables._
 > **Note**: To view the original diagram, open
 > `docs/images/database-diagram.xml` in
 > [diagrams.net](https://app.diagrams.net).
+
+## Quick Start Guides
+
+- [How to Generate Nexus IDs](how-to/generate-nexus-ids.md) - Complete guide for
+  creating unique identifiers
+- [How to Format Events](how-to/format-nexus-events.md) - Guide for formatting
+  events for Nexus
+- [Event Schema Quick Reference](reference/event-schema-quick-reference.md) -
+  Quick reference for event schema

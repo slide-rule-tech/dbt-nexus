@@ -219,7 +219,7 @@ WITH source_data AS (
 SELECT
     {{ dbt_utils.generate_surrogate_key(['id', 'shop_domain']) }} as id,
     id as event_id,
-    {{ dbt_utils.generate_surrogate_key(['id']) }} as row_id,
+    {{ dbt_utils.generate_surrogate_key(['id']) }} as edge_id,
     'domain' as identifier_type,
     shop_domain as identifier_value,
     'shopify_partner' as source,
@@ -233,7 +233,7 @@ UNION ALL
 SELECT
     {{ dbt_utils.generate_surrogate_key(['id', 'shop_id']) }} as id,
     id as event_id,
-    {{ dbt_utils.generate_surrogate_key(['id']) }} as row_id,
+    {{ dbt_utils.generate_surrogate_key(['id']) }} as edge_id,
     'shop_id' as identifier_type,
     shop_id as identifier_value,
     'shopify_partner' as source,
@@ -249,7 +249,7 @@ Each source model must include these required fields:
 
 #### Events Models
 
-- `id` - Unique event identifier
+- `event_id` - Unique event identifier
 - `occurred_at` - Event timestamp
 - `event_name` - Specific event name
 - `event_type` - Event category
@@ -260,7 +260,7 @@ Each source model must include these required fields:
 
 - `id` - Unique identifier record
 - `event_id` - Reference to source event
-- `row_id` - Groups related identifiers
+- `edge_id` - Groups related identifiers
 - `identifier_type` - Type of identifier
 - `identifier_value` - Actual identifier value
 - `source` - Source system
@@ -271,7 +271,7 @@ Each source model must include these required fields:
 
 - `id` - Unique trait record
 - `event_id` - Reference to source event
-- `row_id` - Groups related traits
+- `edge_id` - Groups related traits
 - `trait_name` - Trait name
 - `trait_value` - Trait value
 - `source` - Source system

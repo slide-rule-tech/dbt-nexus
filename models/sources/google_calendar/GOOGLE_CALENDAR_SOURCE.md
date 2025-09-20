@@ -158,7 +158,7 @@ Extracts email addresses from organizer, creator, and attendees:
 
 ```sql
 event_id               -- Reference to calendar event
-row_id                 -- Surrogate key for grouping
+edge_id                 -- Surrogate key for grouping
 identifier_type        -- Always "email"
 identifier_value       -- Email address
 occurred_at            -- Event start time
@@ -184,7 +184,7 @@ Extracts person traits from calendar participants:
 
 ```sql
 event_id               -- Reference to calendar event
-row_id                 -- Links related traits for same person
+edge_id                 -- Links related traits for same person
 trait_name             -- "email" or "display_name"
 trait_value            -- The trait value
 occurred_at            -- Event start time
@@ -212,7 +212,7 @@ Extracts email domains as group identifiers (excluding generic domains):
 
 ```sql
 event_id               -- Reference to calendar event
-row_id                 -- Surrogate key for grouping
+edge_id                 -- Surrogate key for grouping
 identifier_type        -- Always "domain"
 identifier_value       -- Email domain (e.g., "company.com")
 occurred_at            -- Event start time
@@ -231,7 +231,7 @@ Creates domain traits for identified groups:
 
 ```sql
 event_id               -- Reference to calendar event
-row_id                 -- Links to group identifier
+edge_id                 -- Links to group identifier
 trait_name             -- Always "domain"
 trait_value            -- Domain name
 occurred_at            -- Event start time

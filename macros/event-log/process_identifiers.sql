@@ -20,7 +20,7 @@
             -- Standardize identifier formats (lowercase emails, etc.)
             select
                 event_id,
-                row_id,
+                edge_id,
                 identifier_type,
                 identifier_value,
                 -- Normalize identifier values based on type
@@ -38,7 +38,7 @@
 
         select
             event_id,
-            row_id,
+            edge_id,
             identifier_type,
             identifier_value,
             normalized_value,
@@ -50,7 +50,7 @@
         {# Return empty result if no relations found #}
         select 
             cast(null as string) as event_id,
-            cast(null as string) as row_id,
+            cast(null as string) as edge_id,
             cast(null as string) as identifier_type,
             cast(null as string) as identifier_value,
             cast(null as string) as normalized_value,

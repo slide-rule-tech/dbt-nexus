@@ -186,7 +186,7 @@ Extracts email addresses from senders and recipients with role context:
 
 ```sql
 event_id               -- Reference to email event
-row_id                 -- Groups related identifiers
+edge_id                 -- Groups related identifiers
 identifier_type        -- "email"
 identifier_value       -- Email address
 role                   -- "sender" or "recipient"
@@ -205,7 +205,7 @@ Captures person information:
 
 ```sql
 event_id               -- Reference to email event
-row_id                 -- Groups related traits
+edge_id                 -- Groups related traits
 trait_name             -- "email" or "full_name"
 trait_value            -- The trait value
 occurred_at            -- Email timestamp
@@ -225,7 +225,7 @@ Creates groups from email domains (excludes generic providers):
 
 ```sql
 event_id               -- Reference to email event
-row_id                 -- Groups related identifiers
+edge_id                 -- Groups related identifiers
 identifier_type        -- "domain"
 identifier_value       -- Email domain
 occurred_at            -- Email timestamp
@@ -238,7 +238,7 @@ Domain information for organizations:
 
 ```sql
 event_id               -- Reference to email event
-row_id                 -- Groups related traits
+edge_id                 -- Groups related traits
 trait_name             -- "domain"
 trait_value            -- Domain name
 occurred_at            -- Email timestamp
