@@ -127,6 +127,7 @@ nav:
 
   - Reference:
       - Database Schema: reference/database-schema.md
+      - Schema Naming Configuration: reference/nexus-dbt-schema-names.md
       - State Models: reference/models/states.md
 
   - Architecture & Concepts:

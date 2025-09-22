@@ -127,7 +127,34 @@ models:
 ```
 
 By default, models in the `nexus` package will be created in a schema named
-`nexus` (or the schema configured for your target if it overrides this).
+`nexus_{{ target.name }}` (e.g., `nexus_dev` for the dev target, `nexus_prod`
+for the prod target). Template source models in the `sources/` directory will
+use the default dbt schema naming (same as your client models).
+
+### Schema Naming Configuration
+
+The package uses a custom `generate_schema_name` macro that provides flexible
+schema naming:
+
+- **Core nexus models**: Build into `nexus_{{ target.name }}` schema
+- **Template source models**: Build into default dbt schema (same as client
+  models)
+- **Client models**: Use standard dbt schema naming
+
+You can override the default nexus schema naming using variables:
+
+```yaml
+# In your dbt_project.yml
+vars:
+  nexus_schema_dev: "custom_dev_schema" # Override dev schema
+  nexus_schema_prod: "custom_prod_schema" # Override prod schema
+```
+
+Or via command line:
+
+```bash
+dbt run --vars '{"nexus_schema_dev": "my_custom_schema"}'
+```
 
 ## Basic Usage
 
