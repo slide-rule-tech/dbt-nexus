@@ -146,6 +146,7 @@ nav:
       - Format Events: how-to/format-nexus-events.md
       - Update Documentation: how-to/update-docs.md
       - Add New Source: how-to/add-new-source.md
+      - Recommended Source Model Structure: how-to/recommend-source-model-structure.md
       - Configure Identity Resolution: how-to/configure-identity-resolution.md
       - Create Custom States: how-to/create-custom-states.md
       - Handle Multiple Entity Types: how-to/handle-multiple-entities.md

@@ -16,14 +16,13 @@ WITH unioned AS (
             'occurred_at',
             'event_name',
             'event_description',
-            'event_value',
-            'value_unit',
-            'event_significance',
             'event_type',
+            'value',
+            'value_unit',
+            'significance',
             'source',
             'source_table',
             'synced_at',
-            'realtime_processed'
         ]
     ) }}
 )

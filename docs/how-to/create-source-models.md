@@ -36,6 +36,11 @@ Before creating identity resolution models, ensure you have:
 - Understanding of your source's **entity relationships**
 - **dbt_project.yml configuration** updated to include your new source
 
+**Recommended**: Review the
+[Recommended Source Model Structure](recommend-source-model-structure.md) guide
+for best practices on organizing your source models using a four-layer
+architecture pattern.
+
 ## Step 1: Create Events Model
 
 The events model captures the core event data from your source.
