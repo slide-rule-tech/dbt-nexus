@@ -23,6 +23,11 @@ and this project adheres to
   metrics
 - Source identifier formatting documentation with `unpivot_identifiers` macro
   examples
+- Dynamic column handling in `nexus_events` with optional field support
+- Cross-database column name case compatibility (Snowflake uppercase vs others
+  lowercase)
+- Strong typing for all event columns with automatic NULL handling for missing
+  fields
 
 ### Changed
 
@@ -34,6 +39,9 @@ and this project adheres to
 - Enhanced incremental model strategies
 - Identity resolution now scales linearly with unique entities rather than total
   events
+- `nexus_events` model now uses dynamic column detection and strong typing
+- Event column types now enforced: `value`/`significance` as FLOAT, timestamps
+  as TIMESTAMP, strings as VARCHAR
 
 ### Fixed
 
@@ -42,6 +50,10 @@ and this project adheres to
 - Memory issues with large identity resolution datasets
 - Edge explosion problem in high-frequency entity scenarios (26,000+ events per
   entity)
+- Column type inconsistencies in `nexus_events` union operations
+- Cross-database column name case sensitivity issues in
+  `dbt_utils.union_relations`
+- Missing optional columns now properly handled with typed NULL values
 
 ### Performance Improvements
 
@@ -60,17 +72,37 @@ and this project adheres to
 - Eliminates cartesian product explosion in high-frequency entity scenarios
 - Preserves all semantic relationships while removing redundant processing
 
+**Dynamic Column Handling in nexus_events**:
+
+- Compile-time column detection using `adapter.get_columns_in_relation()`
+- Cross-database column name case handling (Snowflake uppercase vs others
+  lowercase)
+- Automatic column override generation with proper dbt type functions
+- Missing columns automatically added as typed NULL values
+- Supports optional schema fields: `significance`, `source_table`, `synced_at`
+
+**Column Type Enforcement**:
+
+- `value`, `significance`: `dbt.type_float()` (cross-database FLOAT)
+- `occurred_at`, `synced_at`: `dbt.type_timestamp()` (cross-database TIMESTAMP)
+- All other fields: `dbt.type_string()` (cross-database VARCHAR/TEXT)
+
 **Impact**:
 
 - Entities with 26,000+ events previously created 676M+ duplicate edges
 - Now creates exactly 1 edge per unique identifier relationship
 - Enables identity resolution on datasets with millions of events per entity
+- Event model now works consistently across Snowflake, BigQuery, PostgreSQL,
+  etc.
+- Flexible schema handling allows source tables with varying column sets
 
 **Backward Compatibility**:
 
 - No changes required to existing source models
 - All `*_person_identifiers`, `*_group_identifiers` tables work unchanged
 - Event participation and final entity tables maintain identical output schema
+- Existing `*_events` models work unchanged, missing columns auto-filled with
+  NULL
 
 ## [0.1.0] - 2024-12-XX
 

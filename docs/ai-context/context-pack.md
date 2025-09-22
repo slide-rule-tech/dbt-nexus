@@ -117,6 +117,20 @@ The package includes comprehensive demo data for exploration and testing:
 
 ## Source Integration Pattern
 
+### Four-Layer Architecture
+
+Sources should follow a four-layer architecture pattern for optimal
+organization:
+
+1. **Base Layer**: Raw `SELECT *` from source tables (e.g.,
+   `base_{source}_{table}`)
+2. **Normalized Layer**: Clean, joined business entities (e.g.,
+   `{source}_{entity}`)
+3. **Intermediate Layer**: Event-type specific formatting using Nexus macros
+4. **Unioned Layer**: Combined models using `dbt_utils.union_relations()`
+
+### Model Naming Convention
+
 Sources must provide models following naming convention
 `{source_name}_{entity_type}_{data_type}`:
 
@@ -124,6 +138,23 @@ Sources must provide models following naming convention
 - Identifiers: `{source}_person_identifiers`, `{source}_group_identifiers`
 - Traits: `{source}_person_traits`, `{source}_group_traits`
 - Memberships: `{source}_membership_identifiers`
+
+### Recommended Directory Structure
+
+```
+models/sources/{source_name}/
+├── base/
+│   ├── base_{source}_table1.sql
+│   └── base_{source}_table2.sql
+├── normalized/
+│   ├── {source}_orders.sql
+│   └── {source}_customers.sql
+├── intermediate/
+│   ├── {source}_order_events.sql
+│   ├── {source}_order_person_identifiers.sql
+│   └── {source}_order_person_traits.sql
+└── {source}_events.sql
+```
 
 ## State Management
 

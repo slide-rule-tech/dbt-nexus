@@ -20,39 +20,100 @@ vars:
       memberships: true
 ```
 
-### Step 2: Create Source Models
+### Step 2: Create Four-Layer Architecture
 
-Create models following naming convention:
+#### Base Layer - Raw Tables
 
-**`models/sources/your_source_events.sql`**:
+**`models/sources/your_source/base/base_orders.sql`**:
 
 ```sql
-select
-    event_id,
-    person_id,
-    occurred_at,
-    event_type,
-    properties
-from {{ source('your_source', 'events') }}
+select * from {{ source('your_source', 'orders') }}
 ```
 
-**`models/sources/your_source_person_identifiers.sql`**:
+**`models/sources/your_source/base/base_customers.sql`**:
+
+```sql
+select * from {{ source('your_source', 'customers') }}
+```
+
+#### Normalized Layer - Clean Business Entities
+
+**`models/sources/your_source/normalized/your_source_orders.sql`**:
 
 ```sql
 select
-    person_id,
-    'email' as identifier_type,
-    email as identifier_value
-from {{ source('your_source', 'users') }}
-where email is not null
+    o.order_id,
+    o.customer_id,
+    o.order_date,
+    o.total_amount,
+    c.customer_name,
+    c.email,
+    c.phone_number
+from {{ ref('base_orders') }} o
+left join {{ ref('base_customers') }} c
+    on o.customer_id = c.customer_id
+```
 
-union all
+#### Intermediate Layer - Event-Specific Formatting
+
+**`models/sources/your_source/intermediate/your_source_order_events.sql`**:
+
+```sql
+{{ config(materialized='table', tags=['event-processing']) }}
 
 select
-    person_id,
-    'user_id' as identifier_type,
-    user_id::string as identifier_value
-from {{ source('your_source', 'users') }}
+    {{ nexus.create_nexus_id('event', ['order_id', 'order_date'], 'your_source') }} as event_id,
+    order_date as occurred_at,
+    'order' as type,
+    'order_placed' as event_name,
+    'Order placed for ' || total_amount as event_description,
+    'your_source' as source,
+
+    -- Source-specific fields
+    customer_id,
+    order_id,
+    total_amount,
+    customer_name,
+    email,
+    phone_number
+
+from {{ ref('your_source_orders') }}
+where order_date is not null
+```
+
+**`models/sources/your_source/intermediate/your_source_order_person_identifiers.sql`**:
+
+```sql
+{{ config(materialized='table', tags=['identity-resolution']) }}
+
+{{ nexus.unpivot_identifiers(
+    model_name='your_source_order_events',
+    event_id_field='event_id',
+    edge_id_field='event_id',
+    columns=['customer_id', 'email', 'phone_number'],
+    additional_columns=['occurred_at', 'source'],
+    column_to_identifier_type={
+        'customer_id': 'customer_id',
+        'email': 'email',
+        'phone_number': 'phone'
+    },
+    role_column="'customer'"
+) }}
+```
+
+#### Unioned Layer - Combined Models
+
+**`models/sources/your_source/your_source_events.sql`**:
+
+```sql
+{{ config(materialized='table', tags=['event-processing']) }}
+
+{{ dbt_utils.union_relations([
+    ref('your_source_order_events'),
+    ref('your_source_payment_events')
+]) }}
+
+order by occurred_at desc
 ```
 
 ### Step 3: Test the Integration

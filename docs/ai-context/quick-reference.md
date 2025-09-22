@@ -91,6 +91,18 @@ dbt test --select package:nexus
 - Group Traits: `{source}_group_traits`
 - Memberships: `{source}_membership_identifiers`
 
+### Event Column Naming Strategy
+
+**Prefixed Columns** (require `event_` prefix):
+
+- `event_id`, `event_name`, `event_description`, `event_type` - Generic names
+  that would conflict across sources
+
+**Non-Prefixed Columns** (standard event tracking fields):
+
+- `value`, `significance` - Standard event tracking fields (GA4 compatible)
+- `occurred_at`, `source` - Standard timestamp and attribution fields
+
 ### Final Tables
 
 - `nexus_persons` - Resolved person entities
@@ -175,6 +187,22 @@ from {{ ref('nexus_events') }}
 where {{ event_filter('billing', 'subscription_created') }}
 ```
 
+## Data Quality Best Practices
+
+### Source Data Validation
+
+- **Explicit field selection** - Avoid `SELECT *` in normalized layer
+- **Null handling** - Use `LEFT JOIN` to preserve all records
+- **Data type consistency** - Ensure compatible types across sources
+- **Deduplication** - Remove duplicates in normalized layer
+
+### Common Data Issues
+
+- **ID mismatches** - Track join success rates between related tables
+- **Missing timestamps** - Filter out events without `occurred_at`
+- **Schema drift** - Monitor for unexpected column changes
+- **Data freshness** - Implement incremental strategies for large sources
+
 ## Troubleshooting Quick Fixes
 
 ### Identity Resolution Issues
@@ -182,15 +210,18 @@ where {{ event_filter('billing', 'subscription_created') }}
 - Check `nexus_max_recursion` setting
 - Verify source model naming conventions
 - Review data quality in identifier columns
+- Use `dbt_utils.union_relations()` for robust unioning
 
 ### Performance Issues
 
 - Adjust `nexus_max_recursion` value
 - Review incremental model strategies
 - Consider partitioning for large datasets
+- Use four-layer architecture for better organization
 
 ### Missing Models
 
 - Verify `sources` variable configuration
 - Check model naming conventions
 - Run `dbt list --select package:nexus` to see available models
+- Ensure proper directory structure (base/normalized/intermediate)

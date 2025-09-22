@@ -61,6 +61,19 @@ Timeline-based tracking of entity conditions:
 4. **State Management**: Timeline tracking with derived states
 5. **Final Tables**: Production-ready resolved entities
 
+## Recommended Source Structure
+
+Sources should follow a four-layer architecture pattern:
+
+1. **Base Layer**: Raw `SELECT *` from source tables
+2. **Normalized Layer**: Clean, joined business entities with explicit field
+   selection
+3. **Intermediate Layer**: Event-type specific formatting using Nexus macros
+4. **Unioned Layer**: Combined models using `dbt_utils.union_relations()`
+
+This pattern ensures data quality, maintainability, and scalability while
+providing clear separation of concerns.
+
 ## Key Benefits
 
 - **Operational Data**: Beyond dashboards - data that drives actions
