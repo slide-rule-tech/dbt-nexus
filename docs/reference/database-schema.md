@@ -69,6 +69,28 @@ The diagram is organized into color-coded sections:
 | `value_unit`        | STRING    | Unit of the value field       | ❌       | e.g., 'USD', 'count'                   |
 | `_ingested_at`      | TIMESTAMP | When dbt processed the record | ✅       | System timestamp                       |
 
+#### Column Naming Strategy
+
+The events table uses a specific naming strategy to avoid conflicts in unions
+and joins:
+
+**Prefixed Columns** (require `event_` prefix):
+
+- `event_id` - Generic "id" would conflict across sources
+- `event_name` - Generic "name" would conflict across sources
+- `event_description` - Generic "description" would conflict across sources
+- `event_type` - Generic "type" would conflict across sources
+
+**Non-Prefixed Columns** (standard event tracking fields):
+
+- `value` - Standard field in event tracking systems (GA4, etc.)
+- `significance` - Specific to event scoring, not generic
+- `occurred_at` - Standard timestamp field
+- `source` - Standard source attribution field
+
+This strategy ensures compatibility with industry-standard event tracking while
+preventing column name conflicts during data unioning.
+
 #### Person Identifiers
 
 **Purpose**: Normalized identifiers for individual entities

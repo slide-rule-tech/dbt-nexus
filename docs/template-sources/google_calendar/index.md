@@ -210,7 +210,7 @@ event_id               -- Reference to calendar event
 event_name             -- "external_meeting" or "internal_meeting"
 occurred_at            -- Meeting start time
 event_description      -- Meeting summary
-event_significance     -- 3 for external, 2 for internal
+significance           -- 3 for external, 2 for internal
 event_type             -- "calendar_event"
 source                 -- "google_calendar"
 ```
@@ -446,7 +446,7 @@ CASE
     WHEN has_external_attendees THEN 3
     WHEN ARRAY_LENGTH(attendees) > 10 THEN 2
     ELSE 1
-END as event_significance
+END as significance
 ```
 
 ### Meeting Type Detection

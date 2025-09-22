@@ -91,6 +91,18 @@ dbt test --select package:nexus
 - Group Traits: `{source}_group_traits`
 - Memberships: `{source}_membership_identifiers`
 
+### Event Column Naming Strategy
+
+**Prefixed Columns** (require `event_` prefix):
+
+- `event_id`, `event_name`, `event_description`, `event_type` - Generic names
+  that would conflict across sources
+
+**Non-Prefixed Columns** (standard event tracking fields):
+
+- `value`, `significance` - Standard event tracking fields (GA4 compatible)
+- `occurred_at`, `source` - Standard timestamp and attribution fields
+
 ### Final Tables
 
 - `nexus_persons` - Resolved person entities
