@@ -1,4 +1,4 @@
-{% macro unpivot_identifiers(model_name, columns=[], additional_exclude=[], additional_columns=[], event_id_field='event_id', edge_id_field='edge_id', column_to_identifier_type={}, role_column=none, limit=none) %}
+{% macro unpivot_identifiers(model_name, columns=[], additional_exclude=[], additional_columns=[], event_id_field='event_id', edge_id_field='edge_id', column_to_identifier_type={}, role_column=none, limit=none, entity_type='person') %}
 {% set cols = adapter.get_columns_in_relation(ref(model_name)) %}
 
 {# If no specific columns are provided, determine them from the model #}
@@ -29,7 +29,7 @@
 with source_data as (
   select 
     {{ event_id_field }} as event_id,
-    {{ edge_id_field }} as edge_id,
+    {{ edge_id_field }} as edge_id_field_value,
     {% if role_column is not none %}
     {{ role_column }} as role,
     {% endif %}
@@ -48,8 +48,9 @@ with source_data as (
 {% for col in identifier_cols %}
   {% if not loop.first %}union all{% endif %}
   select
+    {{ nexus.create_nexus_id(entity_type ~ '_identifier', ['event_id', col, 'role', 'occurred_at']) }} as {{ entity_type }}_identifier_id,
     event_id,
-    edge_id,
+    {{ nexus.create_nexus_id(entity_type ~ '_edge', ['edge_id_field_value']) }} as edge_id,
     {% if col in column_to_identifier_type %}
     '{{ column_to_identifier_type[col] }}' as identifier_type,
     {% else %}

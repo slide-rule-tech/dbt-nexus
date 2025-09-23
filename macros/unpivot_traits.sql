@@ -1,4 +1,4 @@
-{% macro unpivot_traits(model_name, columns=[], identifier_column='identifier_value', identifier_type=none, additional_exclude=[], additional_columns=[], column_to_trait_name={}, event_id_field='event_id', limit=none) %}
+{% macro unpivot_traits(model_name, columns=[], identifier_column='identifier_value', identifier_type=none, additional_exclude=[], additional_columns=[], column_to_trait_name={}, event_id_field='event_id', limit=none, entity_type='person') %}
 {% set cols = adapter.get_columns_in_relation(ref(model_name)) %}
 
 {# If no specific columns are provided, determine them from the model #}
@@ -44,6 +44,7 @@ with source_data as (
 {% for col in trait_cols %}
   {% if not loop.first %}union all{% endif %}
   select
+    {{ nexus.create_nexus_id(entity_type ~ '_trait', ['event_id', 'identifier_column', "'" ~ col ~ "'", "'" ~ (identifier_type if identifier_type is not none else identifier_column) ~ "'"]) }} as {{ entity_type }}_trait_id,
     event_id,
     {% if identifier_type is not none %}
     '{{ identifier_type }}' as identifier_type,
