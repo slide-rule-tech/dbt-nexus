@@ -31,6 +31,8 @@ are defined in `models/nexus-models/nexus.yml`.
 
 - **Foreign key relationships**: Validates references between models
 - **Business rule compliance**: Ensures data follows expected patterns
+- **ID prefix validation**: Ensures all ID columns follow the expected naming
+  convention from `create_nexus_id` macro
 
 ---
 
@@ -53,6 +55,10 @@ columns:
       - not_null:
           config:
             severity: error
+      - dbt_utils.expression_is_true:
+          expression: "like 'evt_%'"
+          config:
+            severity: warn
   - name: occurred_at
     tests:
       - not_null:
@@ -64,10 +70,60 @@ columns:
 
 - Each event has a unique `event_id`
 - No events are missing IDs or timestamps
+- Event IDs follow the expected `evt_` prefix pattern (warning level)
 - Events from all sources (Gmail, Google Calendar, Notion) are properly unified
 
-**Common failures**: Duplicate event IDs when source models generate non-unique
-IDs.
+**Common failures**:
+
+- Duplicate event IDs when source models generate non-unique IDs
+- Event IDs not following the expected `evt_` prefix pattern
+
+---
+
+## 2.1. ID Prefix Validation Tests
+
+All nexus models include ID prefix validation tests to ensure consistency with
+the `create_nexus_id` macro. These tests use `dbt_utils.expression_is_true` with
+**warning severity** to validate that ID columns start with the expected
+prefixes.
+
+### Expected ID Prefixes
+
+| Entity Type         | Expected Prefix | Example ID           |
+| ------------------- | --------------- | -------------------- |
+| Events              | `evt_`          | `evt_abc123...`      |
+| Persons             | `per_`          | `per_def456...`      |
+| Groups              | `grp_`          | `grp_ghi789...`      |
+| Memberships         | `mem_`          | `mem_jkl012...`      |
+| States              | `st_`           | `st_mno345...`       |
+| Person Identifiers  | `per_idfr_`     | `per_idfr_pqr678...` |
+| Group Identifiers   | `grp_idfr_`     | `grp_idfr_stu901...` |
+| Person Traits       | `per_tr_`       | `per_tr_vwx234...`   |
+| Group Traits        | `grp_tr_`       | `grp_tr_yza567...`   |
+| Person Participants | `per_prt_`      | `per_prt_bcd890...`  |
+| Group Participants  | `grp_prt_`      | `grp_prt_efg123...`  |
+| Person Edges        | `per_edg_`      | `per_edg_hij456...`  |
+| Group Edges         | `grp_edg_`      | `grp_edg_klm789...`  |
+
+### Test Configuration
+
+```yaml
+- dbt_utils.expression_is_true:
+    expression: "like 'evt_%'"
+    config:
+      severity: warn
+```
+
+**Why warning severity?**
+
+- Allows builds to continue even with prefix violations
+- Provides visibility into naming convention compliance
+- Enables gradual adoption of naming standards
+
+**Common prefix violations**:
+
+- Manual ID generation that bypasses the `create_nexus_id` macro
+- Source data with unexpected ID formats
 
 ---
 
@@ -90,12 +146,18 @@ columns:
       - not_null:
           config:
             severity: error
+      - dbt_utils.expression_is_true:
+          expression: "like 'per_idfr_%'"
+          config:
+            severity: warn
 ```
 
 **What it tests**:
 
 - Each person identifier record has a unique ID
 - No person identifiers are missing IDs
+- Person identifier IDs follow the expected `per_idfr_` prefix pattern (warning
+  level)
 - Person identifiers from Gmail, Google Calendar, and Notion are properly
   deduplicated
 
@@ -582,6 +644,16 @@ dbt test --models nexus_* --select test_type:unique
 dbt test --models nexus_* --debug
 ```
 
+### Run Only Prefix Validation Tests
+
+```bash
+# Run all expression_is_true tests (prefix validation)
+dbt test --models nexus_* --select test_type:expression_is_true
+
+# Check prefix compliance across all models
+dbt test --models nexus_* --select test_name:*expression_is_true*
+```
+
 ---
 
 ## 11. Test Failure Investigation
@@ -615,8 +687,10 @@ dbt test --models nexus_model
 
 ### Severity Levels
 
-- **error**: Test failure stops execution (default for all nexus tests)
-- **warn**: Test failure logs warning but continues
+- **error**: Test failure stops execution (used for uniqueness and not-null
+  tests)
+- **warn**: Test failure logs warning but continues (used for ID prefix
+  validation tests)
 
 ### Custom Test Thresholds
 
