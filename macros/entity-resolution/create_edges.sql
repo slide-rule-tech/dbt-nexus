@@ -6,6 +6,7 @@ with unpivoted as (
 
 raw_edges as (
   select
+    a.edge_id,
     a.identifier_type as identifier_type_a,
     a.identifier_value as identifier_value_a,
     b.identifier_type as identifier_type_b,
@@ -25,6 +26,7 @@ raw_edges as (
 
 deduplicated_edges as (
   select
+    edge_id,
     identifier_type_a,
     identifier_value_a,
     identifier_type_b,
@@ -35,6 +37,7 @@ deduplicated_edges as (
 )
 
 select
+  edge_id,
   identifier_type_a,
   identifier_value_a,
   identifier_type_b,

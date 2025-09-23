@@ -249,7 +249,9 @@ models:
     description: "Edges connecting person identifiers for identity resolution"
     tests:
       - unique:
-          column_name: edge_id
+          column_name:
+            "edge_id || '|' || identifier_type_a || '|' || identifier_value_a ||
+            '|' || identifier_type_b || '|' || identifier_value_b"
           config:
             severity: error
     columns:
@@ -264,7 +266,9 @@ models:
     description: "Edges connecting group identifiers for identity resolution"
     tests:
       - unique:
-          column_name: edge_id
+          column_name:
+            "edge_id || '|' || identifier_type_a || '|' || identifier_value_a ||
+            '|' || identifier_type_b || '|' || identifier_value_b"
           config:
             severity: error
     columns:

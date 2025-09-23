@@ -3,7 +3,7 @@
 -- Create memberships for senders (using pre-computed domain, excluding generic domains)
 WITH sender_memberships AS (
     SELECT 
-        {{ create_nexus_id('membership_identifier', ['event_id', 'sender.email', 'sender.domain']) }} as membership_identifier_id,
+        {{ create_nexus_id('membership_identifier', ['event_id', 'sender.email', 'sender.domain', 'occurred_at', "'sender'"]) }} as membership_identifier_id,
         event_id,
         sender.email as person_identifier,
         'email' as person_identifier_type,
@@ -20,7 +20,7 @@ WITH sender_memberships AS (
 
 recipient_memberships AS (
     SELECT 
-        {{ create_nexus_id('membership_identifier', ['event_id', 'recipient.email', 'recipient.domain']) }} as membership_identifier_id,
+        {{ create_nexus_id('membership_identifier', ['event_id', 'recipient.email', 'recipient.domain', 'occurred_at', "'recipient'"]) }} as membership_identifier_id,
         event_id,
         recipient.email as person_identifier,
         'email' as person_identifier_type,
