@@ -16,6 +16,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_%'"
+              config:
+                severity: warn
       - name: occurred_at
         description: "Timestamp when the event occurred"
         tests:
@@ -39,6 +43,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_idfr_%'"
+              config:
+                severity: warn
 
   - name: nexus_group_identifiers
     description:
@@ -56,6 +64,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'grp_idfr_%'"
+              config:
+                severity: warn
 
   - name: nexus_membership_identifiers
     description:
@@ -73,6 +85,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'mem_%'"
+              config:
+                severity: warn
 
   - name: nexus_person_traits
     description:
@@ -90,6 +106,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_tr_%'"
+              config:
+                severity: warn
 
   - name: nexus_group_traits
     description:
@@ -107,6 +127,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'grp_tr_%'"
+              config:
+                severity: warn
 
   - name: nexus_persons
     description: "Final persons table with resolved person data"
@@ -122,6 +146,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_%'"
+              config:
+                severity: warn
 
   - name: nexus_groups
     description: "Final groups table with resolved group data"
@@ -137,6 +165,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'grp_%'"
+              config:
+                severity: warn
 
   - name: nexus_memberships
     description: "Final memberships table with resolved membership data"
@@ -152,6 +184,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'mem_%'"
+              config:
+                severity: warn
 
   - name: nexus_person_participants
     description: "Person participants linking persons to events"
@@ -167,6 +203,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_prt_%'"
+              config:
+                severity: warn
 
   - name: nexus_group_participants
     description: "Group participants linking groups to events"
@@ -182,6 +222,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'grp_prt_%'"
+              config:
+                severity: warn
 
   - name: nexus_resolved_person_identifiers
     description: "Resolved person identifiers after identity resolution"
@@ -198,6 +242,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_idfr_%'"
+              config:
+                severity: warn
 
   - name: nexus_resolved_group_identifiers
     description: "Resolved group identifiers after identity resolution"
@@ -214,6 +262,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'grp_idfr_%'"
+              config:
+                severity: warn
 
   - name: nexus_resolved_person_traits
     description: "Resolved person traits after identity resolution"
@@ -229,6 +281,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_tr_%'"
+              config:
+                severity: warn
 
   - name: nexus_resolved_group_traits
     description: "Resolved group traits after identity resolution"
@@ -244,6 +300,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'grp_tr_%'"
+              config:
+                severity: warn
 
   - name: nexus_person_identifiers_edges
     description: "Edges connecting person identifiers for identity resolution"
@@ -261,6 +321,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_edg_%'"
+              config:
+                severity: warn
 
   - name: nexus_group_identifiers_edges
     description: "Edges connecting group identifiers for identity resolution"
@@ -278,6 +342,10 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'grp_edg_%'"
+              config:
+                severity: warn
 
   - name: nexus_states
     description: "States table for tracking entity state changes"
@@ -293,3 +361,7 @@ models:
           - not_null:
               config:
                 severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'st_%'"
+              config:
+                severity: warn
