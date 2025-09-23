@@ -20,7 +20,7 @@ event_filter AS (
 
 extracted AS (
     SELECT
-        {{ dbt_utils.generate_surrogate_key(['event_id']) }} as nexus_event_id,
+        {{ create_nexus_id('event', ['event_id']) }} as nexus_event_id,
         
         -- Event details
         event_id as calendar_event_id,

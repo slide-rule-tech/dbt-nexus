@@ -5,6 +5,7 @@
 ) }}
 WITH organizer_traits AS (
     SELECT 
+        {{ create_nexus_id('person_trait', ['nexus_event_id', 'organizer.email', "'email'"]) }} as trait_id,
         nexus_event_id as event_id,
         organizer.email as identifier_value,
         'email' as identifier_type,
@@ -18,6 +19,7 @@ WITH organizer_traits AS (
     UNION ALL
     
     SELECT 
+        {{ create_nexus_id('person_trait', ['nexus_event_id', 'organizer.email', "'name'"]) }} as trait_id,
         nexus_event_id as event_id,
         organizer.email as identifier_value,
         'email' as identifier_type,
@@ -33,6 +35,7 @@ WITH organizer_traits AS (
 
 creator_traits AS (
     SELECT 
+        {{ create_nexus_id('person_trait', ['nexus_event_id', 'creator.email', "'email'"]) }} as trait_id,
         nexus_event_id as event_id,
         creator.email as person_identifier,
         'email' as identifier_type,
@@ -46,6 +49,7 @@ creator_traits AS (
     UNION ALL
     
     SELECT 
+        {{ create_nexus_id('person_trait', ['nexus_event_id', 'creator.email', "'name'"]) }} as trait_id,
         nexus_event_id as event_id,
         creator.email as identifier_value,
         'email' as identifier_type,
@@ -61,6 +65,7 @@ creator_traits AS (
 
 attendee_traits AS (
     SELECT
+        {{ create_nexus_id('person_trait', ['base.nexus_event_id', 'attendee.email', "'email'"]) }} as trait_id,
         base.nexus_event_id as event_id,
         attendee.email as identifier_value,
         'email' as identifier_type,
@@ -75,6 +80,7 @@ attendee_traits AS (
     UNION ALL
     
     SELECT
+        {{ create_nexus_id('person_trait', ['base.nexus_event_id', 'attendee.email', "'name'"]) }} as trait_id,
         base.nexus_event_id as event_id,
         attendee.email as identifier_value,
         'email' as identifier_type,
@@ -98,6 +104,7 @@ all_traits AS (
 )
 
 SELECT DISTINCT
+    trait_id,
     event_id,
     identifier_value,
     identifier_type,

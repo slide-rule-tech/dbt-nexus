@@ -31,6 +31,7 @@ WITH all_domains AS (
 -- Create domain traits (generic domains already filtered upstream)
 domain_traits AS (
     SELECT 
+        {{ create_nexus_id('group_trait', ['event_id', 'domain', "'domain'"]) }} as trait_id,
         event_id,
         'domain' as identifier_type,
         domain as identifier_value,
@@ -47,6 +48,7 @@ domain_traits AS (
 -- Add internal trait for domains
 domain_internal_traits AS (
     SELECT 
+        {{ create_nexus_id('group_trait', ['event_id', 'domain', "'internal'"]) }} as trait_id,
         event_id,
         'domain' as identifier_type,
         domain as identifier_value,
@@ -61,6 +63,7 @@ domain_internal_traits AS (
 -- Add redirected domain traits (www. versions)
 redirected_domain_traits AS (
     SELECT 
+        {{ create_nexus_id('group_trait', ['event_id', redirected_domain('domain'), "'domain'"]) }} as trait_id,
         event_id,
         'domain' as identifier_type,
         {{ redirected_domain('domain') }} as identifier_value,
@@ -77,6 +80,7 @@ redirected_domain_traits AS (
 -- Add internal trait for redirected domains
 redirected_domain_internal_traits AS (
     SELECT 
+        {{ create_nexus_id('group_trait', ['event_id', redirected_domain('domain'), "'internal'"]) }} as trait_id,
         event_id,
         'domain' as identifier_type,
         {{ redirected_domain('domain') }} as identifier_value,
@@ -99,8 +103,9 @@ unioned AS (
 )
 
 SELECT 
+    trait_id,
     event_id,
-    {{ dbt_utils.generate_surrogate_key(['event_id', 'identifier_value', 'trait_name']) }} as edge_id,
+    {{ create_nexus_id('group_edge', ['event_id', 'identifier_value', 'trait_name']) }} as edge_id,
     identifier_type,
     identifier_value,
     trait_name,

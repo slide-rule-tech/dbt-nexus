@@ -23,7 +23,7 @@ joined as (
 
 -- Final output with just the unique entity_id and event_id combinations
 select
-  {{ dbt_utils.generate_surrogate_key(['event_id', entity_type ~ '_id']) }} as {{ entity_type }}_participant_id,
+  {{ create_nexus_id(entity_type ~ '_participant', ['event_id', entity_type ~ '_id']) }} as {{ entity_type }}_participant_id,
   event_id,
   {{ entity_type }}_id,
   role

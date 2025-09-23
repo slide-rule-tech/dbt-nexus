@@ -6,6 +6,7 @@
 
 WITH organizer_domain_traits AS (
     SELECT 
+        {{ create_nexus_id('group_trait', ['nexus_event_id', 'organizer.domain', "'domain'"]) }} as trait_id,
         nexus_event_id as event_id,
         organizer.domain as identifier_value,
         'domain' as identifier_type,
@@ -18,6 +19,7 @@ WITH organizer_domain_traits AS (
 
 creator_domain_traits AS (
     SELECT 
+        {{ create_nexus_id('group_trait', ['nexus_event_id', 'creator.domain', "'domain'"]) }} as trait_id,
         nexus_event_id as event_id,
         creator.domain as identifier_value,
         'domain' as identifier_type,
@@ -30,6 +32,7 @@ creator_domain_traits AS (
 
 attendee_domain_traits AS (
     SELECT
+        {{ create_nexus_id('group_trait', ['base.nexus_event_id', 'attendee.domain', "'domain'"]) }} as trait_id,
         base.nexus_event_id as event_id,
         attendee.domain as identifier_value,
         'domain' as identifier_type,
@@ -50,6 +53,7 @@ all_traits AS (
 )
 
 SELECT DISTINCT
+    trait_id,
     event_id,
     identifier_value,
     identifier_type,

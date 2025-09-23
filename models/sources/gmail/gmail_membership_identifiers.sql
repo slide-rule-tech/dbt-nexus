@@ -3,7 +3,7 @@
 -- Create memberships for senders (using pre-computed domain, excluding generic domains)
 WITH sender_memberships AS (
     SELECT 
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'sender.email']) }} as id,
+        {{ create_nexus_id('membership_identifier', ['event_id', 'sender.email', 'sender.domain']) }} as identifier_id,
         event_id,
         sender.email as person_identifier,
         'email' as person_identifier_type,
@@ -20,7 +20,7 @@ WITH sender_memberships AS (
 
 recipient_memberships AS (
     SELECT 
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'recipient.email']) }} as id,
+        {{ create_nexus_id('membership_identifier', ['event_id', 'recipient.email', 'recipient.domain']) }} as identifier_id,
         event_id,
         recipient.email as person_identifier,
         'email' as person_identifier_type,
@@ -43,7 +43,7 @@ unioned AS (
 )
 
 SELECT 
-    id,
+    identifier_id,
     event_id,
     person_identifier,
     person_identifier_type,

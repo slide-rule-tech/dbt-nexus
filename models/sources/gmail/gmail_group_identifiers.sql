@@ -39,8 +39,9 @@ all_domains AS (
 -- Create domain identifiers (generic domains already filtered upstream)
 filtered_domains AS (
     SELECT 
+        {{ create_nexus_id('group_identifier', ['event_id', 'domain']) }} as identifier_id,
         event_id,
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'domain']) }} as edge_id,
+        {{ create_nexus_id('group_edge', ['event_id', 'domain']) }} as edge_id,
         'domain' as identifier_type,
         domain as identifier_value,
         role,
@@ -54,8 +55,9 @@ filtered_domains AS (
 -- Add redirected domains (www. versions of email domains)
 redirected_domains AS (
     SELECT 
+        {{ create_nexus_id('group_identifier', ['event_id', redirected_domain('domain')]) }} as identifier_id,
         event_id,
-        {{ dbt_utils.generate_surrogate_key(['event_id', redirected_domain('domain')]) }} as edge_id,
+        {{ create_nexus_id('group_edge', ['event_id', redirected_domain('domain')]) }} as edge_id,
         'domain' as identifier_type,
         {{ redirected_domain('domain') }} as identifier_value,
         role,
@@ -73,6 +75,7 @@ unioned AS (
 )
 
 SELECT 
+    identifier_id,
     event_id,
     edge_id,
     identifier_type,

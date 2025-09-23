@@ -75,7 +75,7 @@ latest_memberships as (
 
 -- Return normal membership results
 select
-    {{ dbt_utils.generate_surrogate_key(['person_id', 'group_id']) }} as membership_id,
+    {{ create_nexus_id('membership', ['person_id', 'group_id']) }} as membership_id,
     person_id,
     group_id,
     role,

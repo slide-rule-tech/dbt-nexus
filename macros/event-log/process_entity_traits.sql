@@ -19,6 +19,7 @@
         normalized as (
             -- Process and standardize trait values
             select
+                trait_id,
                 event_id,
                 identifier_type,
                 identifier_value,
@@ -30,6 +31,7 @@
         )
 
         select
+            trait_id,
             event_id,
             identifier_type,
             identifier_value,
@@ -41,6 +43,7 @@
     {% else %}
         {# Return empty result if no relations found #}
         select 
+            cast(null as string) as trait_id,
             cast(null as string) as event_id,
             cast(null as string) as identifier_type,
             cast(null as string) as identifier_value,

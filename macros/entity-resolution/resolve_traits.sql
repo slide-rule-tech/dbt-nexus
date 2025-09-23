@@ -41,7 +41,7 @@ latest_traits as (
 )
 
 select
-    {{ dbt_utils.generate_surrogate_key([entity_type ~ '_id', 'trait_name', 'trait_value']) }} as trait_id,
+    {{ create_nexus_id(entity_type ~ '_trait', [entity_type ~ '_id', 'trait_name', 'trait_value']) }} as trait_id,
     {{ entity_type }}_id,
     trait_name,
     trait_value,

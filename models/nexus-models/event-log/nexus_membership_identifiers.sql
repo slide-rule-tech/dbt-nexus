@@ -21,6 +21,7 @@ from unioned
 -- Return empty result when no membership sources are configured
 with empty_result as (
     select
+        cast(null as string) as identifier_id,
         cast(null as string) as event_id,
         cast(null as timestamp) as occurred_at,
         cast(null as string) as person_identifier,
