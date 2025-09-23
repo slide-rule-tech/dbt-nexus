@@ -5,8 +5,9 @@
 ) }}
 WITH organizer_identifiers AS (
     SELECT 
+        {{ create_nexus_id('person_identifier', ['nexus_event_id', 'organizer.email', "'organizer'", 'start_time']) }} as person_identifier_id,
         nexus_event_id as event_id,
-        {{ dbt_utils.generate_surrogate_key(['nexus_event_id', 'organizer.email']) }} as edge_id,
+        {{ create_nexus_id('person_edge', ['nexus_event_id', 'organizer.email']) }} as edge_id,
         organizer.email as identifier_value,
         'email' as identifier_type,
         'organizer' as role,
@@ -19,8 +20,9 @@ WITH organizer_identifiers AS (
 
 creator_identifiers AS (
     SELECT 
+        {{ create_nexus_id('person_identifier', ['nexus_event_id', 'creator.email', "'creator'", 'start_time']) }} as person_identifier_id,
         nexus_event_id as event_id,
-        {{ dbt_utils.generate_surrogate_key(['nexus_event_id', 'creator.email']) }} as edge_id,
+        {{ create_nexus_id('person_edge', ['nexus_event_id', 'creator.email']) }} as edge_id,
         creator.email as identifier_value,
         'email' as identifier_type,
         'creator' as role,
@@ -33,8 +35,9 @@ creator_identifiers AS (
 
 attendee_identifiers AS (
     SELECT
+        {{ create_nexus_id('person_identifier', ['base.nexus_event_id', 'attendee.email', "'attendee'", 'base.start_time']) }} as person_identifier_id,
         base.nexus_event_id as event_id,
-        {{ dbt_utils.generate_surrogate_key(['base.nexus_event_id', 'attendee.email']) }} as edge_id,  
+        {{ create_nexus_id('person_edge', ['base.nexus_event_id', 'attendee.email']) }} as edge_id,  
         attendee.email as identifier_value,
         'email' as identifier_type,
         CASE 
@@ -47,6 +50,7 @@ attendee_identifiers AS (
     UNNEST(base.attendees) as attendee
     WHERE attendee.email IS NOT NULL
     AND attendee.email != ''
+    GROUP BY base.nexus_event_id, attendee.email, attendee.is_optional, base.start_time
 ),
 
 all_identifiers AS (
@@ -58,6 +62,7 @@ all_identifiers AS (
 )
 
 SELECT 
+    person_identifier_id,
     event_id,
     edge_id,
     identifier_type,

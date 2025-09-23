@@ -5,6 +5,7 @@
 ) }}
 WITH organizer_memberships AS (
     SELECT 
+        {{ create_nexus_id('membership_identifier', ['nexus_event_id', 'organizer.email', 'organizer.domain', 'start_time', "'organizer'"]) }} as membership_identifier_id,
         nexus_event_id as event_id,
         start_time as occurred_at,
         organizer.email as person_identifier,
@@ -22,6 +23,7 @@ WITH organizer_memberships AS (
 
 creator_memberships AS (
     SELECT 
+        {{ create_nexus_id('membership_identifier', ['nexus_event_id', 'creator.email', 'creator.domain', 'start_time', "'creator'"]) }} as membership_identifier_id,
         nexus_event_id as event_id,
         start_time as occurred_at,
         creator.email as person_identifier,
@@ -39,6 +41,7 @@ creator_memberships AS (
 
 attendee_memberships AS (
     SELECT
+        {{ create_nexus_id('membership_identifier', ['base.nexus_event_id', 'attendee.email', 'attendee.domain', 'base.start_time', "'attendee'"]) }} as membership_identifier_id,
         base.nexus_event_id as event_id,
         base.start_time as occurred_at,
         attendee.email as person_identifier,
@@ -53,6 +56,7 @@ attendee_memberships AS (
     AND attendee.email != ''
     AND attendee.domain IS NOT NULL
     AND attendee.domain != ''
+    GROUP BY base.nexus_event_id, attendee.email, attendee.domain, base.start_time
 ),
 
 all_memberships AS (
@@ -64,6 +68,7 @@ all_memberships AS (
 )
 
 SELECT 
+    membership_identifier_id,
     event_id,
     occurred_at,
     person_identifier,

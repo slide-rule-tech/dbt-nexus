@@ -69,10 +69,7 @@ component_mapping as (
   select
     identifier_type,
     identifier_value,
-    {{ dbt_utils.generate_surrogate_key([
-      'first_component_type',
-      'first_component_value'
-    ]) }} as component_id
+    {{ create_nexus_id(entity_type, ['first_component_type', 'first_component_value']) }} as component_id
   from component_values
   group by identifier_type, identifier_value, first_component_type, first_component_value
 ),
@@ -112,7 +109,7 @@ deduplicated_identifiers as (
 
 --  Output the deduplicated records
 select
-  {{ dbt_utils.generate_surrogate_key([entity_type ~ '_id', 'identifier_type', 'identifier_value']) }} as identifier_id,
+  {{ create_nexus_id(entity_type ~ '_identifier', [entity_type ~ '_id', 'identifier_type', 'identifier_value']) }} as {{ entity_type }}_identifier_id,
   {{ entity_type }}_id,
   event_id,
   identifier_type,

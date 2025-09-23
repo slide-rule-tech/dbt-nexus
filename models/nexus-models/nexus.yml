@@ -1,0 +1,295 @@
+version: 2
+
+models:
+  - name: nexus_events
+    description:
+      "Unified events table containing all events from enabled sources"
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description: "Unique identifier for the event"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: occurred_at
+        description: "Timestamp when the event occurred"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_person_identifiers
+    description:
+      "Unified person identifiers table containing all person identifiers from
+      enabled sources"
+    tests:
+      - unique:
+          column_name: person_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: person_identifier_id
+        description: "Unique identifier for the person identifier record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_group_identifiers
+    description:
+      "Unified group identifiers table containing all group identifiers from
+      enabled sources"
+    tests:
+      - unique:
+          column_name: group_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: group_identifier_id
+        description: "Unique identifier for the group identifier record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_membership_identifiers
+    description:
+      "Unified membership identifiers table containing all membership
+      identifiers from enabled sources"
+    tests:
+      - unique:
+          column_name: membership_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: membership_identifier_id
+        description: "Unique identifier for the membership identifier record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_person_traits
+    description:
+      "Unified person traits table containing all person traits from enabled
+      sources"
+    tests:
+      - unique:
+          column_name: person_trait_id
+          config:
+            severity: error
+    columns:
+      - name: person_trait_id
+        description: "Unique identifier for the person trait record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_group_traits
+    description:
+      "Unified group traits table containing all group traits from enabled
+      sources"
+    tests:
+      - unique:
+          column_name: group_trait_id
+          config:
+            severity: error
+    columns:
+      - name: group_trait_id
+        description: "Unique identifier for the group trait record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_persons
+    description: "Final persons table with resolved person data"
+    tests:
+      - unique:
+          column_name: person_id
+          config:
+            severity: error
+    columns:
+      - name: person_id
+        description: "Unique identifier for the person"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_groups
+    description: "Final groups table with resolved group data"
+    tests:
+      - unique:
+          column_name: group_id
+          config:
+            severity: error
+    columns:
+      - name: group_id
+        description: "Unique identifier for the group"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_memberships
+    description: "Final memberships table with resolved membership data"
+    tests:
+      - unique:
+          column_name: membership_id
+          config:
+            severity: error
+    columns:
+      - name: membership_id
+        description: "Unique identifier for the membership"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_person_participants
+    description: "Person participants linking persons to events"
+    tests:
+      - unique:
+          column_name: person_participant_id
+          config:
+            severity: error
+    columns:
+      - name: person_participant_id
+        description: "Unique identifier for the person participant record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_group_participants
+    description: "Group participants linking groups to events"
+    tests:
+      - unique:
+          column_name: group_participant_id
+          config:
+            severity: error
+    columns:
+      - name: group_participant_id
+        description: "Unique identifier for the group participant record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_resolved_person_identifiers
+    description: "Resolved person identifiers after identity resolution"
+    tests:
+      - unique:
+          column_name: person_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: person_identifier_id
+        description:
+          "Unique identifier for the resolved person identifier record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_resolved_group_identifiers
+    description: "Resolved group identifiers after identity resolution"
+    tests:
+      - unique:
+          column_name: group_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: group_identifier_id
+        description:
+          "Unique identifier for the resolved group identifier record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_resolved_person_traits
+    description: "Resolved person traits after identity resolution"
+    tests:
+      - unique:
+          column_name: person_trait_id
+          config:
+            severity: error
+    columns:
+      - name: person_trait_id
+        description: "Unique identifier for the resolved person trait record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_resolved_group_traits
+    description: "Resolved group traits after identity resolution"
+    tests:
+      - unique:
+          column_name: group_trait_id
+          config:
+            severity: error
+    columns:
+      - name: group_trait_id
+        description: "Unique identifier for the resolved group trait record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_person_identifiers_edges
+    description: "Edges connecting person identifiers for identity resolution"
+    tests:
+      - unique:
+          column_name:
+            "edge_id || '|' || identifier_type_a || '|' || identifier_value_a ||
+            '|' || identifier_type_b || '|' || identifier_value_b"
+          config:
+            severity: error
+    columns:
+      - name: edge_id
+        description: "Unique identifier for the person identifier edge"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_group_identifiers_edges
+    description: "Edges connecting group identifiers for identity resolution"
+    tests:
+      - unique:
+          column_name:
+            "edge_id || '|' || identifier_type_a || '|' || identifier_value_a ||
+            '|' || identifier_type_b || '|' || identifier_value_b"
+          config:
+            severity: error
+    columns:
+      - name: edge_id
+        description: "Unique identifier for the group identifier edge"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_states
+    description: "States table for tracking entity state changes"
+    tests:
+      - unique:
+          column_name: state_id
+          config:
+            severity: error
+    columns:
+      - name: state_id
+        description: "Unique identifier for the state record"
+        tests:
+          - not_null:
+              config:
+                severity: error

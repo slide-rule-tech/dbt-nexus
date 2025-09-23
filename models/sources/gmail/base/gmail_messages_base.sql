@@ -20,7 +20,7 @@ event_filter AS (
 
 extracted AS (
     SELECT
-        {{ dbt_utils.generate_surrogate_key(['message_id']) }} as event_id,
+        {{ create_nexus_id('event', ['message_id']) }} as event_id,
         'message_sent' as event_name,
         CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', JSON_EXTRACT_SCALAR(record, '$.date')) AS TIMESTAMP) as occurred_at,
         

@@ -40,7 +40,7 @@
   {{ dbt_utils.generate_surrogate_key(cols) }}
 {%- endmacro %}
 
-{% macro create_nexus_id(type, cols, source=None) -%}
+{% macro create_nexus_id(type, cols) -%}
   {%- set p = '' -%}
   {%- if type == 'event' -%}
     {%- set p = 'evt' -%}
@@ -73,9 +73,5 @@
   {%- else -%}
     {%- set p = type[:3] -%}
   {%- endif -%}
-  {%- if source is none or source == '' -%}
-    {{ "'" ~ p ~ "'" }} || '_' || {{ dbt_utils.generate_surrogate_key(cols) }}
-  {%- else -%}
-    {{ "'" ~ p ~ "'" }} || '_' || {{ "'" ~ source ~ "'" }} || '_' || {{ dbt_utils.generate_surrogate_key(cols) }}
-  {%- endif -%}
+  {{ "'" ~ p ~ "'" }} || '_' || {{ dbt_utils.generate_surrogate_key(cols) }}
 {%- endmacro %}

@@ -28,6 +28,14 @@ and this project adheres to
   lowercase)
 - Strong typing for all event columns with automatic NULL handling for missing
   fields
+- **NEW**: Comprehensive data quality testing with 37 uniqueness and not-null
+  tests across all nexus models
+- **NEW**: Troubleshooting documentation with diagnostic queries and common
+  solutions
+- **NEW**: Testing reference documentation covering all model validations
+- **NEW**: Role-based ID generation for proper multi-role entity handling
+- **NEW**: Source data deduplication patterns for handling duplicate raw data
+- **NEW**: Composite key testing for edge relationship validation
 
 ### Changed
 
@@ -42,6 +50,17 @@ and this project adheres to
 - `nexus_events` model now uses dynamic column detection and strong typing
 - Event column types now enforced: `value`/`significance` as FLOAT, timestamps
   as TIMESTAMP, strings as VARCHAR
+- **BREAKING**: Standardized all ID field naming across models:
+  - `id` → `person_identifier_id`, `group_identifier_id`,
+    `membership_identifier_id`
+  - `trait_id` → `person_trait_id`, `group_trait_id`
+  - Added `state_id` to state management models
+- **BREAKING**: Updated `create_nexus_id` macro usage across all identity
+  resolution, final tables, and source models
+- **BREAKING**: Enhanced participant ID generation to include role for proper
+  multi-role handling
+- **BREAKING**: Updated composite key test syntax from array format to
+  concatenated string format
 
 ### Fixed
 
@@ -54,6 +73,19 @@ and this project adheres to
 - Cross-database column name case sensitivity issues in
   `dbt_utils.union_relations`
 - Missing optional columns now properly handled with typed NULL values
+- **Critical**: Massive duplicate ID issues across all nexus models (99.96%
+  duplicate reduction)
+- **Critical**: Google Calendar source data duplicates causing 2,455+ duplicate
+  person identifiers
+- **Critical**: Group identifier duplicates from multiple employees at same
+  domain in same event
+- **Critical**: Membership identifier duplicates from same person-group
+  combinations with different roles
+- **Critical**: Participant ID duplicates when same entity has multiple roles in
+  same event
+- Edge relationship test failures due to incorrect composite key syntax
+- Missing role inclusion in ID generation causing entity role conflicts
+- Source data deduplication issues in Google Calendar attendee processing
 
 ### Performance Improvements
 
@@ -61,6 +93,13 @@ and this project adheres to
 - Recursive resolution: 12+ minutes → 4-5 seconds
 - Edge reduction: 1.8M duplicate edges → 790 unique edges (99.96% reduction)
 - Memory usage: Linear scaling vs quadratic explosion
+- **Data Quality**: Duplicate ID reduction across all models:
+  - nexus_person_identifiers: 2,455 duplicates → 1 duplicate (99.96% reduction)
+  - nexus_group_identifiers: 2,640 duplicates → 0 duplicates (100% reduction)
+  - nexus_membership_identifiers: 2,454 duplicates → 0 duplicates (100%
+    reduction)
+  - nexus_group_participants: 3,907 duplicates → 0 duplicates (100% reduction)
+  - nexus_person_participants: All duplicates eliminated (100% reduction)
 
 ### Technical Details
 
@@ -71,6 +110,31 @@ and this project adheres to
   uniqueness
 - Eliminates cartesian product explosion in high-frequency entity scenarios
 - Preserves all semantic relationships while removing redundant processing
+
+**ID Standardization and Uniqueness Fixes**:
+
+- **Standardized create_nexus_id Usage**: Updated all identity resolution, final
+  tables, and source models to use consistent `create_nexus_id` macro with
+  proper entity type prefixes
+- **Role-Based ID Generation**: Enhanced ID generation to include role
+  information preventing same-entity multi-role conflicts:
+  - Person identifiers:
+    `create_nexus_id('person_identifier', ['event_id', 'email', 'role', 'occurred_at'])`
+  - Group identifiers:
+    `create_nexus_id('group_identifier', ['event_id', 'domain', 'role', 'occurred_at'])`
+  - Participant IDs:
+    `create_nexus_id(entity_type ~ '_participant', ['event_id', entity_type ~ '_id', 'role'])`
+- **Source Data Deduplication**: Added GROUP BY clauses to handle duplicate raw
+  data:
+  - Google Calendar attendee processing:
+    `GROUP BY event_id, email, is_optional, occurred_at`
+  - Group domain processing:
+    `GROUP BY event_id, domain, is_optional, occurred_at`
+- **Macro Updates**: Updated `process_entity_identifiers`,
+  `process_entity_traits`, `finalize_participants`, and `common_state_fields`
+  macros for consistent field naming
+- **Test Configuration**: Fixed composite key test syntax from array format to
+  concatenated string format for proper validation
 
 **Dynamic Column Handling in nexus_events**:
 
@@ -96,13 +160,40 @@ and this project adheres to
   etc.
 - Flexible schema handling allows source tables with varying column sets
 
+**Comprehensive Data Quality Testing**:
+
+- **37 Total Tests**: Complete coverage across all nexus models with uniqueness
+  and not-null validations
+- **Composite Key Testing**: Proper validation of edge relationships with
+  concatenated string syntax
+- **Diagnostic Tooling**: SQL queries to identify duplicate sources and root
+  causes
+- **Troubleshooting Documentation**: Step-by-step guides for resolving common
+  duplicate scenarios
+- **Test Categories**: Primary keys, composite keys, data integrity, and
+  business rule compliance
+
+**Documentation Enhancements**:
+
+- **Troubleshooting Guide**: Comprehensive guide with real-world scenarios and
+  SQL diagnostic queries
+- **Testing Reference**: Complete documentation of all 37 tests with failure
+  scenarios and solutions
+- **LLM-Friendly Structure**: Diátaxis framework with clear headings and
+  cross-references
+- **Sample Queries**: Copy-paste diagnostic queries for identifying duplicate
+  sources
+
 **Backward Compatibility**:
 
-- No changes required to existing source models
-- All `*_person_identifiers`, `*_group_identifiers` tables work unchanged
-- Event participation and final entity tables maintain identical output schema
-- Existing `*_events` models work unchanged, missing columns auto-filled with
-  NULL
+- **BREAKING CHANGES**: ID field names updated across all models - migration
+  required
+- **BREAKING CHANGES**: Enhanced ID generation includes additional fields -
+  existing IDs will change
+- **BREAKING CHANGES**: Test syntax updated for composite keys - nexus.yml
+  updates required
+- Source model patterns remain consistent but with enhanced deduplication
+- All macros maintain same interface but with improved internal logic
 
 ## [0.1.0] - 2024-12-XX
 
