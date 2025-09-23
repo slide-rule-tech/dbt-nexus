@@ -6,7 +6,7 @@
 
 WITH sender_email_traits AS (
     SELECT 
-        {{ create_nexus_id('person_trait', ['event_id', 'sender.email', "'email'"]) }} as trait_id,
+        {{ create_nexus_id('person_trait', ['event_id', 'sender.email', "'email'"]) }} as person_trait_id,
         event_id,
         'email' as identifier_type,
         sender.email as identifier_value,
@@ -20,7 +20,7 @@ WITH sender_email_traits AS (
 
 sender_name_traits AS (
     SELECT 
-        {{ create_nexus_id('person_trait', ['event_id', 'sender.email', "'name'"]) }} as trait_id,
+        {{ create_nexus_id('person_trait', ['event_id', 'sender.email', "'name'"]) }} as person_trait_id,
         event_id,
         'email' as identifier_type,
         sender.email as identifier_value,
@@ -36,7 +36,7 @@ sender_name_traits AS (
 
 recipient_email_traits AS (
     SELECT 
-        {{ create_nexus_id('person_trait', ['event_id', 'recipient.email', "'email'"]) }} as trait_id,
+        {{ create_nexus_id('person_trait', ['event_id', 'recipient.email', "'email'"]) }} as person_trait_id,
         event_id,
         'email' as identifier_type,
         recipient.email as identifier_value,
@@ -51,7 +51,7 @@ recipient_email_traits AS (
 
 recipient_name_traits AS (
     SELECT 
-        {{ create_nexus_id('person_trait', ['event_id', 'recipient.email', "'name'"]) }} as trait_id,
+        {{ create_nexus_id('person_trait', ['event_id', 'recipient.email', "'name'"]) }} as person_trait_id,
         event_id,
         'email' as identifier_type,
         recipient.email as identifier_value,
@@ -69,7 +69,7 @@ recipient_name_traits AS (
 -- Internal traits for senders
 sender_internal_traits AS (
     SELECT 
-        {{ create_nexus_id('person_trait', ['event_id', 'sender.email', "'internal'"]) }} as trait_id,
+        {{ create_nexus_id('person_trait', ['event_id', 'sender.email', "'internal'"]) }} as person_trait_id,
         event_id,
         'email' as identifier_type,
         sender.email as identifier_value,
@@ -84,7 +84,7 @@ sender_internal_traits AS (
 -- Test traits for senders
 sender_test_traits AS (
     SELECT 
-        {{ create_nexus_id('person_trait', ['event_id', 'sender.email', "'test'"]) }} as trait_id,
+        {{ create_nexus_id('person_trait', ['event_id', 'sender.email', "'test'"]) }} as person_trait_id,
         event_id,
         'email' as identifier_type,
         sender.email as identifier_value,
@@ -99,7 +99,7 @@ sender_test_traits AS (
 -- Internal traits for recipients
 recipient_internal_traits AS (
     SELECT 
-        {{ create_nexus_id('person_trait', ['event_id', 'recipient.email', "'internal'"]) }} as trait_id,
+        {{ create_nexus_id('person_trait', ['event_id', 'recipient.email', "'internal'"]) }} as person_trait_id,
         event_id,
         'email' as identifier_type,
         recipient.email as identifier_value,
@@ -115,7 +115,7 @@ recipient_internal_traits AS (
 -- Test traits for recipients
 recipient_test_traits AS (
     SELECT 
-        {{ create_nexus_id('person_trait', ['event_id', 'recipient.email', "'test'"]) }} as trait_id,
+        {{ create_nexus_id('person_trait', ['event_id', 'recipient.email', "'test'"]) }} as person_trait_id,
         event_id,
         'email' as identifier_type,
         recipient.email as identifier_value,
@@ -147,7 +147,7 @@ unioned AS (
 )
 
 SELECT 
-    trait_id,
+    person_trait_id,
     event_id,
     {{ create_nexus_id('person_edge', ['event_id', 'identifier_value', 'trait_name']) }} as edge_id,
     identifier_type,

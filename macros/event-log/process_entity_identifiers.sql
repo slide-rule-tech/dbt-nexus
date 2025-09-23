@@ -19,7 +19,7 @@
         normalized as (
             -- Standardize identifier formats (lowercase emails, etc.)
             select
-                identifier_id,
+                {{ entity_type }}_identifier_id,
                 event_id,
                 edge_id,
                 identifier_type,
@@ -38,7 +38,7 @@
         )
 
         select
-            identifier_id,
+            {{ entity_type }}_identifier_id,
             event_id,
             edge_id,
             identifier_type,
@@ -51,7 +51,7 @@
     {% else %}
         {# Return empty result if no relations found #}
         select 
-            cast(null as string) as identifier_id,
+            cast(null as string) as {{ entity_type }}_identifier_id,
             cast(null as string) as event_id,
             cast(null as string) as edge_id,
             cast(null as string) as identifier_type,

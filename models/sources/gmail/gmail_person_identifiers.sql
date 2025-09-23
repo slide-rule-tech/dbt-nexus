@@ -6,7 +6,7 @@
 
 WITH sender_identifiers AS (
     SELECT 
-        {{ create_nexus_id('person_identifier', ['event_id', 'sender.email']) }} as identifier_id,
+        {{ create_nexus_id('person_identifier', ['event_id', 'sender.email']) }} as person_identifier_id,
         event_id,
         {{ create_nexus_id('person_edge', ['event_id', 'sender.email']) }} as edge_id,
         'email' as identifier_type,
@@ -20,7 +20,7 @@ WITH sender_identifiers AS (
 
 recipient_identifiers AS (
     SELECT 
-        {{ create_nexus_id('person_identifier', ['event_id', 'recipient.email']) }} as identifier_id,
+        {{ create_nexus_id('person_identifier', ['event_id', 'recipient.email']) }} as person_identifier_id,
         event_id,
         {{ create_nexus_id('person_edge', ['event_id', 'recipient.email']) }} as edge_id,
         'email' as identifier_type,
@@ -40,7 +40,7 @@ unioned AS (
 )
 
 SELECT 
-    identifier_id,
+    person_identifier_id,
     event_id,
     edge_id,
     identifier_type,

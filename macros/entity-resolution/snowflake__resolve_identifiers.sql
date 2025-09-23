@@ -103,7 +103,7 @@ deduplicated_identifiers as (
 
 --  Output the deduplicated records
 select
-  {{ create_nexus_id(entity_type ~ '_identifier', [entity_type ~ '_id', 'identifier_type', 'identifier_value']) }} as identifier_id,
+  {{ create_nexus_id(entity_type ~ '_identifier', [entity_type ~ '_id', 'identifier_type', 'identifier_value']) }} as {{ entity_type }}_identifier_id,
   {{ entity_type }}_id,
   event_id,
   identifier_type,

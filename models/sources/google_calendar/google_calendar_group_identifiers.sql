@@ -6,7 +6,7 @@
 ) }}
 WITH organizer_domains AS (
     SELECT 
-        {{ create_nexus_id('group_identifier', ['nexus_event_id', 'organizer.domain']) }} as identifier_id,
+        {{ create_nexus_id('group_identifier', ['nexus_event_id', 'organizer.domain']) }} as group_identifier_id,
         nexus_event_id as event_id,
         {{ create_nexus_id('group_edge', ['nexus_event_id', 'organizer.domain']) }} as edge_id,
         organizer.domain as identifier_value,
@@ -20,7 +20,7 @@ WITH organizer_domains AS (
 
 creator_domains AS (
     SELECT 
-        {{ create_nexus_id('group_identifier', ['nexus_event_id', 'creator.domain']) }} as identifier_id,
+        {{ create_nexus_id('group_identifier', ['nexus_event_id', 'creator.domain']) }} as group_identifier_id,
         nexus_event_id as event_id,
         {{ create_nexus_id('group_edge', ['nexus_event_id', 'creator.domain']) }} as edge_id,
         creator.domain as identifier_value,
@@ -34,7 +34,7 @@ creator_domains AS (
 
 attendee_domains AS (
     SELECT
-        {{ create_nexus_id('group_identifier', ['base.nexus_event_id', 'attendee.domain']) }} as identifier_id,
+        {{ create_nexus_id('group_identifier', ['base.nexus_event_id', 'attendee.domain']) }} as group_identifier_id,
         base.nexus_event_id as event_id,
         {{ create_nexus_id('group_edge', ['base.nexus_event_id', 'attendee.domain']) }} as edge_id,
         attendee.domain as identifier_value,
@@ -59,7 +59,7 @@ all_domains AS (
 )
 
 SELECT 
-    identifier_id,
+    group_identifier_id,
     event_id,
     edge_id,
     identifier_type,
