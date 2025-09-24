@@ -31,6 +31,8 @@
     tch
   {%- elif type == 'attribution_deduplication_key' -%}
     att_dedup
+  {%- elif type == 'touchpoint_path' -%}
+    tch_path
   {%- elif type == 'touchpoint_path_batch' -%}
     tch_batch
   {%- else -%}
@@ -80,6 +82,8 @@
     {%- set p = 'tch' -%}
   {%- elif type == 'attribution_deduplication_key' -%}
     {%- set p = 'att_dedup' -%}
+  {%- elif type == 'touchpoint_path' -%}
+    {%- set p = 'tch_path' -%}
   {%- elif type == 'touchpoint_path_batch' -%}
     {%- set p = 'tch_batch' -%}
   {%- else -%}

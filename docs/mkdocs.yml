@@ -177,6 +177,7 @@ nav:
 
   - Architecture & Concepts:
       - explanations/index.md
+      - Attribution Framework: explanations/attribution.md
       - Real-World Use Cases: explanations/use-cases.md
       - Package Architecture: explanations/architecture.md
       - Identity Resolution Logic: explanations/identity-resolution.md

@@ -12,15 +12,28 @@ with touchpoint_paths as (
 
 batches as (
     select
-        {{ dbt_utils.generate_surrogate_key(['last_touchpoint_id', 'person_id']) }} as batch_id,
-        last_touchpoint_id,
-        person_id,
-        min(touchpoint_occurred_at) as first_touchpoint_at,
-        max(event_occurred_at) as last_event_at,
-        count(*) as events_in_batch,
-        count(distinct event_id) as unique_events_in_batch
+        touchpoint_batch_id,
+        max(last_touchpoint_id) as touchpoint_id,
+        max(person_id) as person_id,
+        min(touchpoint_occurred_at) as touchpoint_occurred_at,
+        max(event_occurred_at) as last_event_occurred_at,
+        count(*) as events_in_batch
     from touchpoint_paths
-    group by last_touchpoint_id, person_id
+    group by touchpoint_batch_id
+),
+
+batches_with_attribution as (
+    select
+        b.touchpoint_batch_id,
+        b.person_id,
+        b.touchpoint_occurred_at,
+        b.last_event_occurred_at,
+        b.events_in_batch,
+        -- Attribution columns from nexus_touchpoints
+        t.*
+    from batches b
+    inner join {{ ref('nexus_touchpoints') }} t
+        on b.touchpoint_id = t.touchpoint_id
 )
 
-select * from batches
+select * from batches_with_attribution order by touchpoint_occurred_at desc
