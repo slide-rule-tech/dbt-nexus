@@ -61,6 +61,21 @@ deduplicated_paths as (
     where duplicate_touchpoint = false
 ),
 
+-- Step 1: Find the latest touchpoint timestamp for each event
+latest_touchpoint_times as (
+    select 
+        e.event_id,
+        e.person_id,
+        e.event_occurred_at,
+        max(t.occurred_at) as latest_touchpoint_at
+    from events_with_participants e
+    inner join deduplicated_paths t 
+        on e.person_id = t.person_id 
+        and t.occurred_at < e.event_occurred_at
+    group by e.event_id, e.person_id, e.event_occurred_at
+),
+
+-- Step 2: Join back to get the actual touchpoint details with tie-breaker
 touchpoints_with_events as (
     select
         t.touchpoint_id,
@@ -68,12 +83,31 @@ touchpoints_with_events as (
         t.attribution_deduplication_key,
         t.occurred_at,
         t.person_id,
-        e.event_id,
-        e.event_occurred_at
-    from deduplicated_paths t
-    inner join events_with_participants e
-        on t.person_id = e.person_id
-    where t.occurred_at < e.event_occurred_at
+        lt.event_id,
+        lt.event_occurred_at,
+        -- Add tie-breaker for multiple touchpoints at same timestamp
+        row_number() over (
+            partition by lt.event_id 
+            order by t.touchpoint_id  -- Use touchpoint_id as deterministic tie-breaker
+        ) as tie_breaker_rank
+    from latest_touchpoint_times lt
+    inner join deduplicated_paths t 
+        on lt.person_id = t.person_id 
+        and lt.latest_touchpoint_at = t.occurred_at
+),
+
+-- Step 3: Filter to only one touchpoint per event
+final_touchpoints_with_events as (
+    select
+        touchpoint_id,
+        touchpoint_event_id,
+        attribution_deduplication_key,
+        occurred_at,
+        person_id,
+        event_id,
+        event_occurred_at
+    from touchpoints_with_events
+    where tie_breaker_rank = 1
 )
 
-select * from touchpoints_with_events
+select * from final_touchpoints_with_events
