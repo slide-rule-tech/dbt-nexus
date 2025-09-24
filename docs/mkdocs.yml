@@ -151,6 +151,7 @@ nav:
       - Create Custom States: how-to/create-custom-states.md
       - Handle Multiple Entity Types: how-to/handle-multiple-entities.md
       - Optimize Performance: how-to/optimize-performance.md
+      - Troubleshoot Attribution Issues: how-to/troubleshooting-attribution.md
       - Troubleshoot Common Issues: how-to/troubleshoot.md
 
   - Reference:

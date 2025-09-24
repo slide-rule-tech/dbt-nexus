@@ -78,7 +78,7 @@ latest_touchpoint_times as (
     from events_with_participants e
     inner join deduplicated_paths t 
         on e.person_id = t.person_id 
-        and t.occurred_at < e.event_occurred_at
+        and t.occurred_at <= e.event_occurred_at
         and datediff('day', t.occurred_at, e.event_occurred_at) <= 90  -- 90-day attribution window
     group by e.event_id, e.person_id, e.event_occurred_at
 ),
