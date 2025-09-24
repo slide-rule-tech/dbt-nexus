@@ -41,14 +41,14 @@ Include source-specific fields for reference and debugging:
 ## ID Generation Macro
 
 ```sql
-{{ nexus.create_nexus_id('event', ['unique_cols'], 'source_name') }}
+{{ nexus.create_nexus_id('event', ['unique_cols']) }}
 ```
 
 ## Quick Template
 
 ```sql
 select
-    {{ nexus.create_nexus_id('event', ['id', 'timestamp'], 'source') }} as event_id,
+    {{ nexus.create_nexus_id('event', ['id', 'timestamp']) }} as event_id,
     timestamp_field as occurred_at,
     'category' as event_type,
     'event name' as event_name,

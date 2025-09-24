@@ -81,22 +81,21 @@ updated_at
 Use the `create_nexus_id` macro to generate proper event IDs:
 
 ```sql
-{{ nexus.create_nexus_id('event', ['source_id', 'occurred_at'], 'source_name') }} as event_id
+{{ nexus.create_nexus_id('event', ['source_id', 'occurred_at']) }} as event_id
 ```
 
 ### Parameters:
 
 - **Type**: Always `'event'` for events
 - **Columns**: Array of columns that uniquely identify the event
-- **Source**: Source system name (e.g., `'lobbie'`, `'gmail'`)
 
 ### Example:
 
 ```sql
-{{ nexus.create_nexus_id('event', ['appointment_id', 'start_datetime'], 'lobbie') }} as event_id
+{{ nexus.create_nexus_id('event', ['appointment_id', 'start_datetime']) }} as event_id
 ```
 
-This generates IDs like: `evt_lobbie_abc123def456`
+This generates IDs like: `evt_abc123def456`
 
 ## Complete Event Model Template
 
@@ -114,7 +113,7 @@ with source_data as (
 formatted_events as (
     select
         -- Required nexus event fields
-        {{ nexus.create_nexus_id('event', ['unique_id', 'timestamp_field'], '[source_name]') }} as event_id,
+        {{ nexus.create_nexus_id('event', ['unique_id', 'timestamp_field']) }} as event_id,
         [timestamp_field] as occurred_at,
         '[event_category]' as type,
         '[event name]' as event_name,
@@ -156,7 +155,7 @@ with appointments as (
 appointment_events as (
     select
         -- Nexus event standard fields
-        {{ nexus.create_nexus_id('event', ['appointment_id', 'start_datetime'], 'lobbie') }} as event_id,
+        {{ nexus.create_nexus_id('event', ['appointment_id', 'start_datetime']) }} as event_id,
         start_datetime as occurred_at,
         'appointment' as type,
         'appointment booked' as event_name,
@@ -342,7 +341,7 @@ CAST(timestamp_field AS TIMESTAMP) as occurred_at
 **Solution**: Include more unique columns in the ID generation:
 
 ```sql
-{{ nexus.create_nexus_id('event', ['id', 'timestamp', 'source_id'], 'source') }}
+{{ nexus.create_nexus_id('event', ['id', 'timestamp', 'source_id']) }}
 ```
 
 ### Issue: Missing required fields
