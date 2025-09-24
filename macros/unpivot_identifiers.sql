@@ -32,6 +32,8 @@ with source_data as (
     {{ edge_id_field }} as edge_id_field_value,
     {% if role_column is not none %}
     {{ role_column }} as role,
+    {% else %}
+    cast(null as string) as role,
     {% endif %}
     {% for add_col in additional_columns %}
     {{ add_col }},
@@ -48,7 +50,11 @@ with source_data as (
 {% for col in identifier_cols %}
   {% if not loop.first %}union all{% endif %}
   select
+    {% if role_column is not none %}
     {{ nexus.create_nexus_id(entity_type ~ '_identifier', ['event_id', col, 'role', 'occurred_at']) }} as {{ entity_type }}_identifier_id,
+    {% else %}
+    {{ nexus.create_nexus_id(entity_type ~ '_identifier', ['event_id', col, 'occurred_at']) }} as {{ entity_type }}_identifier_id,
+    {% endif %}
     event_id,
     {{ nexus.create_nexus_id(entity_type ~ '_edge', ['edge_id_field_value']) }} as edge_id,
     {% if col in column_to_identifier_type %}
