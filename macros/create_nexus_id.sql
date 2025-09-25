@@ -35,6 +35,8 @@
     tch_path
   {%- elif type == 'touchpoint_path_batch' -%}
     tch_batch
+  {%- elif type == 'attribution_model_result' -%}
+    attr_res
   {%- else -%}
     {{ type[:3] }}
   {%- endif -%}
@@ -86,6 +88,8 @@
     {%- set p = 'tch_path' -%}
   {%- elif type == 'touchpoint_path_batch' -%}
     {%- set p = 'tch_batch' -%}
+  {%- elif type == 'attribution_model_result' -%}
+    {%- set p = 'attr_res' -%}
   {%- else -%}
     {%- set p = type[:3] -%}
   {%- endif -%}

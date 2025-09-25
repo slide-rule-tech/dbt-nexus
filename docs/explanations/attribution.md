@@ -517,15 +517,141 @@ Result: Digital conversion attributed to offline direct mail campaign
 
 ---
 
+## Attribution Model Results
+
+The Nexus attribution framework supports multiple attribution models through a
+unified results table that unions client-specific attribution implementations.
+
+### Attribution Model Architecture
+
+Client projects develop their own attribution models (like `last_fbclid`,
+`first_touch`, `linear_attribution`, etc.) that implement specific attribution
+logic. These models are automatically unioned into a single
+`nexus_attribution_model_results` table for unified analysis.
+
+### Client Attribution Model Development
+
+Each client attribution model must follow a consistent schema:
+
+**Required Columns:**
+
+- `attribution_model_result_id` - Unique identifier with `attr_res_` prefix
+- `touchpoint_occurred_at` - When the touchpoint occurred
+- `attribution_model_name` - Name of the attribution model (e.g., 'last fbclid')
+- `touchpoint_batch_id` - Batch identifier
+- `touchpoint_event_id` - Event ID associated with the touchpoint
+- `attributed_event_id` - Each event attributed by this model
+- `person_id` - Person identifier
+- `attributed_event_occurred_at` - When the attributed event occurred
+
+**Attribution-Specific Columns:**
+
+- Model-specific attribution data (e.g., `fbclid`, `gclid`, `source`, etc.)
+
+### Configuration
+
+Configure attribution models in `dbt_project.yml`:
+
+```yaml
+vars:
+  attribution_models:
+    - name: last_fbclid
+    - name: first_touch_attribution
+    - name: linear_attribution
+    - name: time_decay_attribution
+```
+
+The nexus package automatically unions all configured attribution models into
+`nexus_attribution_model_results`.
+
+### Unified Attribution Analysis
+
+Query attribution results across all models:
+
+```sql
+-- Compare attribution models
+SELECT
+  attribution_model_name,
+  COUNT(*) as total_attributions,
+  COUNT(DISTINCT person_id) as unique_persons,
+  COUNT(DISTINCT attributed_event_id) as unique_events
+FROM {{ ref('nexus_attribution_model_results') }}
+GROUP BY attribution_model_name
+ORDER BY total_attributions DESC
+
+-- Cross-model attribution analysis
+SELECT
+  person_id,
+  attributed_event_id,
+  STRING_AGG(attribution_model_name || ': ' || COALESCE(fbclid, gclid, source), ' | ') as attribution_summary
+FROM {{ ref('nexus_attribution_model_results') }}
+WHERE person_id = 'per_12345'
+GROUP BY person_id, attributed_event_id
+```
+
+### Column Naming Strategy
+
+Attribution models reuse common column names to keep the unified table narrow
+and sensible:
+
+- `fbclid` - Facebook Click ID (not `last_fbclid`)
+- `gclid` - Google Click ID
+- `source` - Source parameter
+- `medium` - Medium parameter
+- `campaign` - Campaign parameter
+
+This allows queries to work across multiple attribution models without complex
+column mapping.
+
+### Example Attribution Models
+
+**Last FBCLID Attribution:**
+
+```sql
+-- Tracks the most recent Facebook click ID for each user journey
+SELECT
+  {{ nexus.create_nexus_id('attribution_model_result', ['touchpoint_batch_id', 'event_id', 'person_id']) }} as attribution_model_result_id,
+  touchpoint_occurred_at,
+  'last fbclid' as attribution_model_name,
+  touchpoint_batch_id,
+  touchpoint_event_id,
+  attributed_event_id,
+  person_id,
+  attributed_event_occurred_at,
+  last_fbclid as fbclid  -- Renamed for consistency
+FROM last_fbclid_attribution
+```
+
+**First Touch Attribution:**
+
+```sql
+-- Attributes all events to the first touchpoint for each person
+SELECT
+  {{ nexus.create_nexus_id('attribution_model_result', ['touchpoint_batch_id', 'event_id', 'person_id']) }} as attribution_model_result_id,
+  touchpoint_occurred_at,
+  'first touch' as attribution_model_name,
+  touchpoint_batch_id,
+  touchpoint_event_id,
+  attributed_event_id,
+  person_id,
+  attributed_event_occurred_at,
+  first_touch_source as source,
+  first_touch_medium as medium,
+  first_touch_campaign as campaign
+FROM first_touch_attribution
+```
+
 ## Next Steps
 
 To implement attribution models on top of this foundation:
 
-1. **Query `nexus_touchpoint_paths`** for event-level attribution
-2. **Query `nexus_touchpoint_path_batches`** for efficient batch processing
-3. **Store results in `nexus_attribution_model_results`** for fast lookups
-4. **Build dashboards** using the attribution results for marketing insights
+1. **Develop client-specific attribution models** following the unified schema
+2. **Configure models in `dbt_project.yml`** under `attribution_models`
+3. **Query `nexus_attribution_model_results`** for unified attribution analysis
+4. **Build dashboards** comparing multiple attribution models
+5. **Create attribution reports** that work across all configured models
 
 The Nexus attribution framework provides the foundation for sophisticated,
 accurate attribution modeling that reflects real user behavior rather than
-artificial session boundaries.
+artificial session boundaries, while supporting multiple attribution strategies
+through a unified, extensible architecture.
