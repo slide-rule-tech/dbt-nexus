@@ -87,23 +87,22 @@ identity resolution.
 ```sql
 {{ config(tags=['identity-resolution','persons'], materialized='table') }}
 
-with unpivoted as (
 {{ nexus.unpivot_identifiers(
     model_name='stg_your_source',
     columns=['email', 'phone_number', 'user_id', 'customer_id'],
     event_id_field='event_id',
-    edge_id_field=dbt_utils.generate_surrogate_key(['event_id']),
+    edge_id_field='event_id',
     additional_columns=['occurred_at', "'your_source' as source"],
     column_to_identifier_type={
       'email': 'email',
       'phone_number': 'phone',
       'user_id': 'user_id',
       'customer_id': 'customer_id'
-    }
+    },
+    role_column="'customer'",
+    entity_type='person'
 ) }}
-)
 
-select * from unpivoted
 order by occurred_at desc
 ```
 
@@ -114,7 +113,6 @@ Person traits capture characteristics and attributes of individuals.
 ```sql
 {{ config(tags=['identity-resolution','persons'], materialized='table') }}
 
-with unpivoted as (
 {{ nexus.unpivot_traits(
     model_name='stg_your_source',
     columns=[
@@ -129,13 +127,14 @@ with unpivoted as (
     identifier_column='user_id',
     identifier_type='user_id',
     event_id_field='event_id',
-    additional_columns=['occurred_at', "'your_source' as source", "event_id as edge_id"],
-    column_to_trait_name={}
+    additional_columns=['occurred_at', "'your_source' as source"],
+    column_to_trait_name={
+        'first_name': 'first_name',
+        'last_name': 'last_name'
+    },
+    entity_type='person'
 ) }}
-)
 
-select * from unpivoted
-where identifier_value is not null
 order by occurred_at desc
 ```
 
@@ -147,22 +146,21 @@ organizational grouping.
 ```sql
 {{ config(tags=['identity-resolution','groups'], materialized='table') }}
 
-with unpivoted as (
 {{ nexus.unpivot_identifiers(
     model_name='stg_your_source',
     columns=['domain', 'address', 'company_id'],
     event_id_field='event_id',
-    edge_id_field=dbt_utils.generate_surrogate_key(['event_id']),
+    edge_id_field='event_id',
     additional_columns=['occurred_at', "'your_source' as source"],
     column_to_identifier_type={
       'domain': 'domain',
       'address': 'address',
       'company_id': 'company_id'
-    }
+    },
+    role_column="'organization'",
+    entity_type='group'
 ) }}
-)
 
-select * from unpivoted
 order by occurred_at desc
 ```
 
@@ -173,7 +171,6 @@ Group traits capture characteristics and attributes of groups.
 ```sql
 {{ config(tags=['identity-resolution','groups'], materialized='table') }}
 
-with unpivoted as (
 {{ nexus.unpivot_traits(
     model_name='stg_your_source',
     columns=[
@@ -188,13 +185,14 @@ with unpivoted as (
     identifier_column='company_id',
     identifier_type='company_id',
     event_id_field='event_id',
-    additional_columns=['occurred_at', "'your_source' as source", "event_id as edge_id"],
-    column_to_trait_name={}
+    additional_columns=['occurred_at', "'your_source' as source"],
+    column_to_trait_name={
+        'company_name': 'name',
+        'zip_code': 'postal_code'
+    },
+    entity_type='group'
 ) }}
-)
 
-select * from unpivoted
-where identifier_value is not null
 order by occurred_at desc
 ```
 

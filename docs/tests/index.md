@@ -14,6 +14,78 @@ are defined in `models/nexus-models/nexus.yml`.
 
 ---
 
+## 0. Source Testing (Strongly Recommended)
+
+**Before nexus processing begins**, create comprehensive tests for your source
+models. Source tests are your first line of defense against data quality issues.
+
+### Why Source Tests Matter
+
+- **Early Detection**: Catch problems before they propagate through nexus
+  processing
+- **Pipeline Reliability**: Prevent downstream failures in identity resolution
+- **Data Quality Assurance**: Ensure IDs are unique and required fields are
+  populated
+
+### Essential Source Tests
+
+Create tests for your source models following this pattern:
+
+```yaml
+# models/sources/your_source/your_source.yml
+version: 2
+
+models:
+  - name: your_source_events
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_%'"
+              config:
+                severity: warn
+
+  - name: your_source_person_identifiers
+    tests:
+      - unique:
+          column_name: person_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: person_identifier_id
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_idfr_%'"
+              config:
+                severity: warn
+```
+
+### Running Source Tests
+
+```bash
+# Test all models in a specific source
+dbt test --select models/sources/segment/
+
+# Test and build everything in a source folder
+dbt build --select models/sources/segment/
+```
+
+**Complete Guide**: See [Source Testing Best Practices](source-tests.md) for
+detailed examples and patterns.
+
+---
+
 ## 1. Test Categories
 
 ### Primary Key Tests

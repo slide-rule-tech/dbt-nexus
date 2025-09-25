@@ -62,7 +62,7 @@ left join {{ ref('base_customers') }} c
 {{ config(materialized='table', tags=['event-processing']) }}
 
 select
-    {{ nexus.create_nexus_id('event', ['order_id', 'order_date'], 'your_source') }} as event_id,
+    {{ nexus.create_nexus_id('event', ['order_id', 'order_date']) }} as event_id,
     order_date as occurred_at,
     'order' as type,
     'order_placed' as event_name,

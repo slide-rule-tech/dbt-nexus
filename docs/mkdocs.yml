@@ -151,6 +151,7 @@ nav:
       - Create Custom States: how-to/create-custom-states.md
       - Handle Multiple Entity Types: how-to/handle-multiple-entities.md
       - Optimize Performance: how-to/optimize-performance.md
+      - Troubleshoot Attribution Issues: how-to/troubleshooting-attribution.md
       - Troubleshoot Common Issues: how-to/troubleshoot.md
 
   - Reference:
@@ -177,6 +178,7 @@ nav:
 
   - Architecture & Concepts:
       - explanations/index.md
+      - Attribution Framework: explanations/attribution.md
       - Real-World Use Cases: explanations/use-cases.md
       - Package Architecture: explanations/architecture.md
       - Identity Resolution Logic: explanations/identity-resolution.md

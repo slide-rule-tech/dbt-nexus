@@ -27,6 +27,16 @@
     grp_prt
   {%- elif type == 'nexus' -%}
     nx
+  {%- elif type == 'touchpoint' -%}
+    tch
+  {%- elif type == 'attribution_deduplication_key' -%}
+    att_dedup
+  {%- elif type == 'touchpoint_path' -%}
+    tch_path
+  {%- elif type == 'touchpoint_path_batch' -%}
+    tch_batch
+  {%- elif type == 'attribution_model_result' -%}
+    attr_res
   {%- else -%}
     {{ type[:3] }}
   {%- endif -%}
@@ -70,6 +80,16 @@
     {%- set p = 'grp_prt' -%}
   {%- elif type == 'nexus' -%}
     {%- set p = 'nx' -%}
+  {%- elif type == 'touchpoint' -%}
+    {%- set p = 'tch' -%}
+  {%- elif type == 'attribution_deduplication_key' -%}
+    {%- set p = 'att_dedup' -%}
+  {%- elif type == 'touchpoint_path' -%}
+    {%- set p = 'tch_path' -%}
+  {%- elif type == 'touchpoint_path_batch' -%}
+    {%- set p = 'tch_batch' -%}
+  {%- elif type == 'attribution_model_result' -%}
+    {%- set p = 'attr_res' -%}
   {%- else -%}
     {%- set p = type[:3] -%}
   {%- endif -%}

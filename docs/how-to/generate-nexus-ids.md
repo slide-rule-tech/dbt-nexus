@@ -64,7 +64,7 @@ The macro supports the following entity types with their corresponding prefixes:
 ### Syntax
 
 ```sql
-{{ nexus.create_nexus_id(type, columns, source) }}
+{{ nexus.create_nexus_id(type, columns) }}
 ```
 
 ### Parameters
@@ -236,7 +236,7 @@ Use multiple columns to ensure uniqueness:
 
 ```sql
 -- Multiple columns for uniqueness (events with source)
-{{ nexus.create_nexus_id('event', ['id', 'timestamp', 'source_id'], 'system') }}
+{{ nexus.create_nexus_id('event', ['id', 'timestamp', 'source_id']) }}
 -- Result: evt_system_def456ghi789
 
 -- Multiple columns for uniqueness (other entities without source)
@@ -252,11 +252,11 @@ Use conditional logic for different ID patterns:
 -- Conditional ID generation
 case
     when source = 'lobbie' then
-        {{ nexus.create_nexus_id('event', ['appointment_id', 'start_datetime'], 'lobbie') }}
+        {{ nexus.create_nexus_id('event', ['appointment_id', 'start_datetime']) }}
     when source = 'gmail' then
-        {{ nexus.create_nexus_id('event', ['message_id', 'date'], 'gmail') }}
+        {{ nexus.create_nexus_id('event', ['message_id', 'date']) }}
     else
-        {{ nexus.create_nexus_id('event', ['id', 'timestamp'], source) }}
+        {{ nexus.create_nexus_id('event', ['id', 'timestamp']) }}
 end as event_id
 ```
 
@@ -278,7 +278,7 @@ dbt deps
 
 ```sql
 -- Add more unique columns for events
-{{ nexus.create_nexus_id('event', ['id', 'timestamp', 'source_id'], 'system') }}
+{{ nexus.create_nexus_id('event', ['id', 'timestamp', 'source_id']) }}
 
 -- Add more unique columns for other entities
 {{ nexus.create_nexus_id('person', ['id', 'email', 'phone']) }}
