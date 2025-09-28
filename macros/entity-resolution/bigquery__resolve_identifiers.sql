@@ -69,7 +69,7 @@ component_mapping as (
   select
     identifier_type,
     identifier_value,
-    {{ create_nexus_id(entity_type, ['first_component_type', 'first_component_value']) }} as component_id
+    {{ create_nexus_id('entity', ['first_component_type', 'first_component_value']) }} as component_id
   from component_values
   group by identifier_type, identifier_value, first_component_type, first_component_value
 ),
@@ -84,7 +84,8 @@ resolved_identifiers as (
     u.event_id,
     u.identifier_type,
     u.identifier_value,
-    c.component_id as {{ entity_type }}_id
+    u.entity_type,
+    c.component_id as entity_id
   from entity_identifiers u
   join component_mapping c
     on u.identifier_type = c.identifier_type
@@ -96,12 +97,13 @@ deduplicated_identifiers as (
   select
     identifier_type,
     identifier_value,
-    {{ entity_type }}_id,
+    entity_type,
+    entity_id,
     event_id,
     edge_id,
     -- Use ROW_NUMBER to identify duplicates
     row_number() over(
-      partition by identifier_type, identifier_value
+      partition by identifier_type, identifier_value, entity_type
       order by edge_id  -- Keep the earliest occurrence by edge_id
     ) as row_num
   from resolved_identifiers
@@ -109,13 +111,14 @@ deduplicated_identifiers as (
 
 --  Output the deduplicated records
 select
-  {{ create_nexus_id(entity_type ~ '_identifier', [entity_type ~ '_id', 'identifier_type', 'identifier_value']) }} as {{ entity_type }}_identifier_id,
-  {{ entity_type }}_id,
+  {{ create_nexus_id('entity_identifier', ['entity_id', 'identifier_type', 'identifier_value']) }} as entity_identifier_id,
+  entity_id,
+  entity_type,
   event_id,
   identifier_type,
   identifier_value,
   false as realtime_processed,
-  true as existing_{{ entity_type }}
+  true as existing_entity
 from deduplicated_identifiers 
 where row_num = 1 
 {% endmacro %} 

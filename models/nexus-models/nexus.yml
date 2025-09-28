@@ -27,286 +27,299 @@ models:
               config:
                 severity: error
 
-  - name: nexus_person_identifiers
+  - name: nexus_entity_identifiers
     description:
-      "Unified person identifiers table containing all person identifiers from
+      "Unified entity identifiers table containing all entity identifiers from
       enabled sources"
     tests:
       - unique:
-          column_name: person_identifier_id
+          column_name: entity_identifier_id
           config:
             severity: error
     columns:
-      - name: person_identifier_id
-        description: "Unique identifier for the person identifier record"
+      - name: entity_identifier_id
+        description: "Unique identifier for the entity identifier record"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_idfr_%'"
+              expression: "like 'ent_idfr_%'"
               config:
                 severity: warn
-
-  - name: nexus_group_identifiers
-    description:
-      "Unified group identifiers table containing all group identifiers from
-      enabled sources"
-    tests:
-      - unique:
-          column_name: group_identifier_id
-          config:
-            severity: error
-    columns:
-      - name: group_identifier_id
-        description: "Unique identifier for the group identifier record"
+      - name: entity_type
+        description: "Type of entity (person, group, etc.)"
         tests:
           - not_null:
               config:
                 severity: error
-          - dbt_utils.expression_is_true:
-              expression: "like 'grp_idfr_%'"
+          - accepted_values:
+              values:
+                [
+                  "person",
+                  "group",
+                  "task",
+                  "contract",
+                  "product",
+                  "location",
+                  "event_series",
+                ]
               config:
                 severity: warn
 
-  - name: nexus_membership_identifiers
+  - name: nexus_entity_traits
     description:
-      "Unified membership identifiers table containing all membership
-      identifiers from enabled sources"
-    tests:
-      - unique:
-          column_name: membership_identifier_id
-          config:
-            severity: error
-    columns:
-      - name: membership_identifier_id
-        description: "Unique identifier for the membership identifier record"
-        tests:
-          - not_null:
-              config:
-                severity: error
-          - dbt_utils.expression_is_true:
-              expression: "like 'mem_%'"
-              config:
-                severity: warn
-
-  - name: nexus_person_traits
-    description:
-      "Unified person traits table containing all person traits from enabled
+      "Unified entity traits table containing all entity traits from enabled
       sources"
     tests:
       - unique:
-          column_name: person_trait_id
+          column_name: entity_trait_id
           config:
             severity: error
     columns:
-      - name: person_trait_id
-        description: "Unique identifier for the person trait record"
+      - name: entity_trait_id
+        description: "Unique identifier for the entity trait record"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_tr_%'"
+              expression: "like 'ent_tr_%'"
+              config:
+                severity: warn
+      - name: entity_type
+        description: "Type of entity (person, group, etc.)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values:
+                [
+                  "person",
+                  "group",
+                  "task",
+                  "contract",
+                  "product",
+                  "location",
+                  "event_series",
+                ]
               config:
                 severity: warn
 
-  - name: nexus_group_traits
-    description:
-      "Unified group traits table containing all group traits from enabled
-      sources"
+  - name: nexus_entities
+    description: "Final entities table with resolved entity data"
     tests:
       - unique:
-          column_name: group_trait_id
+          column_name: entity_id
           config:
             severity: error
     columns:
-      - name: group_trait_id
-        description: "Unique identifier for the group trait record"
+      - name: entity_id
+        description: "Unique identifier for the entity"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'grp_tr_%'"
+              expression: "like 'ent_%'"
+              config:
+                severity: warn
+      - name: entity_type
+        description: "Type of entity (person, group, task, contract, etc.)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values:
+                [
+                  "person",
+                  "group",
+                  "task",
+                  "contract",
+                  "product",
+                  "location",
+                  "event_series",
+                ]
               config:
                 severity: warn
 
-  - name: nexus_persons
-    description: "Final persons table with resolved person data"
+  - name: nexus_relationships
+    description: "Final relationships table with resolved relationship data"
     tests:
       - unique:
-          column_name: person_id
+          column_name: relationship_id
           config:
             severity: error
     columns:
-      - name: person_id
-        description: "Unique identifier for the person"
+      - name: relationship_id
+        description: "Unique identifier for the relationship"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_%'"
+              expression: "like 'rel_%'"
               config:
                 severity: warn
-
-  - name: nexus_groups
-    description: "Final groups table with resolved group data"
-    tests:
-      - unique:
-          column_name: group_id
-          config:
-            severity: error
-    columns:
-      - name: group_id
-        description: "Unique identifier for the group"
+      - name: entity_a_id
+        description: "ID of the first entity in the relationship"
         tests:
           - not_null:
               config:
                 severity: error
-          - dbt_utils.expression_is_true:
-              expression: "like 'grp_%'"
-              config:
-                severity: warn
-
-  - name: nexus_memberships
-    description: "Final memberships table with resolved membership data"
-    tests:
-      - unique:
-          column_name: membership_id
-          config:
-            severity: error
-    columns:
-      - name: membership_id
-        description: "Unique identifier for the membership"
+      - name: entity_b_id
+        description: "ID of the second entity in the relationship"
         tests:
           - not_null:
               config:
                 severity: error
-          - dbt_utils.expression_is_true:
-              expression: "like 'mem_%'"
-              config:
-                severity: warn
-
-  - name: nexus_person_participants
-    description: "Person participants linking persons to events"
-    tests:
-      - unique:
-          column_name: person_participant_id
-          config:
-            severity: error
-    columns:
-      - name: person_participant_id
-        description: "Unique identifier for the person participant record"
-        tests:
-          - not_null:
-              config:
-                severity: error
-          - dbt_utils.expression_is_true:
-              expression: "like 'per_prt_%'"
-              config:
-                severity: warn
-
-  - name: nexus_group_participants
-    description: "Group participants linking groups to events"
-    tests:
-      - unique:
-          column_name: group_participant_id
-          config:
-            severity: error
-    columns:
-      - name: group_participant_id
-        description: "Unique identifier for the group participant record"
-        tests:
-          - not_null:
-              config:
-                severity: error
-          - dbt_utils.expression_is_true:
-              expression: "like 'grp_prt_%'"
-              config:
-                severity: warn
-
-  - name: nexus_resolved_person_identifiers
-    description: "Resolved person identifiers after identity resolution"
-    tests:
-      - unique:
-          column_name: person_identifier_id
-          config:
-            severity: error
-    columns:
-      - name: person_identifier_id
+      - name: relationship_type
         description:
-          "Unique identifier for the resolved person identifier record"
+          "Type of relationship (advisor_client, manager_employee, etc.)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: nexus_entity_participants
+    description: "Entity participants linking entities to events"
+    tests:
+      - unique:
+          column_name: entity_participant_id
+          config:
+            severity: error
+    columns:
+      - name: entity_participant_id
+        description: "Unique identifier for the entity participant record"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_idfr_%'"
+              expression: "like 'ent_prt_%'"
+              config:
+                severity: warn
+      - name: entity_type
+        description: "Type of entity (person, group, etc.)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values:
+                [
+                  "person",
+                  "group",
+                  "task",
+                  "contract",
+                  "product",
+                  "location",
+                  "event_series",
+                ]
               config:
                 severity: warn
 
-  - name: nexus_resolved_group_identifiers
-    description: "Resolved group identifiers after identity resolution"
+  - name: nexus_resolved_entity_identifiers
+    description: "Resolved entity identifiers after identity resolution"
     tests:
       - unique:
-          column_name: group_identifier_id
+          column_name: entity_identifier_id
           config:
             severity: error
     columns:
-      - name: group_identifier_id
+      - name: entity_identifier_id
         description:
-          "Unique identifier for the resolved group identifier record"
+          "Unique identifier for the resolved entity identifier record"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'grp_idfr_%'"
+              expression: "like 'ent_idfr_%'"
+              config:
+                severity: warn
+      - name: entity_type
+        description: "Type of entity (person, group, etc.)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values:
+                [
+                  "person",
+                  "group",
+                  "task",
+                  "contract",
+                  "product",
+                  "location",
+                  "event_series",
+                ]
+              config:
+                severity: warn
+      - name: entity_id
+        description: "Resolved entity ID after identity resolution"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'ent_%'"
               config:
                 severity: warn
 
-  - name: nexus_resolved_person_traits
-    description: "Resolved person traits after identity resolution"
+  - name: nexus_resolved_entity_traits
+    description: "Resolved entity traits after identity resolution"
     tests:
       - unique:
-          column_name: person_trait_id
+          column_name: entity_trait_id
           config:
             severity: error
     columns:
-      - name: person_trait_id
-        description: "Unique identifier for the resolved person trait record"
+      - name: entity_trait_id
+        description: "Unique identifier for the resolved entity trait record"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_tr_%'"
+              expression: "like 'ent_tr_%'"
               config:
                 severity: warn
-
-  - name: nexus_resolved_group_traits
-    description: "Resolved group traits after identity resolution"
-    tests:
-      - unique:
-          column_name: group_trait_id
-          config:
-            severity: error
-    columns:
-      - name: group_trait_id
-        description: "Unique identifier for the resolved group trait record"
+      - name: entity_type
+        description: "Type of entity (person, group, etc.)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values:
+                [
+                  "person",
+                  "group",
+                  "task",
+                  "contract",
+                  "product",
+                  "location",
+                  "event_series",
+                ]
+              config:
+                severity: warn
+      - name: entity_id
+        description: "Resolved entity ID after identity resolution"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'grp_tr_%'"
+              expression: "like 'ent_%'"
               config:
                 severity: warn
 
-  - name: nexus_person_identifiers_edges
-    description: "Edges connecting person identifiers for identity resolution"
+  - name: nexus_entity_identifiers_edges
+    description: "Edges connecting entity identifiers for identity resolution"
     tests:
       - unique:
           column_name:
@@ -316,34 +329,13 @@ models:
             severity: error
     columns:
       - name: edge_id
-        description: "Unique identifier for the person identifier edge"
+        description: "Unique identifier for the entity identifier edge"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_edg_%'"
-              config:
-                severity: warn
-
-  - name: nexus_group_identifiers_edges
-    description: "Edges connecting group identifiers for identity resolution"
-    tests:
-      - unique:
-          column_name:
-            "edge_id || '|' || identifier_type_a || '|' || identifier_value_a ||
-            '|' || identifier_type_b || '|' || identifier_value_b"
-          config:
-            severity: error
-    columns:
-      - name: edge_id
-        description: "Unique identifier for the group identifier edge"
-        tests:
-          - not_null:
-              config:
-                severity: error
-          - dbt_utils.expression_is_true:
-              expression: "like 'grp_edg_%'"
+              expression: "like 'ent_edg_%'"
               config:
                 severity: warn
 

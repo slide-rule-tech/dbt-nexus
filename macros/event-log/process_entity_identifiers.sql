@@ -1,12 +1,10 @@
-{% macro process_entity_identifiers(entity_type) %}
+{% macro process_entity_identifiers() %}
 
 
     {# Collect relations to union based on entity type #}
     {% set relations_to_union = [] %}
     {% for source in var('sources') %}
-        {% if source[entity_type ~ 's'] %}
-            {% do relations_to_union.append(ref(source.name ~ '_' ~ entity_type ~ '_identifiers')) %}
-        {% endif %}
+        {% do relations_to_union.append(ref(source.name ~ '_entity_identifiers')) %}
     {% endfor %}
 
     {% if relations_to_union %}
@@ -19,7 +17,8 @@
         normalized as (
             -- Standardize identifier formats (lowercase emails, etc.)
             select
-                {{ entity_type }}_identifier_id,
+                entity_identifier_id,
+                entity_type,
                 event_id,
                 edge_id,
                 identifier_type,
@@ -38,7 +37,8 @@
         )
 
         select
-            {{ entity_type }}_identifier_id,
+            entity_identifier_id,
+            entity_type,
             event_id,
             edge_id,
             identifier_type,
@@ -51,7 +51,8 @@
     {% else %}
         {# Return empty result if no relations found #}
         select 
-            cast(null as string) as {{ entity_type }}_identifier_id,
+            cast(null as string) as entity_identifier_id,
+            cast(null as string) as entity_type,
             cast(null as string) as event_id,
             cast(null as string) as edge_id,
             cast(null as string) as identifier_type,

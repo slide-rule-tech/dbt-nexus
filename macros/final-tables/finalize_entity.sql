@@ -1,25 +1,28 @@
 {% macro finalize_entity(entity_type) %}
 
 with resolved_traits as (
-  select * from {{ ref('nexus_resolved_' ~ entity_type ~ '_traits') }}
+  select * from {{ ref('nexus_resolved_entity_traits') }}
+  where entity_type = '{{ entity_type }}'
 ),
 
 -- Get distinct entity IDs first
 distinct_entities as (
   select
-    distinct {{ entity_type }}_id
-  from {{ ref('nexus_resolved_' ~ entity_type ~ '_identifiers') }}
+    distinct entity_id
+  from {{ ref('nexus_resolved_entity_identifiers') }}
+  where entity_type = '{{ entity_type }}'
 ),
 
 -- Then pivot traits separately
 pivoted_traits as (
-  {{ pivot_traits('nexus_resolved_' ~ entity_type ~ '_traits', entity_type ~ '_id', 'traits_') }}
+  {{ pivot_traits('nexus_resolved_entity_traits', 'entity_id', 'traits_', "entity_type = '" ~ entity_type ~ "'") }}
 )
 
 -- Join distinct IDs with traits
 select
-  e.{{ entity_type }}_id,
+  e.entity_id,
+  '{{ entity_type }}' as entity_type,
   t.*
 from distinct_entities e
-left join pivoted_traits t on e.{{ entity_type }}_id = t.traits_{{ entity_type }}_id
+left join pivoted_traits t on e.entity_id = t.traits_entity_id
 {% endmacro %} 

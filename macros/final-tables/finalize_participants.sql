@@ -1,18 +1,20 @@
 {% macro finalize_participants(entity_type) %}
 
 with resolved_identifiers as (
-  select * from {{ ref('nexus_resolved_' ~ entity_type ~ '_identifiers') }}
+  select * from {{ ref('nexus_resolved_entity_identifiers') }}
+  where entity_type = '{{ entity_type }}'
 ),
 
 entity_identifiers as (
   select
     *
-  from {{ref('nexus_' ~ entity_type ~ '_identifiers')}}
+  from {{ref('nexus_entity_identifiers')}}
+  where entity_type = '{{ entity_type }}'
 ),
 
 joined as (
   select
-    ri.{{ entity_type }}_id,
+    ri.entity_id,
     ri.identifier_type,
     ri.identifier_value,
     ei.event_id,
@@ -23,10 +25,11 @@ joined as (
 
 -- Final output with just the unique entity_id and event_id combinations
 select
-  {{ create_nexus_id(entity_type ~ '_participant', ['event_id', entity_type ~ '_id', 'role']) }} as {{ entity_type }}_participant_id,
+  {{ create_nexus_id('entity_participant', ['event_id', 'entity_id', 'role']) }} as entity_participant_id,
   event_id,
-  {{ entity_type }}_id,
+  entity_id,
+  '{{ entity_type }}' as entity_type,
   role
 from joined
-group by event_id, {{ entity_type }}_id, role
+group by event_id, entity_id, role
 {% endmacro %}

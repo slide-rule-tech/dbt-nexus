@@ -37,7 +37,7 @@ creator_traits AS (
     SELECT 
         {{ create_nexus_id('person_trait', ['nexus_event_id', 'creator.email', "'email'", "'creator'"]) }} as person_trait_id,
         nexus_event_id as event_id,
-        creator.email as person_identifier,
+        creator.email as identifier_value,
         'email' as identifier_type,
         'email' as trait_name,
         creator.email as trait_value,

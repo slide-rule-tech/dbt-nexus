@@ -1,7 +1,8 @@
-{% macro create_identifier_edges(identifiers_table) %}
+{% macro create_identifier_edges(identifiers_table, entity_type) %}
 
 with unpivoted as (
   select * from {{ ref(identifiers_table) }}
+  where entity_type = '{{ entity_type }}'
 ),
 
 raw_edges as (
