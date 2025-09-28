@@ -7,5 +7,7 @@
 
 {% for entity_type in entity_types %}
   {% if not loop.first %}UNION ALL{% endif %}
+  (
   {{ resolve_identifiers(entity_type, 'nexus_entity_identifiers', 'nexus_entity_identifiers_edges', var('nexus_max_recursion', 10)) }}
+  )
 {% endfor %}

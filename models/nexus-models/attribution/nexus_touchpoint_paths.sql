@@ -15,8 +15,9 @@ with touchpoints as (
     from {{ ref('nexus_touchpoints') }}
 ),
 
-person_participants as (
-    select event_id, person_id from {{ ref('nexus_person_participants') }}
+entity_participants as (
+    select event_id, entity_id as person_id from {{ ref('nexus_entity_participants') }}
+    where entity_type = 'person'
 ),
 
 events as (

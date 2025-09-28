@@ -13,9 +13,9 @@ distinct_entities as (
   where entity_type = '{{ entity_type }}'
 ),
 
--- Then pivot traits separately
+-- Pivot traits using the updated macro
 pivoted_traits as (
-  {{ pivot_traits('nexus_resolved_entity_traits', 'entity_id', 'traits_', "entity_type = '" ~ entity_type ~ "'") }}
+  {{ pivot_traits('nexus_resolved_entity_traits', 'entity_id', 'traits_', entity_type) }}
 )
 
 -- Join distinct IDs with traits
