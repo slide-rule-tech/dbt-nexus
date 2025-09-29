@@ -105,6 +105,14 @@ vars:
         memberships: false
         attribution: true
 
+  # Attribution models configuration
+  attribution_models:
+    last_fbclid:
+      enabled: false
+      description: "Last Facebook Click ID attribution model"
+      attribution_window_days: 90
+      touchpoint_types: ["facebook_click", "campaign"]
+
   # Global configuration
   internal_domains:
     - sliderule.com

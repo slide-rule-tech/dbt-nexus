@@ -1,9 +1,12 @@
 {{ config(materialized = 'table')}}
 
-{# Collect relations to union based on attribution_models configuration #}
+{# Collect relations to union based on nexus attribution_models configuration #}
 {% set relations_to_union = [] %}
-{% for model in var('attribution_models', []) %}
-    {% do relations_to_union.append(ref(model.name)) %}
+{% set attribution_models = var('nexus', {}).get('attribution_models', {}) %}
+{% for model_name, model_config in attribution_models.items() %}
+    {% if model_config.get('enabled', false) %}
+        {% do relations_to_union.append(ref(model_name)) %}
+    {% endif %}
 {% endfor %}
 
 {% if relations_to_union %}

@@ -41,6 +41,10 @@ and this project adheres to
 - **NEW**: UTM parameter and click ID tracking for attribution analysis
 - **NEW**: Channel classification (paid, social, organic, referral, direct)
 - **NEW**: Touchpoint modeling with Facebook and Google click ID support
+- **NEW**: Attribution models template source with configurable attribution
+  logic
+- **NEW**: Last Facebook Click ID attribution model with window function
+  approach
 
 ### Changed
 
@@ -68,6 +72,8 @@ and this project adheres to
   concatenated string format
 - **MIGRATION**: Segment source migrated from client-specific implementation to
   reusable template source with enabled configuration
+- **MIGRATION**: Attribution models migrated from client-specific implementation
+  to reusable template source with enabled configuration
 
 ### Fixed
 
@@ -193,6 +199,22 @@ and this project adheres to
   configuration examples and troubleshooting guides
 - **Migration Guide**: Step-by-step process for migrating from legacy sources to
   template sources
+
+**Attribution Models Template Source Migration**:
+
+- **Template Attribution Pattern**: Migrated attribution models from
+  client-specific implementation to reusable template source
+- **Enabled Configuration**: All attribution models now use
+  `var('nexus', {}).get('attribution_models', {}).get('model_name', {}).get('enabled', false)`
+  pattern
+- **Last Facebook Click ID Model**: Complete fbclid attribution with window
+  function approach for person-level tracking
+- **Attribution Infrastructure**: Updated `nexus_attribution_model_results` to
+  use new configuration structure
+- **Comprehensive Documentation**: Full attribution models documentation with
+  configuration examples and usage patterns
+- **Attribution Logic**: Window function-based attribution with 90-day
+  attribution window and touchpoint batch processing
 
 **Documentation Enhancements**:
 
