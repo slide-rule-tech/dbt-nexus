@@ -3,7 +3,11 @@
   {%- set location = source_config.get('location', {}) -%}
   
   {%- set schema_name = location.get('schema', source_name) -%}
-  {%- set table_name = table_name or location.get('table', 'events') -%}
+  {%- if table_name -%}
+    {%- set actual_table_name = location.get('tables', {}).get(table_name, table_name) -%}
+  {%- else -%}
+    {%- set actual_table_name = location.get('table', 'events') -%}
+  {%- endif -%}
   
-  {{ source(schema_name, table_name) }}
+  {{ source(schema_name, actual_table_name) }}
 {% endmacro %}

@@ -1,10 +1,17 @@
 version: 2
 
 sources:
-  - name: SEGMENT_LIVE
+  - name:
+      "{{ var('nexus', {}).get('segment', {}).get('location', {}).get('schema')
+      }}"
     description: "Segment live data warehouse tables"
+    database:
+      "{{ var('nexus', {}).get('segment', {}).get('location',
+      {}).get('database', '') }}"
     tables:
-      - name: TRACKS
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('tracks', 'TRACKS') }}"
         description: "Segment track events"
         columns:
           - name: event_id
@@ -23,7 +30,9 @@ sources:
             description: "Event timestamp"
           - name: received_at
             description: "When event was received"
-      - name: PAGES
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('pages', 'PAGES') }}"
         description: "Segment page events"
         columns:
           - name: event_id
@@ -42,7 +51,9 @@ sources:
             description: "Event timestamp"
           - name: received_at
             description: "When event was received"
-      - name: IDENTIFIES
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('identifies', 'IDENTIFIES') }}"
         description: "Segment identify events"
         columns:
           - name: event_id
