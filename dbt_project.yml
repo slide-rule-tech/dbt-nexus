@@ -117,6 +117,11 @@ vars:
   test_emails:
     - test@example.com
 
+  # Attribution configuration
+  referral_exclusions:
+    - "%sliderule.com%"
+    - "%hollywoodfarms.com%"
+
 # Test configurations
 tests:
   nexus:

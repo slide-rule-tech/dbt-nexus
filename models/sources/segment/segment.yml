@@ -1,5 +1,65 @@
 version: 2
 
+sources:
+  - name: SEGMENT_LIVE
+    description: "Segment live data warehouse tables"
+    tables:
+      - name: TRACKS
+        description: "Segment track events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+          - name: anonymous_id
+            description: "Anonymous user identifier"
+          - name: user_id
+            description: "User identifier"
+          - name: event
+            description: "Event name"
+          - name: properties
+            description: "Event properties"
+          - name: context
+            description: "Event context"
+          - name: timestamp
+            description: "Event timestamp"
+          - name: received_at
+            description: "When event was received"
+      - name: PAGES
+        description: "Segment page events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+          - name: anonymous_id
+            description: "Anonymous user identifier"
+          - name: user_id
+            description: "User identifier"
+          - name: name
+            description: "Page name"
+          - name: properties
+            description: "Page properties"
+          - name: context
+            description: "Event context"
+          - name: timestamp
+            description: "Event timestamp"
+          - name: received_at
+            description: "When event was received"
+      - name: IDENTIFIES
+        description: "Segment identify events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+          - name: anonymous_id
+            description: "Anonymous user identifier"
+          - name: user_id
+            description: "User identifier"
+          - name: traits
+            description: "User traits"
+          - name: context
+            description: "Event context"
+          - name: timestamp
+            description: "Event timestamp"
+          - name: received_at
+            description: "When event was received"
+
 models:
   - name: segment_events
     description:
