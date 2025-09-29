@@ -29,12 +29,13 @@ by providing:
 
 ## Available Template Sources
 
-| Source                              | Status         | Events | Persons | Groups | Memberships |
-| ----------------------------------- | -------------- | ------ | ------- | ------ | ----------- |
-| [Gmail](gmail/)                     | ✅ Ready       | ✅     | ✅      | ✅     | ✅          |
-| [Google Calendar](google_calendar/) | ✅ Ready       | ✅     | ✅      | ✅     | ✅          |
-| Stripe                              | 🚧 Coming Soon | ✅     | ✅      | ✅     | ❌          |
-| Shopify                             | 🚧 Coming Soon | ✅     | ❌      | ✅     | ❌          |
+| Source                              | Status         | Events | Persons | Groups | Memberships | Attribution |
+| ----------------------------------- | -------------- | ------ | ------- | ------ | ----------- | ----------- |
+| [Gmail](gmail/)                     | ✅ Ready       | ✅     | ✅      | ✅     | ✅          | ❌          |
+| [Google Calendar](google_calendar/) | ✅ Ready       | ✅     | ✅      | ✅     | ✅          | ❌          |
+| [Segment](segment/)                 | ✅ Ready       | ✅     | ✅      | ❌     | ❌          | ✅          |
+| Stripe                              | 🚧 Coming Soon | ✅     | ✅      | ✅     | ❌          | ❌          |
+| Shopify                             | 🚧 Coming Soon | ✅     | ❌      | ✅     | ❌          | ❌          |
 
 ## Prerequisites
 

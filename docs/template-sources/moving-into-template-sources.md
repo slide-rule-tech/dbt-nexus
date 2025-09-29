@@ -98,6 +98,9 @@ configurable:
 - Trait models
 - Membership models
 
+**Important**: For sources that don't have universal defaults (like Segment),
+consider removing hardcoded defaults to force explicit client configuration.
+
 ### Step 5: Update dbt-nexus Package Configuration
 
 Add your source to the dbt-nexus package configuration:
@@ -116,6 +119,69 @@ vars:
         persons: true
         groups: true
         memberships: true
+```
+
+### Step 5a: Handle Database-Specific Requirements
+
+**For Snowflake compatibility**, ensure your source configuration supports the
+three-part naming convention:
+
+```yaml
+# dbt-nexus/dbt_project.yml
+vars:
+  nexus:
+    your_source:
+      enabled: false
+      location:
+        database: "" # Empty default for flexibility
+        schema: your_source_schema
+        table: your_source_table
+        # For sources with multiple tables (like Segment)
+        tables:
+          table1: TABLE1
+          table2: TABLE2
+```
+
+**For sources without universal defaults** (like Segment), remove hardcoded
+defaults:
+
+```yaml
+# Instead of: schema: 'DEFAULT_SCHEMA'
+# Use: schema: var('nexus', {}).get('your_source', {}).get('location', {}).get('schema')
+```
+
+### Step 5b: Update Source References for Dynamic Resolution
+
+**Use the `nexus_source` macro** for dynamic source resolution instead of
+hardcoded source references:
+
+```sql
+-- Instead of: select * from {{ source('HARDCODED_SCHEMA', 'HARDCODED_TABLE') }}
+-- Use: select * from {{ nexus_source('your_source', 'table_name') }}
+```
+
+**Update base models** to use the macro:
+
+```sql
+-- base/your_source_table_base.sql
+select * from {{ nexus_source('your_source', 'table_name') }}
+```
+
+**Update source definitions** to use Jinja templating:
+
+```yaml
+# your_source.yml
+sources:
+  - name:
+      "{{ var('nexus', {}).get('your_source', {}).get('location',
+      {}).get('schema') }}"
+    database:
+      "{{ var('nexus', {}).get('your_source', {}).get('location',
+      {}).get('database', '') }}"
+    tables:
+      - name:
+          "{{ var('nexus', {}).get('your_source', {}).get('location',
+          {}).get('tables', {}).get('table_name', 'DEFAULT_TABLE') }}"
 ```
 
 ### Step 6: Create Template Documentation
@@ -186,6 +252,62 @@ dbt run --select package:nexus
 dbt run --select your_source_events
 dbt run --select your_source_person_identifiers
 ```
+
+## Example: Segment Migration
+
+Here's how we migrated Segment from a client project to a template source,
+including the specific challenges and solutions we encountered:
+
+### Before Migration
+
+**Client Project Structure:**
+
+```
+client-projects/gameday_dbt/models/sources/segment/
+├── base/
+│   ├── base_segment_tracks.sql
+│   ├── base_segment_pages.sql
+│   └── base_segment_identifies.sql
+├── segment_events.sql
+├── segment_person_identifiers.sql
+├── segment_person_traits.sql
+├── segment_touchpoints.sql
+└── segment.yml
+```
+
+**Key Challenges Encountered:**
+
+- NoneType iteration error in attribution models
+- Hardcoded source references not compatible with Snowflake
+- Missing database parameter for three-part naming
+- Case sensitivity issues between YAML and database
+
+### After Migration
+
+**dbt-nexus Template Source:**
+
+```
+dbt-nexus/models/sources/segment/
+├── base/
+│   ├── base_segment_tracks.sql      # Uses nexus_source macro
+│   ├── base_segment_pages.sql       # Uses nexus_source macro
+│   └── base_segment_identifies.sql  # Uses nexus_source macro
+├── segment_events.sql
+├── segment_person_identifiers.sql
+├── segment_person_traits.sql
+├── segment_touchpoints.sql
+├── segment.yml                      # Dynamic Jinja templating
+└── docs/template-sources/segment/
+    └── index.md
+```
+
+**Key Fixes Applied:**
+
+- Added `referral_exclusions` variable to prevent NoneType errors
+- Updated `nexus_source` macro to handle database parameter
+- Implemented dynamic source resolution with Jinja templating
+- Removed hardcoded defaults to force explicit configuration
+- Added Snowflake compatibility with three-part naming
 
 ## Example: Google Calendar Migration
 
@@ -345,6 +467,39 @@ project
 
 **Solution**: Remove the source from the legacy `sources` list in client project
 
+### Compilation Errors
+
+**Problem**: "NoneType object is not iterable" error
+
+**Solution**: Ensure all required variables are configured in the nexus package
+(e.g., `referral_exclusions` for attribution sources)
+
+**Problem**: "Source not found" error with correct configuration
+
+**Solution**: Check table name casing - YAML uses lowercase, database may use
+uppercase
+
+**Problem**: "Schema does not exist" error
+
+**Solution**: Verify the schema name in configuration matches your actual
+database schema
+
+### Snowflake-Specific Issues
+
+**Problem**: "Schema 'DATABASE.SCHEMA' does not exist" error
+
+**Solution**: Ensure the `database` parameter is configured in your source
+definition
+
+**Problem**: Duplicate source names
+
+**Solution**: Clean target directory and reinstall packages:
+`dbt clean && dbt deps`
+
+**Problem**: Three-part naming not working
+
+**Solution**: Use the `nexus_source` macro instead of direct `source()` calls
+
 ## Best Practices
 
 1. **Always add enabled configuration** to all models
@@ -355,6 +510,14 @@ project
    memberships)
 6. **Include comprehensive examples** in documentation
 7. **Test with multiple client projects** to ensure reusability
+8. **Use the `nexus_source` macro** for dynamic source resolution
+9. **Handle database-specific requirements** (e.g., Snowflake three-part naming)
+10. **Remove hardcoded defaults** for sources without universal standards
+11. **Configure all required variables** to prevent compilation errors
+12. **Test compilation** before running models to catch configuration issues
+    early
+13. **Handle case sensitivity** properly between YAML and database systems
+14. **Clean target directory** when encountering duplicate source errors
 
 ## Next Steps
 
