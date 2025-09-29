@@ -57,8 +57,6 @@ theme:
 plugins:
   - search:
       lang: en
-  - autorefs
-  - section-index
 
 # Extensions
 markdown_extensions:
@@ -131,6 +129,8 @@ nav:
       - Overview: template-sources/index.md
       - Gmail Integration: template-sources/gmail/index.md
       - Google Calendar Integration: template-sources/google_calendar/index.md
+      - Segment Integration: template-sources/segment/index.md
+      - Attribution Models: template-sources/attribution-models/index.md
 
   - Tutorials:
       - tutorials/index.md
@@ -175,6 +175,12 @@ nav:
           - Schema Requirements: reference/data-contracts/schema.md
           - Source Adapter Interface: reference/data-contracts/source-adapters.md
           - Output Schema: reference/data-contracts/output-schema.md
+
+  - Attribution:
+      - Overview: attribution/index.md
+      - Models:
+          - Attribution Models: attribution/models/index.md
+          - Last Facebook Click ID: attribution/models/last_fbclid.md
 
   - Architecture & Concepts:
       - explanations/index.md
