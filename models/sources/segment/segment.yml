@@ -1,0 +1,207 @@
+version: 2
+
+models:
+  - name: segment_events
+    description:
+      "Unified Segment events table containing all event types (tracks, pages,
+      identifies)"
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description: "Unique identifier for the event"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_%'"
+              config:
+                severity: warn
+      - name: occurred_at
+        description: "Timestamp when the event occurred"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: event_type
+        description: "Type of event (web, identity)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["web", "identity"]
+              config:
+                severity: warn
+      - name: event_name
+        description: "Specific name of the event"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: source
+        description: "Source system (segment)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["segment"]
+              config:
+                severity: error
+
+  - name: segment_person_identifiers
+    description:
+      "Unified Segment person identifiers table containing all person
+      identifiers from tracks, pages, and identifies"
+    tests:
+      - unique:
+          column_name: person_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: person_identifier_id
+        description: "Unique identifier for the person identifier record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_idfr_%'"
+              config:
+                severity: warn
+      - name: event_id
+        description: "Reference to the source event"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_%'"
+              config:
+                severity: warn
+      - name: edge_id
+        description: "Edge identifier for relationship tracking"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_edg_%'"
+              config:
+                severity: warn
+      - name: identifier_type
+        description: "Type of person identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["segment_anonymous_id", "user_id", "email"]
+              config:
+                severity: warn
+      - name: identifier_value
+        description: "Value of the person identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: occurred_at
+        description: "Timestamp when the identifier was captured"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: source
+        description: "Source system (segment)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["segment"]
+              config:
+                severity: error
+
+  - name: segment_person_traits
+    description:
+      "Unified Segment person traits table containing all person traits from
+      tracks, pages, and identifies"
+    tests:
+      - unique:
+          column_name: person_trait_id
+          config:
+            severity: error
+    columns:
+      - name: person_trait_id
+        description: "Unique identifier for the person trait record"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'per_tr_%'"
+              config:
+                severity: warn
+      - name: event_id
+        description: "Reference to the source event"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_%'"
+              config:
+                severity: warn
+      - name: identifier_type
+        description: "Type of person identifier this trait belongs to"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["segment_anonymous_id"]
+              config:
+                severity: warn
+      - name: identifier_value
+        description: "Value of the person identifier this trait belongs to"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: trait_name
+        description: "Name of the person trait"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["anonymous_id", "user_id", "email", "first_name"]
+              config:
+                severity: warn
+      - name: trait_value
+        description: "Value of the person trait"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: occurred_at
+        description: "Timestamp when the trait was captured"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: source
+        description: "Source system (segment)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["segment"]
+              config:
+                severity: error

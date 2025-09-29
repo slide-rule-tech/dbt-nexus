@@ -36,6 +36,11 @@ and this project adheres to
 - **NEW**: Role-based ID generation for proper multi-role entity handling
 - **NEW**: Source data deduplication patterns for handling duplicate raw data
 - **NEW**: Composite key testing for edge relationship validation
+- **NEW**: Segment template source with comprehensive attribution and identity
+  resolution
+- **NEW**: UTM parameter and click ID tracking for attribution analysis
+- **NEW**: Channel classification (paid, social, organic, referral, direct)
+- **NEW**: Touchpoint modeling with Facebook and Google click ID support
 
 ### Changed
 
@@ -61,6 +66,8 @@ and this project adheres to
   multi-role handling
 - **BREAKING**: Updated composite key test syntax from array format to
   concatenated string format
+- **MIGRATION**: Segment source migrated from client-specific implementation to
+  reusable template source with enabled configuration
 
 ### Fixed
 
@@ -172,6 +179,20 @@ and this project adheres to
   duplicate scenarios
 - **Test Categories**: Primary keys, composite keys, data integrity, and
   business rule compliance
+
+**Segment Template Source Migration**:
+
+- **Template Source Pattern**: Migrated Segment integration from client-specific
+  implementation to reusable template source
+- **Enabled Configuration**: All models now use
+  `var('nexus', {}).get('segment', {}).get('enabled', false)` pattern
+- **Attribution Features**: Complete UTM parameter and click ID tracking with
+  channel classification
+- **Touchpoint Modeling**: Facebook (fbclid) and Google (gclid) click ID support
+- **Comprehensive Documentation**: Full template source documentation with
+  configuration examples and troubleshooting guides
+- **Migration Guide**: Step-by-step process for migrating from legacy sources to
+  template sources
 
 **Documentation Enhancements**:
 

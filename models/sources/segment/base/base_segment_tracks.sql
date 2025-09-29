@@ -1,0 +1,1 @@
+select * from {{ source('SEGMENT_LIVE', 'TRACKS') }}

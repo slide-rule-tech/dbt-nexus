@@ -90,6 +90,21 @@ vars:
         groups: true
         memberships: false
 
+    segment:
+      enabled: false
+      location:
+        schema: SEGMENT_LIVE
+        tables:
+          tracks: TRACKS
+          pages: PAGES
+          identifies: IDENTIFIES
+      capabilities:
+        events: true
+        persons: true
+        groups: false
+        memberships: false
+        attribution: true
+
   # Global configuration
   internal_domains:
     - sliderule.com
