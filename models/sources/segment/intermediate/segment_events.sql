@@ -9,62 +9,62 @@
 ) }}
 
 with source_data as (
-    select * from {{ ref('base_segment_all_calls') }}
+    select 
+        *,
+        case 
+            when segment_call_model like '%identifies%' then 'identify'
+            when segment_call_model like '%aliases%' then 'alias'
+            when segment_call_model like '%tracks%' then 'track'
+            when segment_call_model like '%screens%' then 'screen'
+            when segment_call_model like '%groups%' then 'group'
+            when segment_call_model like '%page%' then 'page'
+        end as segment_event_type
+    from {{ ref('base_segment_all_calls') }}
 ),
 
 formatted_events as (
     select
-        {% set identifiers = var('nexus').segment.identifiers %}
-        '{{ identifiers | join(",") }}' as test_field,
-        -- Required nexus event fields
         {{ nexus.create_nexus_id('event', ['id', 'timestamp']) }} as event_id,
         timestamp as occurred_at,
-        'identity' as event_type,
-        'user identified' as event_name,
+        'web' as event_type,
+        case
+            when segment_event_type = 'identify' then 'user identified'
+            when segment_event_type = 'alias' then 'user aliased'
+            when segment_event_type = 'track' then lower(event_text)
+            when segment_event_type = 'screen' then 'screen viewed'
+            when segment_event_type = 'group' then 'user grouped'
+            when segment_event_type = 'page' then 'page viewed'
+        end as event_name,
         'segment' as source,
 
         -- Optional fields
-        'User identified in Segment' as event_description,
+        case
+            when segment_event_type = 'identify' then concat('User identified: ', anonymous_id)
+            when segment_event_type = 'alias' then 'User aliased'
+            when segment_event_type = 'track' then concat('tracked ', lower(event_text))
+            when segment_event_type = 'screen' then concat('viewed ', context_page_title, ' screen')
+            when segment_event_type = 'group' then 'User grouped'
+            when segment_event_type = 'page' then concat('viewed ', context_page_title, ' page')
+        end as event_description,
         null as value,
         null as value_unit,
-        null as significance,
+        0 as significance,
         current_timestamp() as _ingested_at,
 
-        -- Source-specific fields (for reference)
-        id as segment_id,
         anonymous_id as segment_anonymous_id,
-        original_timestamp,
-        timestamp,
-        received_at,
-        sent_at,
-        uuid_ts,
+        id as segment_id,
+        context_page_title as page_title,
+        context_page_referrer as page_referrer,
+        context_page_url as page_url,
+        *
         
-
-        {%- set traits = var('nexus').segment.traits -%}
-        {%- for trait in traits -%}
-        {{ trait }}{%- if not loop.last -%},{%- endif -%}
-        {%- endfor -%},
-        
-        
-        -- Context fields
-        context_campaign_content,
-        context_campaign_name,
-        context_campaign_medium,
-        context_campaign_source,
-        context_campaign_term,
-        
-        
-        -- Page context fields
-        context_page_search,
-        context_page_path,
-        context_page_url,
-        context_page_referrer,
-        context_page_title
 
     from source_data
     where timestamp is not null
       and timestamp > '1900-01-01'  -- Filter out invalid dates
 )
 
-select * from formatted_events
+select 
+    *
+from formatted_events
 order by occurred_at desc
