@@ -9,7 +9,7 @@
 ) }}
 
 {{ nexus.unpivot_identifiers(
-    model_name='segment_identify_events',
+    model_name='segment_events',
     columns=['segment_anonymous_id'] + var('nexus', {}).get('segment', {}).get('identifiers', []),
     event_id_field='event_id',
     edge_id_field='event_id',

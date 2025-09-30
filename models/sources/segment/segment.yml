@@ -70,6 +70,28 @@ sources:
             description: "Event timestamp"
           - name: received_at
             description: "When event was received"
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('appointment_form_submitted',
+          'APPOINTMENT_FORM_SUBMITTED') }}"
+        description: "Appointment form submission events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+          - name: anonymous_id
+            description: "Anonymous user identifier"
+          - name: user_id
+            description: "User identifier"
+          - name: event
+            description: "Event name"
+          - name: properties
+            description: "Event properties"
+          - name: context
+            description: "Event context"
+          - name: timestamp
+            description: "Event timestamp"
+          - name: received_at
+            description: "When event was received"
 
 models:
   - name: segment_events
