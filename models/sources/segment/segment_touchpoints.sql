@@ -9,7 +9,7 @@
 ) }}
 
 with segment_events as (
-    select * from {{ ref('segment_events') }}
+    select * from {{ ref('segment_all_events') }}
 ),
 
 touchpoint_events as (
@@ -22,15 +22,15 @@ touchpoint_events as (
         occurred_at,
         
         -- Attribution fields from UTM parameters (preferred source)
-        coalesce(utm_parameters_utm_source, context_campaign_source) as source,
-        coalesce(utm_parameters_utm_medium, context_campaign_medium) as medium,
-        coalesce(utm_parameters_utm_campaign, context_campaign_name) as campaign,
-        coalesce(utm_parameters_utm_content, context_campaign_content) as content,
-        coalesce(utm_parameters_utm_term, context_campaign_term) as term,
+        context_campaign_source as source,
+        context_campaign_medium as medium,
+        context_campaign_name as campaign,
+        context_campaign_content as content,
+        context_campaign_term as term,
         
         -- Channel classification
         case 
-            when coalesce(utm_parameters_utm_source, context_campaign_source) is not null then 'paid'
+            when context_campaign_source is not null then 'paid'
             when context_page_referrer like '%facebook%' or context_page_search like '%fbclid%' then 'social'
             when context_page_referrer like '%google%' then 'organic'
             when context_page_referrer is not null 
@@ -43,7 +43,7 @@ touchpoint_events as (
         
         -- Touchpoint type
         case 
-            when coalesce(utm_parameters_utm_source, context_campaign_source) is not null then 'campaign'
+            when context_campaign_source is not null then 'campaign'
             when context_page_search like '%fbclid%' then 'facebook_click'
             when context_page_referrer is not null 
                  {% for exclusion in var('referral_exclusions') -%}
@@ -71,19 +71,15 @@ touchpoint_events as (
             else null
         end as gclid,
         
-        -- Additional attribution context
-        context_campaign_id,
-        context_campaign_ad_group,
-        context_campaign_ad,
 
     from segment_events
     
     -- Filter for events that have attribution information
     where (
         -- UTM parameters present
-        coalesce(utm_parameters_utm_source, context_campaign_source) is not null
-        or coalesce(utm_parameters_utm_medium, context_campaign_medium) is not null
-        or coalesce(utm_parameters_utm_campaign, context_campaign_name) is not null
+        context_campaign_source is not null
+        or context_campaign_medium is not null
+        or context_campaign_name is not null
         
         -- Click IDs present
         or context_page_search like '%fbclid=%'
@@ -126,10 +122,6 @@ final as (
         fbclid,
         gclid,
         
-        -- Additional context
-        context_campaign_id as campaign_id,
-        context_campaign_ad_group as ad_group,
-        context_campaign_ad as ad,
 
         {{ nexus.create_nexus_id('attribution_deduplication_key', ['source', 'medium', 'campaign', 'content', 'term', 'referrer',  'fbclid', 'gclid']) }} as attribution_deduplication_key,
         

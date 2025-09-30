@@ -1,3 +1,1 @@
-select * from {{ nexus_source('segment', 'identifies') }}
-
-
+select * from {{ nexus.nexus_source('segment', 'identifies') }}

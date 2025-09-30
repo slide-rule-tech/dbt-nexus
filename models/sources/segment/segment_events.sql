@@ -1,17 +1,16 @@
--- Unioned Layer - Nexus-Ready Segment Events
--- Combines all Segment event types into final Nexus-compatible table
--- Follows four-layer architecture pattern
+-- Nexus Segment Events - Touchpoint Filtered
+-- Filters segment_all_events to only include events that exist as touchpoints
+-- Joins with segment_touchpoints to ensure only attribution-relevant events are included
 
 {{ config(
     enabled=var('nexus', {}).get('segment', {}).get('enabled', false),
-    tags=['identity-resolution', 'events'], 
+    tags=['identity-resolution', 'events', 'touchpoints'], 
     materialized='table'
 ) }}
 
-{{ dbt_utils.union_relations([
-    ref('segment_track_events'),
-    ref('segment_page_events'),
-    ref('segment_identify_events')
-]) }}
-
-order by occurred_at desc
+select 
+    all_events.*
+from {{ ref('segment_all_events') }} as all_events
+inner join {{ ref('segment_touchpoints') }} as touchpoints
+    on all_events.event_id = touchpoints.touchpoint_event_id
+order by all_events.occurred_at desc

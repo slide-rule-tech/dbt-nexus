@@ -13,7 +13,7 @@ distinct_entities as (
 
 -- Then pivot traits separately
 pivoted_traits as (
-  {{ pivot_traits('nexus_resolved_' ~ entity_type ~ '_traits', entity_type ~ '_id', 'traits_') }}
+  {{ nexus.pivot_traits('nexus_resolved_' ~ entity_type ~ '_traits', entity_type ~ '_id', 'traits_') }}
 )
 
 -- Join distinct IDs with traits

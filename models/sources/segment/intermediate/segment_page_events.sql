@@ -34,11 +34,8 @@ formatted_events as (
         title as page_title,
         path as page_path,
         url as page_url,
-        full_url as page_full_url,
         search as page_search,
         referrer as page_referrer,
-        session_id,
-        user_id,
         anonymous_id as segment_anonymous_id,
         original_timestamp,
         timestamp,
@@ -52,25 +49,6 @@ formatted_events as (
         context_campaign_medium,
         context_campaign_source,
         context_campaign_term,
-        context_campaign_id,
-        context_campaign_ad_group,
-        context_campaign_ad,
-        context_campaign_funnel,
-        context_campaign_platform,
-        context_campaign_audience,
-        context_campaign_marketing_audience,
-        context_campaign_customer,
-        context_campaign_source_platform,
-        context_campaign_subid5,
-        context_ip,
-        context_timezone,
-        context_locale,
-        context_library_name,
-        context_library_version,
-        context_user_agent,
-        context_user_agent_data_brands,
-        context_user_agent_data_platform,
-        context_user_agent_data_mobile,
         
         -- Page context fields
         context_page_search,
@@ -79,12 +57,6 @@ formatted_events as (
         context_page_referrer,
         context_page_title,
         
-        -- UTM parameters (specific to pages)
-        utm_parameters_utm_term,
-        utm_parameters_utm_medium,
-        utm_parameters_utm_source,
-        utm_parameters_utm_campaign,
-        utm_parameters_utm_content
 
     from source_data
     where timestamp is not null

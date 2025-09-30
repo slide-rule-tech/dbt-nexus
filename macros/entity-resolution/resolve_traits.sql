@@ -41,7 +41,7 @@ latest_traits as (
 )
 
 select
-    {{ create_nexus_id(entity_type ~ '_trait', [entity_type ~ '_id', 'trait_name', 'trait_value']) }} as {{ entity_type }}_trait_id,
+    {{ nexus.create_nexus_id(entity_type ~ '_trait', [entity_type ~ '_id', 'trait_name', 'trait_value']) }} as {{ entity_type }}_trait_id,
     {{ entity_type }}_id,
     trait_name,
     trait_value,

@@ -14,6 +14,8 @@ with source_data as (
 
 formatted_events as (
     select
+        {% set identifiers = var('nexus').segment.identifiers %}
+        '{{ identifiers | join(",") }}' as test_field,
         -- Required nexus event fields
         {{ nexus.create_nexus_id('event', ['id', 'timestamp']) }} as event_id,
         timestamp as occurred_at,
@@ -22,7 +24,7 @@ formatted_events as (
         'segment' as source,
 
         -- Optional fields
-        coalesce('User identified: ' || first_name || ' (' || email || ')', 'Segment user identification') as event_description,
+        'User identified in Segment' as event_description,
         null as value,
         null as value_unit,
         null as significance,
@@ -30,10 +32,6 @@ formatted_events as (
 
         -- Source-specific fields (for reference)
         id as segment_id,
-        email,
-        first_name,
-        message as identify_message,
-        user_id,
         anonymous_id as segment_anonymous_id,
         original_timestamp,
         timestamp,
@@ -41,25 +39,20 @@ formatted_events as (
         sent_at,
         uuid_ts,
         
+
+        {%- set traits = var('nexus').segment.traits -%}
+        {%- for trait in traits -%}
+        {{ trait }}{%- if not loop.last -%},{%- endif -%}
+        {%- endfor -%},
+        
+        
         -- Context fields
         context_campaign_content,
         context_campaign_name,
         context_campaign_medium,
         context_campaign_source,
         context_campaign_term,
-        context_campaign_ad_group,
-        context_campaign_ad,
-        context_campaign_funnel,
-        context_campaign_platform,
-        context_ip,
-        context_timezone,
-        context_locale,
-        context_library_name,
-        context_library_version,
-        context_user_agent,
-        context_user_agent_data_brands,
-        context_user_agent_data_platform,
-        context_user_agent_data_mobile,
+        
         
         -- Page context fields
         context_page_search,

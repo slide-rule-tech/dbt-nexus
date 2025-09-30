@@ -61,11 +61,58 @@ vars:
         groups: false
         memberships: false
         attribution: true
+      # Configure which identifiers and traits to extract from identify events
+      identifiers:
+        - segment_anonymous_id
+        - user_id
+        - email
+      traits:
+        - segment_anonymous_id
+        - user_id
+        - email
+        - first_name
 ```
 
 **Note**: Unlike other template sources, Segment requires explicit configuration
 of both `database` and `schema` as there are no universal defaults for Segment
 implementations.
+
+**Configurable Traits**: The `identifiers` and `traits` arrays allow you to
+specify which fields to extract from Segment identify events, making the
+template source adaptable to different Segment implementations.
+
+### Customizing Identifiers and Traits
+
+If your Segment implementation doesn't include certain fields (like
+`first_name`), you can customize the configuration:
+
+```yaml
+vars:
+  nexus:
+    segment:
+      enabled: true
+      # ... other configuration ...
+      identifiers:
+        - segment_anonymous_id
+        - user_id
+        - email
+        # Add custom identifiers as needed
+      traits:
+        - segment_anonymous_id
+        - user_id
+        - email
+        # Remove first_name if not available
+        # Add custom traits as needed
+```
+
+**Available Fields**: The template source supports these standard Segment
+identify fields:
+
+- `segment_anonymous_id` (from `anonymous_id`)
+- `user_id`
+- `email`
+- `first_name`
+- Custom traits as configured in your Segment implementation
 
 ## Data Sources
 

@@ -10,14 +10,10 @@
 
 {{ nexus.unpivot_identifiers(
     model_name='segment_page_events',
-    columns=['segment_anonymous_id', 'user_id'],
+    columns=['segment_anonymous_id'],
     event_id_field='event_id',
     edge_id_field='event_id',
     additional_columns=['occurred_at', "'segment' as source"],
-    column_to_identifier_type={
-      'segment_anonymous_id': 'segment_anonymous_id',
-      'user_id': 'user_id'
-    },
     entity_type='person',
     role_column="'visitor'"
 ) }}
