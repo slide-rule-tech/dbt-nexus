@@ -1,16 +1,22 @@
--- Nexus Segment Person Traits - Touchpoint Filtered
--- Filters segment_all_person_traits to only include traits from events that exist as touchpoints
--- Joins with segment_touchpoints to ensure only attribution-relevant person traits are included
+-- Nexus Segment Events - Touchpoint Filtered
+-- Filters segment_all_events to only include events that exist as touchpoints
+-- Joins with segment_touchpoints to ensure only attribution-relevant events are included
 
 {{ config(
     enabled=var('nexus', {}).get('segment', {}).get('enabled', false),
-    tags=['identity-resolution', 'persons', 'touchpoints'], 
+    tags=['identity-resolution', 'events', 'touchpoints'], 
     materialized='table'
 ) }}
 
-select 
-    all_traits.*
-from {{ ref('segment_all_person_traits') }} as all_traits
-inner join {{ ref('segment_touchpoints') }} as touchpoints
-    on all_traits.event_id = touchpoints.touchpoint_event_id
-order by all_traits.occurred_at desc
+with all_traits as (
+{{ dbt_utils.union_relations([
+    ref('segment_identify_person_traits'),
+    ref('segment_track_person_traits'),
+    ref('segment_page_person_traits'),
+]) }}
+
+)
+
+select *
+from all_traits
+order by occurred_at desc

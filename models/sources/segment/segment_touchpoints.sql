@@ -9,7 +9,7 @@
 ) }}
 
 with segment_events as (
-    select * from {{ ref('segment_all_events') }}
+    select * from {{ ref('segment_events') }}
 ),
 
 touchpoint_events as (
