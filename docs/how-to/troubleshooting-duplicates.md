@@ -98,7 +98,72 @@ LIMIT 10;
 
 ## 4. Common Duplicate Scenarios and Solutions
 
-### Scenario 1: Missing Role in ID Generation
+### Scenario 1: String "null" Values in Source Data
+
+**Problem**: Source data contains string "null" values instead of actual NULL values,
+causing duplicate person_identifier_ids when the same event has multiple identifier
+types with "null" values.
+
+**Example**:
+```
+event_id: evt_123
+email: "null" (string)
+phone: "null" (string)
+-- Both generate same person_identifier_id because they hash to same value
+```
+
+**Solution**: Use `safe_cast_with_null_strings` macro to handle null string variations:
+
+```sql
+-- In unpivot macros, replace:
+cast({{ col }} as string) as identifier_value
+
+-- With:
+{{ nexus.safe_cast_with_null_strings(col, api.Column.translate_type("string")) }} as identifier_value
+```
+
+**Helper Macro**:
+```sql
+{% macro safe_cast_with_null_strings(column_name, target_type) %}
+  case 
+    when {{ column_name }} is null then null
+    when {{ column_name }} = 'null' then null
+    when {{ column_name }} = 'NULL' then null
+    when {{ column_name }} = 'None' then null
+    when {{ column_name }} = 'none' then null
+    when {{ column_name }} = '' then null
+    else {{ dbt.safe_cast(column_name, api.Column.translate_type(target_type)) }}
+  end
+{% endmacro %}
+```
+
+### Scenario 2: Cross-Contamination Between Identifier Types
+
+**Problem**: Same value used for different identifier types (e.g., phone number used as email),
+creating duplicate person_identifier_ids.
+
+**Example**:
+```
+person_identifier_id: per_idfr_abc123
+identifier_type: email
+identifier_value: "6307776986" (phone number)
+
+person_identifier_id: per_idfr_abc123 (same ID!)
+identifier_type: phone  
+identifier_value: "6307776986" (same value)
+```
+
+**Solution**: Use validation macros to prevent cross-contamination:
+
+```sql
+-- Email validation
+{{ nexus.validate_and_normalize_email(column.name) }}
+
+-- Phone validation (filters out emails)
+{{ nexus.validate_and_normalize_phone(column.name) }}
+```
+
+### Scenario 3: Missing Role in ID Generation
 
 **Problem**: Same person/group appears multiple times with different roles but
 same ID.

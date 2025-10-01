@@ -19,7 +19,7 @@ with source_data as (
             when segment_call_model like '%groups%' then 'group'
             when segment_call_model like '%page%' then 'page'
         end as segment_event_type
-    from {{ ref('base_segment_all_calls') }}
+    from {{ ref('cleaned_segment_all_columns') }}
 ),
 
 formatted_events as (

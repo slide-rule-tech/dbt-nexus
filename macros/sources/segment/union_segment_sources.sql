@@ -5,15 +5,19 @@
         {% do segment_call_sources.append(source(segment_source.name, actual_table_name)) %}
     {% endfor %}
 
-    {% for relation in segment_call_sources %}
-        (
-            select 
-                *,
-                '{{ relation.schema }}' as segment_source
-            from {{ relation }}
-        )
-        {% if not loop.last %}
-        union all
-        {% endif %}
-    {% endfor %}
+    with unioned as (
+        {{ dbt_utils.union_relations(
+            relations=segment_call_sources,
+            source_column_name='_dbt_source_relation'
+        ) }}
+    )
+
+    select 
+        *,
+        case 
+            when _dbt_source_relation like '%WORDPRESS_SITE%' then 'WORDPRESS_SITE'
+            when _dbt_source_relation like '%SERVER_AWS_LAMBDA_TRACKING%' then 'SERVER_AWS_LAMBDA_TRACKING'
+            else split_part(_dbt_source_relation, '.', 2)
+        end as segment_source
+    from unioned
 {%- endmacro -%}

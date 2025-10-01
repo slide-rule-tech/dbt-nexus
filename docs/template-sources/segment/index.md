@@ -41,6 +41,72 @@ vars:
       enabled: true
 ```
 
+### Multiple Segment Sources
+
+When you have multiple Segment sources (e.g., different schemas or databases),
+you need to create a `segment_sources.yml` file in your project to define all
+sources:
+
+**1. Create `models/sources/segment/segment_sources.yml`:**
+
+```yaml
+version: 2
+
+sources:
+  - name: WORDPRESS_SITE
+    description: "WordPress site Segment data"
+    database: DEV_RAW
+    schema: WORDPRESS_SITE
+    tables:
+      - name: TRACKS
+        description: "Segment track events"
+      - name: PAGES
+        description: "Segment page events"
+      - name: IDENTIFIES
+        description: "Segment identify events"
+      - name: APPOINTMENT_FORM_SUBMITTED
+        description: "Appointment form submission events"
+
+  - name: SERVER_AWS_LAMBDA_TRACKING
+    description: "Server AWS Lambda tracking Segment data"
+    database: DEV_RAW
+    schema: SERVER_AWS_LAMBDA_TRACKING
+    tables:
+      - name: TRACKS
+        description: "Segment track events"
+      - name: PAGES
+        description: "Segment page events"
+      - name: IDENTIFIES
+        description: "Segment identify events"
+      - name: NEW_LEAD_WEBSITE
+        description: "New lead website events"
+```
+
+**2. Configure `segment_sources` in your `dbt_project.yml`:**
+
+```yaml
+vars:
+  # Segment sources configuration for union_segment_sources macro
+  segment_sources:
+    - name: WORDPRESS_SITE
+      tracks:
+        - name: APPOINTMENT_FORM_SUBMITTED
+          conversion: true
+    - name: SERVER_AWS_LAMBDA_TRACKING
+      tracks:
+        - name: NEW_LEAD_WEBSITE
+          conversion: true
+```
+
+**Why This Setup?**
+
+- The `segment_sources.yml` defines the actual database sources that dbt can
+  reference
+- The `segment_sources` variable tells the `union_segment_sources` macro which
+  sources to union and which specific track tables to include
+- This allows you to have different table structures across different Segment
+  sources while still unioning them together
+
 ### Advanced Configuration
 
 ```yaml
@@ -128,6 +194,27 @@ configuration. For the example configuration above, it expects:
 **Configuration Flexibility**: The actual table names are determined by your
 `location` configuration, making the template source adaptable to any Segment
 implementation structure.
+
+### File Structure for Multiple Sources
+
+When using multiple Segment sources, your project structure should look like:
+
+```
+models/
+└── sources/
+    └── segment/
+        └── segment_sources.yml    # Your project-specific sources
+dbt_packages/
+└── nexus/
+    └── models/
+        └── sources/
+            └── segment/
+                └── segment.yml    # Nexus package sources (configurable)
+```
+
+**Important**: The nexus package's `segment.yml` remains configurable and should
+not be modified. Your project-specific sources go in
+`models/sources/segment/segment_sources.yml`.
 
 ## Models
 
@@ -242,8 +329,8 @@ Events are automatically classified into channels:
 ### Referral Exclusions
 
 The template source automatically excludes internal domains from referral
-classification. Configure your internal domains in the nexus package
-configuration:
+classification. Configure your internal domains in your project's
+`dbt_project.yml`:
 
 ```yaml
 vars:
@@ -252,11 +339,24 @@ vars:
     - "yourcompany.com"
     - "subsidiary.com"
 
-  # Attribution-specific exclusions
+  # Attribution-specific exclusions (required for segment_touchpoints)
   referral_exclusions:
     - "%yourcompany.com%"
     - "%subsidiary.com%"
 ```
+
+**Important**: The `referral_exclusions` variable is **required** for the
+`segment_touchpoints` model to work properly. Without this configuration, you'll
+get compilation errors like "NoneType object is not iterable" because the model
+uses Jinja templating to iterate over these exclusions.
+
+The exclusions use SQL `LIKE` operators with `%` wildcards to match any URL
+containing your domain (including subdomains). For example, `%yourcompany.com%`
+will exclude:
+
+- `https://www.yourcompany.com`
+- `https://blog.yourcompany.com/page`
+- `https://yourcompany.com/landing-page`
 
 ## Usage Examples
 
@@ -338,6 +438,12 @@ dbt test --select package:nexus segment
   (lowercase in YAML, uppercase in database)
 - **"Schema does not exist"**: Check that the schema name in your configuration
   matches your actual database schema
+- **"Source named 'X.Y' which was not found"**: For multiple segment sources,
+  ensure you have created `models/sources/segment/segment_sources.yml` with all
+  your segment sources defined
+- **"union_segment_sources macro error"**: Verify that your `segment_sources`
+  variable in `dbt_project.yml` matches the source names in your
+  `segment_sources.yml` file
 
 **Missing Attribution Data**
 
