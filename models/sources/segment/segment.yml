@@ -1,5 +1,98 @@
 version: 2
 
+sources:
+  - name:
+      "{{ var('nexus', {}).get('segment', {}).get('location', {}).get('schema')
+      }}"
+    description: "Segment live data warehouse tables"
+    database:
+      "{{ var('nexus', {}).get('segment', {}).get('location',
+      {}).get('database', '') }}"
+    tables:
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('tracks', 'TRACKS') }}"
+        description: "Segment track events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+          - name: anonymous_id
+            description: "Anonymous user identifier"
+          - name: user_id
+            description: "User identifier"
+          - name: event
+            description: "Event name"
+          - name: properties
+            description: "Event properties"
+          - name: context
+            description: "Event context"
+          - name: timestamp
+            description: "Event timestamp"
+          - name: received_at
+            description: "When event was received"
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('pages', 'PAGES') }}"
+        description: "Segment page events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+          - name: anonymous_id
+            description: "Anonymous user identifier"
+          - name: user_id
+            description: "User identifier"
+          - name: name
+            description: "Page name"
+          - name: properties
+            description: "Page properties"
+          - name: context
+            description: "Event context"
+          - name: timestamp
+            description: "Event timestamp"
+          - name: received_at
+            description: "When event was received"
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('identifies', 'IDENTIFIES') }}"
+        description: "Segment identify events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+          - name: anonymous_id
+            description: "Anonymous user identifier"
+          - name: user_id
+            description: "User identifier"
+          - name: traits
+            description: "User traits"
+          - name: context
+            description: "Event context"
+          - name: timestamp
+            description: "Event timestamp"
+          - name: received_at
+            description: "When event was received"
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('appointment_form_submitted',
+          'APPOINTMENT_FORM_SUBMITTED') }}"
+        description: "Appointment form submission events"
+        columns:
+          - name: event_id
+            description: "Unique event identifier"
+          - name: anonymous_id
+            description: "Anonymous user identifier"
+          - name: user_id
+            description: "User identifier"
+          - name: event
+            description: "Event name"
+          - name: properties
+            description: "Event properties"
+          - name: context
+            description: "Event context"
+          - name: timestamp
+            description: "Event timestamp"
+          - name: received_at
+            description: "When event was received"
+
 models:
   - name: segment_events
     description:
@@ -100,10 +193,6 @@ models:
           - not_null:
               config:
                 severity: error
-          - accepted_values:
-              values: ["segment_anonymous_id", "user_id", "email"]
-              config:
-                severity: warn
       - name: identifier_value
         description: "Value of the person identifier"
         tests:
@@ -163,10 +252,6 @@ models:
           - not_null:
               config:
                 severity: error
-          - accepted_values:
-              values: ["segment_anonymous_id"]
-              config:
-                severity: warn
       - name: identifier_value
         description: "Value of the person identifier this trait belongs to"
         tests:
@@ -179,10 +264,6 @@ models:
           - not_null:
               config:
                 severity: error
-          - accepted_values:
-              values: ["anonymous_id", "user_id", "email", "first_name"]
-              config:
-                severity: warn
       - name: trait_value
         description: "Value of the person trait"
         tests:

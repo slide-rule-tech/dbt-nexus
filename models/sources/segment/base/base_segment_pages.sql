@@ -1,3 +1,3 @@
-select * from {{ source('SEGMENT_LIVE', 'PAGES') }}
+select * from {{ nexus_source('segment', 'pages') }}
 
 

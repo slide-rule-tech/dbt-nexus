@@ -57,11 +57,11 @@ with source_data as (
     {% else %}
     '{{ col }}' as trait_name,
     {% endif %}
-    cast({{ col }} as string) as trait_value
+    {{ nexus.safe_cast_with_null_strings(col, api.Column.translate_type("string")) }} as trait_value
     {% for add_col in additional_columns %}
     , {{ add_col.split(' as ')[1] if ' as ' in add_col else add_col }}
     {% endfor %}
   from source_data
-  where {{ col }} is not null
+  where {{ nexus.safe_cast_with_null_strings(col, api.Column.translate_type("string")) }} is not null
 {% endfor %}
 {% endmacro %}

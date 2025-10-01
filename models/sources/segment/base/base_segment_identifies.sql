@@ -1,3 +1,1 @@
-select * from {{ source('SEGMENT_LIVE', 'IDENTIFIES') }}
-
-
+select * from {{ nexus.nexus_source('segment', 'identifies') }}

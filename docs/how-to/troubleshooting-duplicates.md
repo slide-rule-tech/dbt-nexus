@@ -98,7 +98,76 @@ LIMIT 10;
 
 ## 4. Common Duplicate Scenarios and Solutions
 
-### Scenario 1: Missing Role in ID Generation
+### Scenario 1: String "null" Values in Source Data
+
+**Problem**: Source data contains string "null" values instead of actual NULL
+values, causing duplicate person_identifier_ids when the same event has multiple
+identifier types with "null" values.
+
+**Example**:
+
+```
+event_id: evt_123
+email: "null" (string)
+phone: "null" (string)
+-- Both generate same person_identifier_id because they hash to same value
+```
+
+**Solution**: Use `safe_cast_with_null_strings` macro to handle null string
+variations:
+
+```sql
+-- In unpivot macros, replace:
+cast({{ col }} as string) as identifier_value
+
+-- With:
+{{ nexus.safe_cast_with_null_strings(col, api.Column.translate_type("string")) }} as identifier_value
+```
+
+**Helper Macro**:
+
+```sql
+{% macro safe_cast_with_null_strings(column_name, target_type) %}
+  case
+    when {{ column_name }} is null then null
+    when {{ column_name }} = 'null' then null
+    when {{ column_name }} = 'NULL' then null
+    when {{ column_name }} = 'None' then null
+    when {{ column_name }} = 'none' then null
+    when {{ column_name }} = '' then null
+    else {{ dbt.safe_cast(column_name, api.Column.translate_type(target_type)) }}
+  end
+{% endmacro %}
+```
+
+### Scenario 2: Cross-Contamination Between Identifier Types
+
+**Problem**: Same value used for different identifier types (e.g., phone number
+used as email), creating duplicate person_identifier_ids.
+
+**Example**:
+
+```
+person_identifier_id: per_idfr_abc123
+identifier_type: email
+identifier_value: "6307776986" (phone number)
+
+person_identifier_id: per_idfr_abc123 (same ID!)
+identifier_type: phone
+identifier_value: "6307776986" (same value)
+```
+
+**Solution**: Use validation macros to prevent cross-contamination:
+
+```sql
+-- Email validation
+{{ nexus.validate_and_normalize_email(column.name) }}
+
+-- Phone validation (filters out emails)
+{{ nexus.validate_and_normalize_phone(column.name) }}
+```
+
+### Scenario 3: Missing Role in ID Generation
 
 **Problem**: Same person/group appears multiple times with different roles but
 same ID.
@@ -122,7 +191,7 @@ role: creator
 {{ create_nexus_id('person_identifier', ['event_id', 'email', 'role', 'occurred_at']) }}
 ```
 
-### Scenario 2: Multiple People from Same Domain
+### Scenario 4: Multiple People from Same Domain
 
 **Problem**: Multiple employees from same company attend same event, creating
 duplicate group identifiers.
@@ -141,7 +210,7 @@ attendee_domains AS (
 )
 ```
 
-### Scenario 3: Duplicate Source Data
+### Scenario 5: Duplicate Source Data
 
 **Problem**: Same person appears multiple times in source data for same event.
 
@@ -164,7 +233,7 @@ ORDER BY attendee.email;
 GROUP BY base.nexus_event_id, attendee.email, attendee.is_optional, base.start_time
 ```
 
-### Scenario 4: Missing Timestamp in ID Generation
+### Scenario 6: Missing Timestamp in ID Generation
 
 **Problem**: Same identifier appears at different times but gets same ID.
 
@@ -174,7 +243,7 @@ GROUP BY base.nexus_event_id, attendee.email, attendee.is_optional, base.start_t
 {{ create_nexus_id('person_identifier', ['event_id', 'email', 'role', 'occurred_at']) }}
 ```
 
-### Scenario 5: Participant Role Duplicates
+### Scenario 7: Participant Role Duplicates
 
 **Problem**: Same entity participates in event with multiple roles but gets same
 participant ID.
@@ -281,12 +350,14 @@ For large datasets with many duplicates:
 
 ## 8. Common Error Messages and Solutions
 
-| Error Pattern            | Likely Cause                      | Solution                             |
-| ------------------------ | --------------------------------- | ------------------------------------ |
-| `Got 2000+ results`      | Missing role in ID generation     | Add role to `create_nexus_id` call   |
-| `Got 1-10 results`       | Duplicate source data             | Add deduplication with `GROUP BY`    |
-| `Edge test failing`      | Wrong test syntax                 | Use concatenated string syntax       |
-| `Participant duplicates` | Missing role in participant macro | Update `finalize_participants` macro |
+| Error Pattern            | Likely Cause                      | Solution                                |
+| ------------------------ | --------------------------------- | --------------------------------------- |
+| `Got 2000+ results`      | String "null" values in source    | Use `safe_cast_with_null_strings` macro |
+| `Got 1000+ results`      | Missing role in ID generation     | Add role to `create_nexus_id` call      |
+| `Got 1-10 results`       | Duplicate source data             | Add deduplication with `GROUP BY`       |
+| `Cross-contamination`    | Same value for different types    | Use validation macros for identifiers   |
+| `Edge test failing`      | Wrong test syntax                 | Use concatenated string syntax          |
+| `Participant duplicates` | Missing role in participant macro | Update `finalize_participants` macro    |
 
 For additional help, see the [Testing Reference](../tests/index.md) for detailed
 information about all available tests.

@@ -41,6 +41,72 @@ vars:
       enabled: true
 ```
 
+### Multiple Segment Sources
+
+When you have multiple Segment sources (e.g., different schemas or databases),
+you need to create a `segment_sources.yml` file in your project to define all
+sources:
+
+**1. Create `models/sources/segment/segment_sources.yml`:**
+
+```yaml
+version: 2
+
+sources:
+  - name: WORDPRESS_SITE
+    description: "WordPress site Segment data"
+    database: DEV_RAW
+    schema: WORDPRESS_SITE
+    tables:
+      - name: TRACKS
+        description: "Segment track events"
+      - name: PAGES
+        description: "Segment page events"
+      - name: IDENTIFIES
+        description: "Segment identify events"
+      - name: APPOINTMENT_FORM_SUBMITTED
+        description: "Appointment form submission events"
+
+  - name: SERVER_AWS_LAMBDA_TRACKING
+    description: "Server AWS Lambda tracking Segment data"
+    database: DEV_RAW
+    schema: SERVER_AWS_LAMBDA_TRACKING
+    tables:
+      - name: TRACKS
+        description: "Segment track events"
+      - name: PAGES
+        description: "Segment page events"
+      - name: IDENTIFIES
+        description: "Segment identify events"
+      - name: NEW_LEAD_WEBSITE
+        description: "New lead website events"
+```
+
+**2. Configure `segment_sources` in your `dbt_project.yml`:**
+
+```yaml
+vars:
+  # Segment sources configuration for union_segment_sources macro
+  segment_sources:
+    - name: WORDPRESS_SITE
+      tracks:
+        - name: APPOINTMENT_FORM_SUBMITTED
+          conversion: true
+    - name: SERVER_AWS_LAMBDA_TRACKING
+      tracks:
+        - name: NEW_LEAD_WEBSITE
+          conversion: true
+```
+
+**Why This Setup?**
+
+- The `segment_sources.yml` defines the actual database sources that dbt can
+  reference
+- The `segment_sources` variable tells the `union_segment_sources` macro which
+  sources to union and which specific track tables to include
+- This allows you to have different table structures across different Segment
+  sources while still unioning them together
+
 ### Advanced Configuration
 
 ```yaml
@@ -49,7 +115,8 @@ vars:
     segment:
       enabled: true
       location:
-        schema: SEGMENT_LIVE
+        database: DEV_RAW
+        schema: WORDPRESS_SITE
         tables:
           tracks: TRACKS
           pages: PAGES
@@ -60,17 +127,94 @@ vars:
         groups: false
         memberships: false
         attribution: true
+      # Configure which identifiers and traits to extract from identify events
+      identifiers:
+        - segment_anonymous_id
+        - user_id
+        - email
+      traits:
+        - segment_anonymous_id
+        - user_id
+        - email
+        - first_name
 ```
+
+**Note**: Unlike other template sources, Segment requires explicit configuration
+of both `database` and `schema` as there are no universal defaults for Segment
+implementations.
+
+**Configurable Traits**: The `identifiers` and `traits` arrays allow you to
+specify which fields to extract from Segment identify events, making the
+template source adaptable to different Segment implementations.
+
+### Customizing Identifiers and Traits
+
+If your Segment implementation doesn't include certain fields (like
+`first_name`), you can customize the configuration:
+
+```yaml
+vars:
+  nexus:
+    segment:
+      enabled: true
+      # ... other configuration ...
+      identifiers:
+        - segment_anonymous_id
+        - user_id
+        - email
+        # Add custom identifiers as needed
+      traits:
+        - segment_anonymous_id
+        - user_id
+        - email
+        # Remove first_name if not available
+        # Add custom traits as needed
+```
+
+**Available Fields**: The template source supports these standard Segment
+identify fields:
+
+- `segment_anonymous_id` (from `anonymous_id`)
+- `user_id`
+- `email`
+- `first_name`
+- Custom traits as configured in your Segment implementation
 
 ## Data Sources
 
-The template source expects Segment data in the following tables:
+The template source dynamically references Segment data based on your
+configuration. For the example configuration above, it expects:
 
-| Table                     | Description                   | Required |
-| ------------------------- | ----------------------------- | -------- |
-| `SEGMENT_LIVE.TRACKS`     | Track events from Segment     | Yes      |
-| `SEGMENT_LIVE.PAGES`      | Page view events from Segment | Yes      |
-| `SEGMENT_LIVE.IDENTIFIES` | Identify events from Segment  | Yes      |
+| Table                               | Description                   | Required |
+| ----------------------------------- | ----------------------------- | -------- |
+| `DEV_RAW.WORDPRESS_SITE.TRACKS`     | Track events from Segment     | Yes      |
+| `DEV_RAW.WORDPRESS_SITE.PAGES`      | Page view events from Segment | Yes      |
+| `DEV_RAW.WORDPRESS_SITE.IDENTIFIES` | Identify events from Segment  | Yes      |
+
+**Configuration Flexibility**: The actual table names are determined by your
+`location` configuration, making the template source adaptable to any Segment
+implementation structure.
+
+### File Structure for Multiple Sources
+
+When using multiple Segment sources, your project structure should look like:
+
+```
+models/
+└── sources/
+    └── segment/
+        └── segment_sources.yml    # Your project-specific sources
+dbt_packages/
+└── nexus/
+    └── models/
+        └── sources/
+            └── segment/
+                └── segment.yml    # Nexus package sources (configurable)
+```
+
+**Important**: The nexus package's `segment.yml` remains configurable and should
+not be modified. Your project-specific sources go in
+`models/sources/segment/segment_sources.yml`.
 
 ## Models
 
@@ -131,6 +275,29 @@ Attribution touchpoints with UTM parameters and click IDs.
 - `fbclid`: Facebook click ID
 - `gclid`: Google click ID
 
+## Database Compatibility
+
+The Segment template source is fully compatible with **Snowflake** and supports
+the three-part naming convention (`database.schema.table`). It uses the
+`nexus_source` macro for dynamic source resolution, making it adaptable to
+different database structures.
+
+### Snowflake Configuration
+
+```yaml
+vars:
+  nexus:
+    segment:
+      enabled: true
+      location:
+        database: YOUR_DATABASE # Required for Snowflake
+        schema: YOUR_SCHEMA # Required - no default
+        tables:
+          tracks: YOUR_TRACKS_TABLE
+          pages: YOUR_PAGES_TABLE
+          identifies: YOUR_IDENTIFIES_TABLE
+```
+
 ## Attribution Configuration
 
 The template source supports attribution analysis through UTM parameters and
@@ -158,6 +325,38 @@ Events are automatically classified into channels:
 - **Organic**: Google referrer present
 - **Referral**: External referrer (excluding internal domains)
 - **Direct**: No attribution information
+
+### Referral Exclusions
+
+The template source automatically excludes internal domains from referral
+classification. Configure your internal domains in your project's
+`dbt_project.yml`:
+
+```yaml
+vars:
+  # Global configuration for all template sources
+  internal_domains:
+    - "yourcompany.com"
+    - "subsidiary.com"
+
+  # Attribution-specific exclusions (required for segment_touchpoints)
+  referral_exclusions:
+    - "%yourcompany.com%"
+    - "%subsidiary.com%"
+```
+
+**Important**: The `referral_exclusions` variable is **required** for the
+`segment_touchpoints` model to work properly. Without this configuration, you'll
+get compilation errors like "NoneType object is not iterable" because the model
+uses Jinja templating to iterate over these exclusions.
+
+The exclusions use SQL `LIKE` operators with `%` wildcards to match any URL
+containing your domain (including subdomains). For example, `%yourcompany.com%`
+will exclude:
+
+- `https://www.yourcompany.com`
+- `https://blog.yourcompany.com/page`
+- `https://yourcompany.com/landing-page`
 
 ## Usage Examples
 
@@ -228,16 +427,40 @@ dbt test --select package:nexus segment
 
 - Ensure `nexus.segment.enabled: true` in your project configuration
 - Verify Segment source tables exist and are accessible
+- Check that both `database` and `schema` are configured (no defaults for
+  Segment)
+
+**Compilation Errors**
+
+- **"NoneType object is not iterable"**: Ensure `referral_exclusions` variable
+  is configured in the nexus package
+- **"Source not found"**: Verify table name casing matches your configuration
+  (lowercase in YAML, uppercase in database)
+- **"Schema does not exist"**: Check that the schema name in your configuration
+  matches your actual database schema
+- **"Source named 'X.Y' which was not found"**: For multiple segment sources,
+  ensure you have created `models/sources/segment/segment_sources.yml` with all
+  your segment sources defined
+- **"union_segment_sources macro error"**: Verify that your `segment_sources`
+  variable in `dbt_project.yml` matches the source names in your
+  `segment_sources.yml` file
 
 **Missing Attribution Data**
 
 - Check that UTM parameters are being sent in Segment events
 - Verify referrer exclusions are configured correctly
+- Ensure `referral_exclusions` variable is defined to prevent compilation errors
 
 **Person Resolution Issues**
 
 - Ensure person identifiers are being captured in Segment
 - Check that anonymous_id and user_id are being sent consistently
+
+**Snowflake-Specific Issues**
+
+- Verify three-part naming convention: `database.schema.table`
+- Check that the `database` parameter is set in your configuration
+- Ensure table names match your actual Snowflake table names (case-sensitive)
 
 ### Debug Queries
 
@@ -270,6 +493,52 @@ If migrating from a legacy Segment source implementation:
 4. **Update References**: Update any custom models referencing old source models
 5. **Remove Legacy Files**: Delete old Segment source files
 
+## Technical Implementation
+
+### Dynamic Source Resolution
+
+The Segment template source uses the `nexus_source` macro for dynamic source
+resolution:
+
+```sql
+-- Base models use the nexus_source macro
+select * from {{ nexus_source('segment', 'tracks') }}
+select * from {{ nexus_source('segment', 'pages') }}
+select * from {{ nexus_source('segment', 'identifies') }}
+```
+
+This macro automatically resolves to the correct database.schema.table structure
+based on your configuration.
+
+### Jinja Templating
+
+The source definitions use Jinja templating for complete configurability:
+
+```yaml
+sources:
+  - name:
+      "{{ var('nexus', {}).get('segment', {}).get('location', {}).get('schema')
+      }}"
+    database:
+      "{{ var('nexus', {}).get('segment', {}).get('location',
+      {}).get('database', '') }}"
+    tables:
+      - name:
+          "{{ var('nexus', {}).get('segment', {}).get('location',
+          {}).get('tables', {}).get('tracks', 'TRACKS') }}"
+```
+
+### Error Prevention
+
+The template source includes several error prevention measures:
+
+- **Referral Exclusions**: Prevents `NoneType` iteration errors by requiring
+  `referral_exclusions` configuration
+- **No Hardcoded Defaults**: Forces explicit configuration to prevent
+  assumptions about Segment implementations
+- **Case Sensitivity**: Handles table name casing correctly for different
+  database systems
+
 ## Best Practices
 
 1. **Consistent Naming**: Use consistent event names in Segment
@@ -277,6 +546,10 @@ If migrating from a legacy Segment source implementation:
 3. **Person Identification**: Send both anonymous_id and user_id consistently
 4. **Data Quality**: Monitor for missing or invalid timestamps
 5. **Attribution**: Configure referrer exclusions for internal domains
+6. **Configuration**: Always specify both `database` and `schema` (no defaults
+   for Segment)
+7. **Testing**: Test compilation before running models to catch configuration
+   issues early
 
 ## Support
 

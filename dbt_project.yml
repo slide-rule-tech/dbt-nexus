@@ -104,6 +104,12 @@ vars:
         groups: false
         memberships: false
         attribution: true
+      # Configurable identifiers and traits for identify events
+      # Note: segment_anonymous_id is always included as it's a core Segment field
+      identifiers:
+        - email
+      traits:
+        - email
 
   # Attribution models configuration
   attribution_models:
@@ -116,6 +122,11 @@ vars:
     - hollywoodfarms.com
   test_emails:
     - test@example.com
+
+  # Attribution configuration
+  referral_exclusions:
+    - "%sliderule.com%"
+    - "%hollywoodfarms.com%"
 
 # Test configurations
 tests:
