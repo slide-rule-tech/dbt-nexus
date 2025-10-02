@@ -81,7 +81,7 @@ graph TD
 The following diagram illustrates the complete database schema and relationships
 between entities:
 
-![Database Schema](../images/database-schema.png)
+![Database Schema](../assets/images/database-schema.png)
 
 _This diagram shows the data flow from raw sources through identity resolution
 to final tables, including all entity relationships and key fields._
