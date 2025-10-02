@@ -56,8 +56,6 @@ theme:
 plugins:
   - search:
       lang: en
-  - autorefs
-  - section-index
 
 # Extensions
 markdown_extensions:
@@ -104,44 +102,77 @@ markdown_extensions:
 
 # Extra CSS
 extra_css:
-  - stylesheets/extra.css
+  - docs/assets/stylesheets/extra.css
 
 # Extra JavaScript
 extra_javascript:
-  - javascripts/mathjax.js
+  - docs/assets/javascripts/mathjax.js
   - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 
-# Navigation structure - only existing files
+# Navigation structure - workflow-based organization
 nav:
   - Home: index.md
 
-  - Getting Started:
-      - Overview: getting-started/index.md
-      - Installation: getting-started/installation.md
-      - Configuration: getting-started/configuration.md
+  - Overview:
+      - Architecture: overview/architecture.md
+      - Database Schema: overview/database-schema.md
+      - Use Cases: overview/use-cases.md
 
   - How-to Guides:
+      - Getting Started:
+          - Complete Guide: how-to/getting-started/complete-guide.md
       - Update Documentation: how-to/update-docs.md
-      - Create Source Models: how-to/create-source-models.md
+      - Troubleshooting Duplicates: how-to/troubleshooting-duplicates.md
+
+  - Sources:
+      - Create Source Models: sources/create-source-models.md
+      - Recommend Source Model Structure: sources/recommend-source-model-structure.md
+      - Source Tests: sources/source-tests.md
+      - Template Sources:
+          - Overview: sources/template-sources/index.md
+          - Moving into Template Sources: sources/template-sources/moving-into-template-sources.md
+          - Gmail Integration: sources/template-sources/gmail/index.md
+          - Google Calendar Integration: sources/template-sources/google_calendar/index.md
+          - Segment Integration: sources/template-sources/segment/index.md
+
+  - Event Log:
+      - Event Schema Quick Reference: event-log/event-schema-quick-reference.md
+      - Format Nexus Events: event-log/format-nexus-events.md
+      - Tests: event-log/tests.md
+
+  - Identity Resolution:
+      - Overview: identity-resolution/index.md
+      - Troubleshooting: identity-resolution/trouble-shooting-identity-resolution.md
+
+  - States:
+      - States: states/states.md
+
+  - Attribution:
+      - Overview: attribution/index.md
+      - Models:
+          - Attribution Models: attribution/models/index.md
+          - Last Facebook Click ID: attribution/models/last_fbclid.md
+      - Troubleshooting: attribution/troubleshooting-attribution.md
 
   - Reference:
-      - Database Schema: reference/database-schema.md
-      - Schema Naming Configuration: reference/nexus-dbt-schema-names.md
-      - State Models: reference/models/states.md
-
-  - Architecture & Concepts:
-      - explanations/index.md
-      - Real-World Use Cases: explanations/use-cases.md
-      - Package Architecture: explanations/architecture.md
-
-  - AI Context:
-      - LLM Context Pack: llm/context-pack.md
-
-  - Development:
-      - Changelog: changelog.md
-      - Contributing: CONTRIBUTING.md
-      - To-Do Items: to-dos/index.md
+      - AI Context:
+          - Overview: ai-context/index.md
+          - Context Pack: ai-context/context-pack.md
+          - Package Overview: ai-context/package-overview.md
+          - Quick Reference: ai-context/quick-reference.md
+          - Common Tasks: ai-context/common-tasks.md
+          - Troubleshooting: ai-context/troubleshooting.md
+      - To-Dos:
+          - Overview: to-dos/index.md
+          - Fix Resolve Traits: to-dos/fix-resolve-traits.md
+          - Reduce Recursive CTE: to-dos/reduce-recursive-cte.md
+      - Macros:
+          - Generate Nexus IDs: macros/generate-nexus-ids.md
+          - Nexus dbt Schema Names: macros/nexus-dbt-schema-names.md
+      - Development:
+          - Changelog: changelog.md
+          - Contributing: CONTRIBUTING.md
 
 # Extra configuration
 extra:

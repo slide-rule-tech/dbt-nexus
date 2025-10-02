@@ -55,11 +55,11 @@ git clone https://github.com/YOUR-USERNAME/dbt-nexus.git
 cd dbt-nexus
 
 # Install development dependencies
-pip install -r docs/scripts/requirements.txt
+pip install -r docs/assets/scripts/requirements.txt
 
 # Generate documentation
-python docs/scripts/doc-generator.py --project-root .
-python docs/scripts/llm-context-updater.py --project-root .
+python docs/assets/scripts/doc-generator.py --project-root .
+python docs/assets/scripts/llm-context-updater.py --project-root .
 
 # Serve documentation locally
 cd docs

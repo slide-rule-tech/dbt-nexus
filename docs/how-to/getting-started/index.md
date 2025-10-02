@@ -1,16 +1,15 @@
 ---
-title: Quickstart Guide
-tags: [quickstart, getting-started, setup, installation]
+title: Getting Started
+tags: [getting-started, quickstart, setup, installation]
 summary:
-  Get up and running with dbt-nexus quickly with step-by-step guides for
-  installation, setup, and configuration.
+  Complete guide to get up and running with dbt-nexus from project
+  initialization to production deployment
 ---
 
-# Quickstart Guide
+# Getting Started with dbt-nexus
 
-Welcome to the dbt-nexus quickstart guide! This section provides step-by-step
-instructions to get you up and running with the dbt-nexus package as quickly as
-possible.
+Welcome to the dbt-nexus getting started guide! This section provides everything
+you need to go from zero to a fully functional dbt-nexus implementation.
 
 ## What is dbt-nexus?
 
@@ -25,14 +24,13 @@ dbt-nexus is a comprehensive dbt package that helps you:
 - **🎯 Drive operations** - support teams, sales teams, and AI tools get
   complete customer context
 
-## Quickstart Path
+## Quick Start Path
 
 Follow these guides in order for the fastest path to success:
 
 ### 1. Initialize a New dbt Project
 
-**[dbt-init.md](dbt-init.md)** - Set up a new dbt project following best
-practices:
+Set up a new dbt project following best practices:
 
 - Data warehouse setup (BigQuery example)
 - Virtual environment configuration
@@ -41,17 +39,28 @@ practices:
 
 ### 2. Install and Configure dbt-nexus
 
-**[dbt-nexus-setup.md](dbt-nexus-setup.md)** - Install and configure the
-dbt-nexus package:
+Install and configure the dbt-nexus package:
 
 - Installation methods (submodule vs GitHub)
 - Template sources configuration (Gmail, Google Calendar)
 - Schema configuration and final table aliases
 - Demo data exploration
 
+## Complete Guide
+
+For a comprehensive walkthrough, see our
+**[Complete Getting Started Guide](complete-guide.md)** which covers:
+
+- ✅ **Project initialization** with security best practices
+- ✅ **Package installation** using multiple methods
+- ✅ **Configuration setup** with all required variables
+- ✅ **Demo data exploration** to understand the system
+- ✅ **Local development** setup and troubleshooting
+- ✅ **Production deployment** considerations
+
 ## What You'll Learn
 
-By following these quickstart guides, you'll:
+By following these guides, you'll:
 
 - ✅ **Set up a production-ready dbt project** with proper virtual environments
   and security
@@ -75,10 +84,10 @@ Before starting, ensure you have:
 
 ## Next Steps
 
-After completing the quickstart guides:
+After completing the getting started guides:
 
 1. **Enable template sources** - Configure Gmail, Google Calendar, or other
-   [template sources](../template-sources/) for instant integration
+   template sources for instant integration
 2. **Set up your ETL pipeline** - Configure the Nexus ETL pipeline for data
    syncing
 3. **Build custom models** - Create analytics models using the unified nexus
@@ -97,6 +106,6 @@ After completing the quickstart guides:
 
 ---
 
-**Ready to get started?** Begin with [dbt-init.md](dbt-init.md) to set up your
-dbt project, then move on to [dbt-nexus-setup.md](dbt-nexus-setup.md) to install
-and configure the package.
+**Ready to get started?** Begin with the
+[Complete Getting Started Guide](complete-guide.md) for a comprehensive
+walkthrough from project initialization to production deployment.

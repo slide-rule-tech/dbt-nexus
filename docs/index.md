@@ -54,7 +54,7 @@ dbt deps
 
 ### Image
 
-![Database Schema Diagram](images/database-diagram.png)
+![Database Schema Diagram](assets/images/database-diagram.png)
 
 ### Mermaid
 
@@ -212,7 +212,7 @@ with the five-layer architecture: Raw Data, Source Event Log, Core Event Log,
 Identity Resolution, and Final Tables._
 
 > **Note**: To view the original diagram, open
-> `docs/images/database-diagram.xml` in
+> `docs/assets/images/database-diagram.xml` in
 > [diagrams.net](https://app.diagrams.net).
 
 ## Quick Start Guides
