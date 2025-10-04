@@ -1,3 +1,7 @@
+{{ config(
+    enabled=var('nexus', {}).get('segment', {}).get('enabled', false)
+) }}
+
 {% set segment_calls =  ['pages','tracks','identifies'] %}
 {% set segment_call_models = [] %}
 {% for segment_call in segment_calls %}

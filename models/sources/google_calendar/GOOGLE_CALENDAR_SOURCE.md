@@ -359,7 +359,6 @@ models:
 **2. Missing participants**
 
 - Verify attendee emails are not null/empty in source data
-- Check that `real_time_event_filter` macro is not filtering too aggressively
 
 **3. Generic domains appearing as groups**
 

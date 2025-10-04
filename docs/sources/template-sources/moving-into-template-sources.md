@@ -79,8 +79,8 @@ cp client-project/models/sources/your_source/base/*.sql dbt-nexus/models/sources
 
 ### Step 4: Add Enabled Variable Configuration
 
-**Critical Step**: Add the `enabled` variable to all models to make them
-configurable:
+**Critical Step**: Add the `enabled` variable to **ALL MODELS** in the source to
+make them configurable:
 
 ```sql
 {{ config(
@@ -90,13 +90,19 @@ configurable:
 ) }}
 ```
 
-**Apply to ALL models:**
+**Apply to ALL models without exception:**
 
-- Base models
+- Base models (all files in `base/` directory)
 - Event models
 - Identifier models
 - Trait models
 - Membership models
+- Cleaned/intermediate models
+- Any other SQL files in the source
+
+**⚠️ Critical**: Every single `.sql` file in the source directory must have the
+enabled configuration. Missing this on even one model will cause compilation
+errors when the source is disabled.
 
 **Important**: For sources that don't have universal defaults (like Segment),
 consider removing hardcoded defaults to force explicit client configuration.
@@ -167,14 +173,14 @@ hardcoded source references:
 select * from {{ nexus_source('your_source', 'table_name') }}
 ```
 
-**Update source definitions** to use Jinja templating:
+**Update source definitions** to use Jinja templating with fallback defaults:
 
 ```yaml
 # your_source.yml
 sources:
   - name:
       "{{ var('nexus', {}).get('your_source', {}).get('location',
-      {}).get('schema') }}"
+      {}).get('schema', 'your_source_disabled') }}"
     database:
       "{{ var('nexus', {}).get('your_source', {}).get('location',
       {}).get('database', '') }}"
@@ -183,6 +189,11 @@ sources:
           "{{ var('nexus', {}).get('your_source', {}).get('location',
           {}).get('tables', {}).get('table_name', 'DEFAULT_TABLE') }}"
 ```
+
+**⚠️ Critical YAML Configuration**: Always provide fallback defaults in YAML
+templating to prevent `None` values that cause validation errors when the source
+is disabled. The schema name fallback should indicate the disabled state (e.g.,
+`'your_source_disabled'`).
 
 ### Step 6: Create Template Documentation
 
@@ -241,16 +252,58 @@ rm -rf client-project/models/sources/your_source/
 
 ### Step 9: Test the Migration
 
-Verify the migration works correctly:
+**⚠️ CRITICAL**: Always test both enabled AND disabled states before deploying a
+nexus version.
+
+#### Test Enabled State
 
 ```bash
-# Test in client project
+# Test in client project with source enabled
 cd client-project
 dbt run --select package:nexus
 
 # Check that models are created
 dbt run --select your_source_events
 dbt run --select your_source_person_identifiers
+```
+
+#### Test Disabled State (MANDATORY)
+
+**This step is critical and must not be skipped**:
+
+```bash
+# Test with source disabled
+# Set nexus.your_source.enabled: false in dbt_project.yml
+
+# Test compilation (should not fail)
+dbt compile --select package:nexus
+
+# Test parsing (should not fail)
+dbt parse
+
+# Test that disabled models don't run
+dbt run --select package:nexus
+# Should skip your_source models
+
+# Test that other nexus models still work
+dbt run --select events persons groups
+```
+
+**Common Issues When Disabled**:
+
+- `'NoneType' object is not iterable` → Missing enabled config on a model
+- `None is not of type 'string'` → Missing fallback defaults in YAML
+- `Source not found` → Hardcoded source references instead of nexus_source macro
+
+#### Test Multiple Client Projects
+
+Test the template source with different client configurations:
+
+```bash
+# Test with different schema names
+# Test with different table names
+# Test with minimal configuration
+# Test with full configuration
 ```
 
 ## Example: Segment Migration
@@ -484,6 +537,39 @@ uppercase
 **Solution**: Verify the schema name in configuration matches your actual
 database schema
 
+### YAML Configuration Errors
+
+**Problem**: `None is not of type 'string'` in source YAML validation
+
+**Root Cause**: When a template source is disabled, Jinja variables in the YAML
+return `None`, causing dbt's YAML validation to fail.
+
+**Solution**: Always provide fallback defaults in YAML templating:
+
+```yaml
+# ❌ Wrong - will cause validation error when disabled
+sources:
+  - name: "{{ var('nexus', {}).get('your_source', {}).get('location', {}).get('schema') }}"
+
+# ✅ Correct - provides fallback default
+sources:
+  - name: "{{ var('nexus', {}).get('your_source', {}).get('location', {}).get('schema', 'your_source_disabled') }}"
+```
+
+**Additional Steps**:
+
+1. Add default values in the nexus package `dbt_project.yml`:
+   ```yaml
+   nexus:
+     your_source:
+       enabled: false
+       location:
+         schema: your_source_disabled
+         database: ""
+   ```
+2. Ensure all YAML template variables have fallback defaults
+3. Test compilation with the source disabled to verify the fix
+
 ### Snowflake-Specific Issues
 
 **Problem**: "Schema 'DATABASE.SCHEMA' does not exist" error
@@ -502,22 +588,27 @@ definition
 
 ## Best Practices
 
-1. **Always add enabled configuration** to all models
-2. **Test thoroughly** before removing client project files
-3. **Update documentation** to reflect template source usage
-4. **Use consistent naming** patterns across template sources
-5. **Follow the established structure** (base/, events, identifiers, traits,
+1. **Always add enabled configuration** to ALL models (every .sql file in the
+   source)
+2. **MANDATORY: Test disabled state** before deploying any nexus version
+3. **Test thoroughly** before removing client project files
+4. **Update documentation** to reflect template source usage
+5. **Use consistent naming** patterns across template sources
+6. **Follow the established structure** (base/, events, identifiers, traits,
    memberships)
-6. **Include comprehensive examples** in documentation
-7. **Test with multiple client projects** to ensure reusability
-8. **Use the `nexus_source` macro** for dynamic source resolution
-9. **Handle database-specific requirements** (e.g., Snowflake three-part naming)
-10. **Remove hardcoded defaults** for sources without universal standards
-11. **Configure all required variables** to prevent compilation errors
-12. **Test compilation** before running models to catch configuration issues
+7. **Include comprehensive examples** in documentation
+8. **Test with multiple client projects** to ensure reusability
+9. **Use the `nexus_source` macro** for dynamic source resolution
+10. **Handle database-specific requirements** (e.g., Snowflake three-part
+    naming)
+11. **Remove hardcoded defaults** for sources without universal standards
+12. **Configure all required variables** to prevent compilation errors
+13. **Test compilation** before running models to catch configuration issues
     early
-13. **Handle case sensitivity** properly between YAML and database systems
-14. **Clean target directory** when encountering duplicate source errors
+14. **Handle case sensitivity** properly between YAML and database systems
+15. **Clean target directory** when encountering duplicate source errors
+16. **Always provide YAML fallback defaults** to prevent None validation errors
+17. **Test both enabled and disabled states** in multiple client environments
 
 ## Next Steps
 

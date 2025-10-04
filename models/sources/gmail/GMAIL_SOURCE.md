@@ -63,7 +63,6 @@ Transforms raw Gmail JSON into structured fields:
 
 ```sql
 -- Extracts message_id from JSON first (no direct ID column)
--- Applies real-time filtering on message_id
 -- Generates event_id from message_id
 -- Parses timestamp, sender, recipients, subject, body
 -- Deduplicates on message_id (latest occurrence)
@@ -309,12 +308,11 @@ if (parent.source === "gmail" && parent.event_type === "email") {
 
 ## Real-Time Processing
 
-### Event Filtering
+### Event Processing
 
-Uses `real_time_event_filter('message_id')` for incremental processing:
+Processes all Gmail messages for batch processing:
 
-- Filters to specific message IDs for real-time updates
-- Supports both batch and incremental refreshes
+- Supports batch refreshes
 - Tagged with `realtime` for processing orchestration
 
 ### Deduplication Strategy

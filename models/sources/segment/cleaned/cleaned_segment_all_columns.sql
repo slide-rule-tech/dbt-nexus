@@ -1,3 +1,7 @@
+{{ config(
+    enabled=var('nexus', {}).get('segment', {}).get('enabled', false)
+) }}
+
 {%- set columns = adapter.get_columns_in_relation(ref('base_segment_all_calls')) -%}
 
 select

@@ -11,12 +11,6 @@ WITH source_data AS (
     FROM {{ nexus_source('gmail', 'messages') }}
 ),
 
-event_filter AS (
-    SELECT
-        *
-    FROM source_data
-    {{ real_time_event_filter('message_id') }}
-),
 
 extracted AS (
     SELECT
@@ -91,7 +85,7 @@ extracted AS (
         -- Keep the original record for reference
         record as raw_record,
         synced_at
-    FROM event_filter
+    FROM source_data
 ),
 
 with_latest_events AS (
