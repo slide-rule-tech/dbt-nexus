@@ -68,9 +68,9 @@ jobs:
       - name: Auto-generate documentation
         run: |
           # Generate model/macro references from source code
-          python docs/scripts/doc-generator.py --project-root .
+          python docs/assets/scripts/doc-generator.py --project-root .
           # Update LLM context pack with current project structure
-          python docs/scripts/llm-context-updater.py --project-root .
+          python docs/assets/scripts/llm-context-updater.py --project-root .
 
       - name: Setup Pages
         id: pages
