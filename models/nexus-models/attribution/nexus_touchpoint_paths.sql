@@ -79,7 +79,7 @@ latest_touchpoint_times as (
     inner join deduplicated_paths t 
         on e.person_id = t.person_id 
         and t.occurred_at <= e.event_occurred_at
-        and datediff('day', t.occurred_at, e.event_occurred_at) <= 7  -- 90-day attribution window
+        and {{ dbt.datediff('t.occurred_at', 'e.event_occurred_at', 'day') }} <= 90  -- 90-day attribution window
     group by e.event_id, e.person_id, e.event_occurred_at
 ),
 

@@ -93,7 +93,8 @@ vars:
     segment:
       enabled: false
       location:
-        schema: SEGMENT_LIVE
+        schema: segment_disabled
+        database: ""
         tables:
           tracks: TRACKS
           pages: PAGES

@@ -1,4 +1,4 @@
-{{ config(materialized = 'table')}}
+{{ config(materialized = 'table', tags=['attribution']) }}
 
 {# Collect relations to union based on nexus attribution_models configuration #}
 {% set relations_to_union = [] %}
@@ -14,15 +14,14 @@
         relations=relations_to_union
     ) }}
 {% else %}
-    {# Return empty result if no attribution models found #}
-    select 
-        cast(null as string) as attribution_model_result_id,
-        cast(null as timestamp) as touchpoint_occurred_at,
-        cast(null as string) as attribution_model_name,
-        cast(null as string) as touchpoint_batch_id,
-        cast(null as string) as touchpoint_event_id,
-        cast(null as string) as attributed_event_id,
-        cast(null as string) as person_id,
-        cast(null as timestamp) as attributed_event_occurred_at
-    where 1=0
+-- Return empty result when no attribution models are configured
+WITH empty_result AS (
+    SELECT
+        {{ common_attribution_model_result_fields(return_empty=true) }}
+)
+
+SELECT 
+    {{ common_attribution_model_result_fields() }}
+FROM empty_result
+WHERE 1 = 0
 {% endif %}

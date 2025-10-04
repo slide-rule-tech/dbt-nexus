@@ -2,8 +2,8 @@ version: 2
 
 sources:
   - name:
-      "{{ var('nexus', {}).get('segment', {}).get('location', {}).get('schema')
-      }}"
+      "{{ var('nexus', {}).get('segment', {}).get('location', {}).get('schema',
+      'segment_disabled') }}"
     description: "Segment live data warehouse tables"
     database:
       "{{ var('nexus', {}).get('segment', {}).get('location',
