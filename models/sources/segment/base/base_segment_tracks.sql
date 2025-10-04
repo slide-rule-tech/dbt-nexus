@@ -1,3 +1,7 @@
+{{ config(
+    enabled=var('nexus', {}).get('segment', {}).get('enabled', false)
+) }}
+
 {{ nexus.join_and_rename_or_drop(
     rename='drop',
     ref1=ref('base_segment_all_tracks'),
