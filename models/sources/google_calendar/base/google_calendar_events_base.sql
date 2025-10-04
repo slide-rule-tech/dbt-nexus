@@ -9,7 +9,8 @@ WITH source_data AS (
     SELECT
         JSON_EXTRACT_SCALAR(record, '$.id') as event_id,
         *
-    FROM {{ source('google_calendar', 'calendar_events') }}
+    FROM {{ nexus.nexus_source('google_calendar', 'calendar_events') }}
+    WHERE deleted_at IS NULL  -- Filter out deleted events
 ),
 
 event_filter AS (
@@ -20,7 +21,7 @@ event_filter AS (
 
 extracted AS (
     SELECT
-        {{ create_nexus_id('event', ['event_id']) }} as nexus_event_id,
+        {{ nexus.create_nexus_id('event', ['event_id']) }} as nexus_event_id,
         
         -- Event details
         event_id as calendar_event_id,
@@ -28,6 +29,8 @@ extracted AS (
         JSON_EXTRACT_SCALAR(record, '$.description') as description,
         JSON_EXTRACT_SCALAR(record, '$.location') as location,
         JSON_EXTRACT_SCALAR(record, '$.status') as status,
+        JSON_EXTRACT_SCALAR(record, '$.userEmail') as user_email,
+        JSON_EXTRACT_SCALAR(record, '$.calendarId') as calendar_id,
         
         -- Parse start and end times
         CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 

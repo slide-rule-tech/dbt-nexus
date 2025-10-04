@@ -163,14 +163,18 @@ hardcoded source references:
 
 ```sql
 -- Instead of: select * from {{ source('HARDCODED_SCHEMA', 'HARDCODED_TABLE') }}
--- Use: select * from {{ nexus_source('your_source', 'table_name') }}
+-- Use: select * from {{ nexus.nexus_source('your_source', 'table_name') }}
 ```
+
+**Important**: Use the fully qualified macro name `nexus.nexus_source()` to
+ensure proper resolution across different dbt contexts.
 
 **Update base models** to use the macro:
 
 ```sql
 -- base/your_source_table_base.sql
-select * from {{ nexus_source('your_source', 'table_name') }}
+select * from {{ nexus.nexus_source('your_source', 'table_name') }}
+WHERE deleted_at IS NULL  -- Add filtering for deleted records if applicable
 ```
 
 **Update source definitions** to use Jinja templating with fallback defaults:
@@ -423,8 +427,23 @@ vars:
   nexus:
     google_calendar:
       enabled: true
+      location:
+        schema: slide-rule-tech-nexus.google_workspace
+        table: calendar_events
 # sources: section updated with comment explaining template source
 ```
+
+**Key Lessons Learned:**
+
+- **Schema Evolution**: Updated from simple `record + synced_at` to
+  comprehensive schema with `connection_id`, `first_seen_at`,
+  `last_modified_at`, `deleted_at`, `cursor` fields
+- **Deleted Record Handling**: Added `WHERE deleted_at IS NULL` filtering in
+  base model
+- **Dynamic Source Resolution**: Successfully migrated from hardcoded `source()`
+  to `nexus.nexus_source()` macro
+- **Domain-Wide Delegation**: Template source now supports organization-wide
+  calendar access patterns
 
 ## Configuration Patterns
 
@@ -570,6 +589,39 @@ sources:
 2. Ensure all YAML template variables have fallback defaults
 3. Test compilation with the source disabled to verify the fix
 
+### Schema Evolution Issues
+
+**Problem**: New fields added to source data but models fail
+
+**Root Cause**: Template source models may need updates to handle new schema
+fields
+
+**Solution**: Update source YAML definition and add field handling:
+
+```yaml
+# Add new fields to source definition
+columns:
+  - name: connection_id
+    description: "Connection identifier"
+    data_type: string
+  - name: deleted_at
+    description: "When record was deleted (nullable)"
+    data_type: timestamp
+```
+
+```sql
+-- Update base models to handle new fields
+FROM {{ nexus.nexus_source('your_source', 'table_name') }}
+WHERE deleted_at IS NULL  -- Use new fields for filtering
+```
+
+**Best Practices for Schema Evolution**:
+
+1. Document all schema changes in template source documentation
+2. Add backward compatibility when possible
+3. Test with both old and new schema structures
+4. Update troubleshooting guides with new field usage
+
 ### Snowflake-Specific Issues
 
 **Problem**: "Schema 'DATABASE.SCHEMA' does not exist" error
@@ -598,7 +650,8 @@ definition
    memberships)
 7. **Include comprehensive examples** in documentation
 8. **Test with multiple client projects** to ensure reusability
-9. **Use the `nexus_source` macro** for dynamic source resolution
+9. **Use the fully qualified `nexus.nexus_source()` macro** for dynamic source
+   resolution
 10. **Handle database-specific requirements** (e.g., Snowflake three-part
     naming)
 11. **Remove hardcoded defaults** for sources without universal standards
@@ -609,6 +662,11 @@ definition
 15. **Clean target directory** when encountering duplicate source errors
 16. **Always provide YAML fallback defaults** to prevent None validation errors
 17. **Test both enabled and disabled states** in multiple client environments
+18. **Add deleted record filtering** when applicable (e.g.,
+    `WHERE deleted_at IS NULL`)
+19. **Support schema evolution** by documenting field additions and changes
+20. **Consider domain-wide delegation patterns** for organization-wide data
+    access
 
 ## Next Steps
 

@@ -9,9 +9,9 @@ summary:
 # Google Calendar Template Source
 
 The **Google Calendar Template Source** provides instant integration with Google
-Calendar data through the Nango ETL pipeline. It processes calendar events into
-meeting events, extracts attendee information, and identifies internal vs
-external meetings - all through simple configuration.
+Calendar data through domain-wide delegation or ETL pipelines. It processes
+calendar events into meeting events, extracts attendee information, and
+identifies internal vs external meetings - all through simple configuration.
 
 ## Overview
 
@@ -26,6 +26,44 @@ framework:
 - **🔗 Participation Links**: Connects people to meetings they attended
 - **🏷️ Meeting Context**: Captures meeting details and external participant
   flags
+
+## Architecture
+
+```
+Calendar Events (JSON) → Base Model → Events + Identifiers + Traits + Memberships
+                                  ↓
+                            Nexus Framework → Final Tables
+```
+
+### Data Flow
+
+1. **Data Sync**: Calendar events synced to your data warehouse via domain-wide
+   delegation or ETL
+2. **Base Processing**: `google_calendar_events_base.sql` transforms JSON to
+   structured data
+3. **Event Creation**: Each event = 1 `external_meeting` or `internal_meeting`
+   event
+4. **Participant Extraction**: Organizer, creator + attendees become event
+   participants
+5. **Identity Resolution**: Email addresses → person identifiers, domains →
+   group identifiers
+6. **Final Integration**: Auto-included in nexus `events`, `persons`, `groups`
+   tables
+
+## File Structure
+
+```
+sources/google_calendar/
+├── base/
+│   └── google_calendar_events_base.sql     # JSON → structured events
+├── google_calendar_events.sql              # Events for nexus processing
+├── google_calendar_person_identifiers.sql  # Email identifiers
+├── google_calendar_person_traits.sql       # Person traits (name, email)
+├── google_calendar_group_identifiers.sql   # Domain identifiers
+├── google_calendar_group_traits.sql        # Group traits (domain)
+├── google_calendar_membership_identifiers.sql # Person-group relationships
+└── google_calendar.yml                     # dbt source definition
+```
 
 ## Quick Start
 
@@ -92,7 +130,7 @@ vars:
     google_calendar:
       enabled: true
       location:
-        schema: my_calendar_data
+        schema: slide-rule-tech-nexus.google_workspace
         table: calendar_events
 ```
 
@@ -118,10 +156,26 @@ Your Google Calendar source table must have this structure:
 
 ```sql
 CREATE TABLE `project.schema.table` (
-  record JSON,           -- Google Calendar event as JSON
-  synced_at TIMESTAMP    -- When the record was synced
+  connection_id STRING NOT NULL,      -- Connection identifier
+  first_seen_at TIMESTAMP NOT NULL,   -- When record was first seen
+  last_modified_at STRING NOT NULL,   -- When record was last modified
+  last_action STRING NOT NULL,        -- Last action performed
+  deleted_at TIMESTAMP,               -- When record was deleted (nullable)
+  cursor STRING NOT NULL,             -- Sync cursor for incremental processing
+  record JSON NOT NULL,               -- Google Calendar event as JSON
+  synced_at TIMESTAMP NOT NULL        -- When the record was synced
 );
 ```
+
+**Key Features:**
+
+- **Deleted record handling**: `deleted_at` field allows filtering out deleted
+  events
+- **Incremental sync support**: `cursor` field enables efficient incremental
+  processing
+- **Change tracking**: `last_modified_at` and `last_action` provide audit trail
+- **Domain-wide delegation compatible**: Supports organization-wide calendar
+  access
 
 ### Google Calendar Event JSON Structure
 
@@ -170,11 +224,15 @@ Transforms raw Google Calendar JSON into structured events:
 
 **Key Features:**
 
+- **Deleted record filtering**: Automatically excludes deleted events using
+  `deleted_at` field
 - Parses start/end times (handles both dateTime and date formats)
 - Extracts organizer, creator, and attendee information
 - Detects external meetings based on `internal_domains`
 - Creates structured arrays for attendees with metadata
 - Deduplicates events by latest start time
+- **Domain-wide delegation support**: Works with organization-wide calendar
+  access
 
 **Output Schema:**
 
@@ -184,6 +242,9 @@ calendar_event_id      -- Original Google Calendar event ID
 summary                -- Meeting title
 description            -- Meeting description
 location               -- Meeting location
+status                 -- Event status (confirmed, tentative, cancelled)
+user_email             -- Email of user whose calendar this event came from (domain-wide delegation)
+calendar_id            -- Calendar ID where the event resides
 start_time             -- Meeting start timestamp
 end_time               -- Meeting end timestamp
 is_all_day             -- Boolean for all-day events
@@ -357,6 +418,83 @@ GROUP BY e.id, e.occurred_at, e.event_description
 ORDER BY e.occurred_at DESC;
 ```
 
+### Domain-Wide Delegation Analytics
+
+```sql
+-- Analyze meeting patterns by calendar owner
+SELECT
+    base.user_email as calendar_owner,
+    COUNT(*) as total_meetings,
+    COUNT(CASE WHEN base.has_external_attendees THEN 1 END) as external_meetings,
+    ROUND(COUNT(CASE WHEN base.has_external_attendees THEN 1 END) * 100.0 / COUNT(*), 2) as external_meeting_pct,
+    COUNT(DISTINCT DATE(base.start_time)) as active_days
+FROM {{ ref('google_calendar_events_base') }} base
+WHERE base.start_time >= current_date - interval 30 days
+GROUP BY base.user_email
+ORDER BY total_meetings DESC;
+
+-- Find cross-calendar collaboration patterns
+SELECT
+    organizer.user_email as organizer_calendar,
+    attendee_calendar.user_email as attendee_calendar,
+    COUNT(*) as shared_meetings
+FROM {{ ref('google_calendar_events_base') }} organizer
+JOIN {{ ref('google_calendar_events_base') }} attendee_calendar
+  ON organizer.calendar_event_id = attendee_calendar.calendar_event_id
+  AND organizer.user_email != attendee_calendar.user_email
+WHERE organizer.start_time >= current_date - interval 30 days
+GROUP BY organizer.user_email, attendee_calendar.user_email
+HAVING COUNT(*) >= 5
+ORDER BY shared_meetings DESC;
+```
+
+## Integration with Nexus
+
+### Automatic Processing
+
+When enabled, Google Calendar models automatically integrate with nexus:
+
+1. **Events** → `nexus_events` table
+2. **Person Identifiers** → Identity resolution → `nexus_persons`
+3. **Group Identifiers** → Identity resolution → `nexus_groups`
+4. **Memberships** → `nexus_memberships` table
+
+### Final Table Access
+
+```sql
+-- View all calendar events
+SELECT * FROM nexus_events
+WHERE source = 'google_calendar'
+ORDER BY occurred_at DESC;
+
+-- Find external meetings
+SELECT * FROM nexus_events
+WHERE source = 'google_calendar'
+AND event_name = 'external_meeting'
+ORDER BY occurred_at DESC;
+
+-- See calendar participants
+SELECT
+    e.event_description,
+    e.occurred_at,
+    p.name,
+    p.email
+FROM nexus_events e
+JOIN nexus_person_participants pp ON e.id = pp.event_id
+JOIN nexus_persons p ON pp.person_id = p.id
+WHERE e.source = 'google_calendar'
+ORDER BY e.occurred_at DESC;
+
+-- View events by calendar owner (domain-wide delegation)
+SELECT
+    user_email as calendar_owner,
+    COUNT(*) as event_count,
+    COUNT(CASE WHEN has_external_attendees THEN 1 END) as external_meetings
+FROM {{ ref('google_calendar_events_base') }}
+GROUP BY user_email
+ORDER BY event_count DESC;
+```
+
 ## Performance Optimization
 
 ### Incremental Processing
@@ -370,7 +508,20 @@ models:
       google_calendar:
         +materialized: incremental
         +unique_key: event_id
+        +incremental_strategy: merge
         +cluster_by: ["occurred_at"]
+```
+
+### Clustering
+
+Improve query performance with clustering:
+
+```yaml
+models:
+  nexus:
+    sources:
+      google_calendar:
+        +cluster_by: ["occurred_at", "source"]
 ```
 
 ### Partitioning (BigQuery)
@@ -397,8 +548,9 @@ models:
 **1. No calendar events appearing**
 
 - Check `nexus.google_calendar.enabled: true` is set
-- Verify source table exists: `google_calendar.calendar_events`
+- Verify source table exists and location is correctly configured
 - Ensure source data has the expected JSON structure
+- Check that `deleted_at IS NULL` filter isn't excluding all events
 
 **2. All meetings classified as internal**
 
@@ -415,6 +567,13 @@ models:
 ```sql
 -- Check raw source data
 SELECT * FROM {{ nexus_source('google_calendar', 'calendar_events') }} LIMIT 5;
+
+-- Check for deleted events
+SELECT
+  COUNT(*) as total_events,
+  COUNT(CASE WHEN deleted_at IS NULL THEN 1 END) as active_events,
+  COUNT(CASE WHEN deleted_at IS NOT NULL THEN 1 END) as deleted_events
+FROM {{ nexus_source('google_calendar', 'calendar_events') }};
 
 -- Verify base model processing
 SELECT
