@@ -15,11 +15,7 @@
 
         select 
             *,
-            case 
-                when _dbt_source_relation like '%WORDPRESS_SITE%' then 'WORDPRESS_SITE'
-                when _dbt_source_relation like '%SERVER_AWS_LAMBDA_TRACKING%' then 'SERVER_AWS_LAMBDA_TRACKING'
-                else split_part(_dbt_source_relation, '.', 2)
-            end as segment_source
+            split_part(_dbt_source_relation, '.', 2) as segment_source
         from unioned
     {% else %}
         -- Segment is disabled or no segment sources configured, return empty result set
