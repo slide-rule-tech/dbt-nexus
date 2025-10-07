@@ -60,6 +60,10 @@ enabling proper attribution of conversions back to Facebook ad interactions.
   Facebook ad clicks using attribution models
 - **Data Enrichment**: Combines event data with customer identifiers for
   enhanced Facebook matching
+- **Multiple Person Support**: Handles multiple persons per event with unique
+  sync IDs
+- **Duplicate Prevention**: Deduplicates records to prevent sending duplicate
+  conversions to Facebook
 
 ### Table Structure
 
@@ -70,6 +74,7 @@ The table includes:
   persons
 - **Attribution Data**: Facebook click ID (fbclid) from attribution models
 - **Facebook-Specific Fields**: Event type mapping, content type, currency
+- **Sync Management**: Unique sync IDs for handling multiple persons per event
 
 ## Data Integration Flow
 
@@ -96,6 +101,137 @@ an example workflow:
 - **Event Data**: Standard Facebook event names and custom data
 - **Attribution**: Facebook click IDs and browser parameters
 - **Custom Properties**: Customer information, event values
+
+## Multiple Persons Per Event
+
+### Facebook Event Sync ID
+
+The model handles multiple persons per event through a unique sync identifier:
+
+```sql
+{{ nexus.create_nexus_id('facebook_event_sync', ['event_id', 'person_id']) }} as facebook_event_sync_id
+```
+
+### Use Cases
+
+- **Multiple Guests**: When an event has multiple participants (e.g., family
+  bookings)
+- **Group Events**: When multiple people are involved in the same conversion
+  event
+- **Attribution Tracking**: Each person gets their own Facebook event with
+  proper attribution
+
+### Benefits
+
+- **Deduplication**: Prevents duplicate Facebook events for the same
+  person-event combination
+- **Attribution Accuracy**: Each person gets proper Facebook attribution
+- **Sync Management**: Enables tracking of which events have been synced to
+  Facebook
+- **Error Handling**: Helps identify and resolve sync issues
+
+## Duplicate Prevention and Testing
+
+### Multiple Roles Issue
+
+**Critical Issue**: The same person can have multiple roles for the same event
+(e.g., both 'customer' and 'booker'), which would create duplicate
+`facebook_event_sync_id` values and send duplicate conversions to Facebook.
+
+### Deduplication Logic
+
+The model implements deduplication to prevent duplicate Facebook conversions:
+
+```sql
+-- Add row number for deduplication
+row_number() over (partition by facebook_event_sync_id order by occurred_at) as rn
+
+-- Keep only first occurrence
+where rn = 1
+```
+
+### Required Testing
+
+**MUST WRITE THIS TEST**: You must include a uniqueness test for
+`facebook_event_sync_id` to ensure no duplicate conversions are sent to
+Facebook:
+
+```yaml
+models:
+  - name: facebook_events
+    columns:
+      - name: facebook_event_sync_id
+        tests:
+          - not_null
+          - unique # CRITICAL: Prevents duplicate Facebook conversions
+```
+
+### Why This Test Is Critical
+
+- **Facebook API Limits**: Duplicate conversions can trigger rate limiting
+- **Attribution Accuracy**: Duplicate events skew Facebook's optimization
+  algorithms
+- **Cost Impact**: Duplicate conversions can inflate Facebook ad costs
+- **Data Quality**: Ensures clean, reliable conversion tracking
+
+### Deduplication Strategy
+
+1. **Partition By**: Groups records by `facebook_event_sync_id` (same
+   person-event combination)
+2. **Order By**: Orders by `occurred_at` for consistent first occurrence
+   selection
+3. **Row Number**: Assigns `1` to first occurrence, `2` to second, etc.
+4. **Filter**: `WHERE rn = 1` keeps only the earliest occurrence
+
+## Facebook ClickID Formatting (fbc Parameter)
+
+### Format Specification
+
+The `fbc` parameter follows Facebook's ClickID formatting requirements as
+specified in the
+[Facebook Conversions API documentation](http://developers.facebook.com/docs/marketing-api/conversions-api/parameters/fbp-and-fbc/):
+
+```
+fb.1.timestamp.fbclid
+```
+
+Where:
+
+- **`fb`**: Version prefix (always "fb")
+- **`1`**: Subdomain index (1 for most domains)
+- **`timestamp`**: UNIX timestamp in milliseconds when fbclid was first observed
+- **`fbclid`**: The actual Facebook click ID value
+
+### Implementation
+
+```sql
+case
+    when fbclid is not null and fbclid_occurred_at is not null then
+        'fb.1.' ||
+        cast(extract(epoch from fbclid_occurred_at) * 1000 as bigint) ||
+        '.' ||
+        fbclid
+    else null
+end as fbc
+```
+
+### Example Output
+
+```
+fb.1.1554763741205.AbCdEfGhIjKlMnOpQrStUvWxYz1234567890
+```
+
+### When to Use fbc
+
+- **Use `fbc`**: When you have access to the timestamp when the fbclid was first
+  observed and can format it according to Facebook's specification
+
+### Benefits
+
+- **Enhanced Attribution**: Provides Facebook with precise click timing
+- **Cross-Device Tracking**: Enables better user journey tracking
+- **Optimization**: Improves Facebook's algorithm performance
+- **Compliance**: Meets Facebook's CAPI requirements
 
 ## Benefits
 
@@ -221,6 +357,7 @@ erDiagram
         string source
         decimal value
         string value_unit
+        decimal significance
     }
 
     NEXUS_PERSON_PARTICIPANTS {
@@ -249,15 +386,33 @@ erDiagram
         string fbclid
     }
 
+    FACEBOOK_EVENTS_RAW {
+        string event_id PK
+        timestamp occurred_at
+        string event_name
+        string facebook_event_type
+        string facebook_event_sync_id
+        string person_id FK
+        string email
+        string phone
+        string fbclid
+        string fbc
+        decimal value
+        string currency
+        integer rn
+    }
+
     FACEBOOK_EVENTS {
         string event_id PK
         timestamp occurred_at
         string event_name
         string facebook_event_type
+        string facebook_event_sync_id PK
         string person_id FK
         string email
         string phone
         string fbclid
+        string fbc
         decimal value
         string currency
     }
@@ -265,15 +420,16 @@ erDiagram
     NEXUS_EVENTS ||--o{ NEXUS_PERSON_PARTICIPANTS : "has participants"
     NEXUS_PERSON_PARTICIPANTS }o--|| NEXUS_PERSONS : "references person"
     NEXUS_EVENTS ||--o{ NEXUS_ATTRIBUTION_MODEL_RESULTS : "has attribution"
-    NEXUS_EVENTS ||--|| FACEBOOK_EVENTS : "becomes"
-    NEXUS_PERSONS ||--o{ FACEBOOK_EVENTS : "provides identifiers"
-    NEXUS_ATTRIBUTION_MODEL_RESULTS ||--o{ FACEBOOK_EVENTS : "provides fbclid"
+    NEXUS_EVENTS ||--o{ FACEBOOK_EVENTS_RAW : "becomes"
+    NEXUS_PERSONS ||--o{ FACEBOOK_EVENTS_RAW : "provides identifiers"
+    NEXUS_ATTRIBUTION_MODEL_RESULTS ||--o{ FACEBOOK_EVENTS_RAW : "provides fbclid"
+    FACEBOOK_EVENTS_RAW ||--|| FACEBOOK_EVENTS : "deduplicated by sync_id"
 ```
 
 ### Key Join Logic
 
 1. **Event Filtering**: Start with your target conversion events from
-   `nexus_events`
+   `nexus_events` (filter by `significance >= 100` for marketing relevance)
 2. **Customer Attribution**: Join through `nexus_person_participants` to get
    customer relationships
 3. **Customer Data**: Join `nexus_persons` to get email, phone, and other
@@ -281,6 +437,12 @@ erDiagram
 4. **Attribution Data**: Join `nexus_attribution_model_results` to get Facebook
    click IDs (fbclid)
 5. **Facebook Mapping**: Transform event names to Facebook standard events
+6. **Sync ID Generation**: Create unique `facebook_event_sync_id` for each
+   person-event combination
+7. **Deduplication**: Use `row_number()` to identify and remove duplicate sync
+   IDs
+8. **Final Output**: Keep only first occurrence (`rn = 1`) to prevent duplicate
+   Facebook conversions
 
 ### Required Data Quality
 
