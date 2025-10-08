@@ -641,6 +641,222 @@ SELECT
 FROM first_touch_attribution
 ```
 
+---
+
+## Data Quality and Cleaning Best Practices
+
+Attribution data often contains quality issues that can skew results and create
+noise in your analysis. Implementing proper data cleaning at the touchpoint
+level ensures accurate attribution.
+
+### Common Data Quality Issues
+
+**String "null" Values:**
+
+Attribution parameters often contain the string `"null"` instead of actual NULL
+values:
+
+```sql
+-- BAD: String "null" treated as valid data
+source = 'null'  -- Should be NULL
+gclid = 'NULL'   -- Should be NULL
+```
+
+**URL-Encoded Placeholders:**
+
+Analytics platforms may record placeholder values that should be treated as
+NULL:
+
+```sql
+-- Common placeholder patterns to clean
+'(not set)'   -- Google Analytics placeholder
+'(not+set)'   -- URL-encoded version
+'(null)'      -- Another null variant
+'N/A'         -- Manual data entry placeholder
+```
+
+**Platform-Specific Defaults:**
+
+Default values that indicate lack of attribution data:
+
+```sql
+-- Direct traffic indicators (often should be NULL)
+source = 'direct'
+medium = 'none'
+medium = 'direct'
+```
+
+### Cleaning Strategy
+
+Use the `safe_cast_with_null_strings` macro to handle common null string
+patterns:
+
+```sql
+-- Clean attribution fields at the touchpoint level
+{{ nexus.safe_cast_with_null_strings('utm_source', dbt.type_string()) }}
+```
+
+This macro automatically converts these patterns to NULL:
+
+- `'null'`, `'NULL'`
+- `'None'`, `'none'`
+- Empty strings (`''`)
+
+**Additional Cleaning with NULLIF:**
+
+Layer additional cleaning for platform-specific patterns:
+
+```sql
+-- Example: Clean source field
+nullif(
+    nullif(
+        nullif(
+            {{ nexus.safe_cast_with_null_strings('utm_source', dbt.type_string()) }},
+            '(not set)'
+        ),
+        '(not+set)'
+    ),
+    '(null)'
+) as source
+
+-- For source field specifically, also remove 'direct'
+nullif(..., 'direct') as source
+
+-- For medium field, also remove 'none'
+nullif(..., 'none') as medium
+```
+
+### Value Normalization
+
+Normalize common variations to standard values and ensure consistent casing:
+
+```sql
+-- Lowercase all attribution fields for consistency
+lower(source) as source
+lower(medium) as medium
+lower(campaign) as campaign
+lower(content) as content
+lower(term) as term
+lower(referrer) as referrer
+lower(landing_page) as landing_page
+
+-- Note: Do NOT lowercase click IDs (gclid, fbclid) as they are unique identifiers
+
+-- Normalize domain variations to standard source names
+case
+    when lower(source) = 'google.com' then 'google'
+    when lower(source) = 'facebook.com' then 'facebook'
+    else source
+end as source
+```
+
+**Why lowercase?**
+
+- **Prevents duplicates**: "Google" vs "google" vs "GOOGLE" are all the same
+  source
+- **Consistent reporting**: Simplifies grouping and filtering in queries
+- **Better deduplication**: Attribution deduplication key uses these values
+
+### Filtering Strategy
+
+After cleaning, filter out touchpoints where ALL attribution fields are NULL:
+
+```sql
+where (
+    source is not null
+    or medium is not null
+    or campaign is not null
+    or content is not null
+    or gclid is not null
+)
+```
+
+This ensures you only create touchpoints when there's actual attribution data
+present.
+
+### Impact of Data Cleaning
+
+Proper data cleaning typically:
+
+- **Reduces noise** by 10-30% by removing junk data
+- **Improves accuracy** by consolidating duplicate attribution sources
+- **Simplifies reporting** by reducing the number of "unknown" or placeholder
+  values
+- **Enables better analysis** by ensuring NULL truly means "no data" rather than
+  a string value
+
+### Example: Complete Cleaning Implementation
+
+```sql
+with cleaned_touchpoints as (
+    select
+        event_id,
+
+        -- Clean, normalize, and lowercase source
+        lower(
+            case
+                when lower({{ nexus.safe_cast_with_null_strings('utm_source', dbt.type_string()) }}) = 'google.com'
+                    then 'google'
+                else nullif(
+                    nullif(
+                        nullif(
+                            {{ nexus.safe_cast_with_null_strings('utm_source', dbt.type_string()) }},
+                            '(not set)'
+                        ),
+                        '(not+set)'
+                    ),
+                    'direct'
+                )
+            end
+        ) as source,
+
+        -- Clean and lowercase medium
+        lower(
+            nullif(
+                nullif(
+                    {{ nexus.safe_cast_with_null_strings('utm_medium', dbt.type_string()) }},
+                    '(not set)'
+                ),
+                'none'
+            )
+        ) as medium,
+
+        -- Clean and lowercase campaign
+        lower(
+            nullif(
+                {{ nexus.safe_cast_with_null_strings('utm_campaign', dbt.type_string()) }},
+                '(not set)'
+            )
+        ) as campaign,
+
+        -- Clean click IDs (DO NOT lowercase - these are unique identifiers)
+        nullif(
+            {{ nexus.safe_cast_with_null_strings('gclid', dbt.type_string()) }},
+            '(not set)'
+        ) as gclid
+
+    from source_events
+    where (
+        -- Only create touchpoints with actual attribution data
+        utm_source is not null
+        or utm_medium is not null
+        or utm_campaign is not null
+        or gclid is not null
+    )
+)
+
+select * from cleaned_touchpoints
+where (
+    -- Filter out records where cleaning resulted in all NULLs
+    source is not null
+    or medium is not null
+    or campaign is not null
+    or gclid is not null
+)
+```
+
+---
+
 ## Next Steps
 
 To implement attribution models on top of this foundation:
