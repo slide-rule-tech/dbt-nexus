@@ -22,6 +22,9 @@
             when {{ phone_expr }} is null then null
             when trim({{ phone_expr }}) = '' then null
             when contains_substr(trim({{ phone_expr }}), '@') then null
+            when trim({{ phone_expr }}) in ('0000000000', '1111111111', '2222222222', '3333333333', '4444444444', '5555555555', '6666666666', '7777777777', '8888888888', '9999999999') then null  -- All same digit
+            when trim({{ phone_expr }}) = '1234567890' then null  -- Sequential
+            when trim({{ phone_expr }}) = '0123456789' then null  -- Sequential with leading zero
             else trim({{ phone_expr }})
           end
         )
@@ -32,6 +35,9 @@
             when {{ phone_expr }} is null then null
             when trim({{ phone_expr }}) = '' then null
             when contains(trim({{ phone_expr }}), '@') then null
+            when trim({{ phone_expr }}) in ('0000000000', '1111111111', '2222222222', '3333333333', '4444444444', '5555555555', '6666666666', '7777777777', '8888888888', '9999999999') then null  -- All same digit
+            when trim({{ phone_expr }}) = '1234567890' then null  -- Sequential
+            when trim({{ phone_expr }}) = '0123456789' then null  -- Sequential with leading zero
             else trim({{ phone_expr }})
           end
         )
@@ -42,6 +48,9 @@
             when {{ phone_expr }} is null then null
             when trim({{ phone_expr }}) = '' then null
             when position('@' in trim({{ phone_expr }})) > 0 then null
+            when trim({{ phone_expr }}) in ('0000000000', '1111111111', '2222222222', '3333333333', '4444444444', '5555555555', '6666666666', '7777777777', '8888888888', '9999999999') then null  -- All same digit
+            when trim({{ phone_expr }}) = '1234567890' then null  -- Sequential
+            when trim({{ phone_expr }}) = '0123456789' then null  -- Sequential with leading zero
             else trim({{ phone_expr }})
           end
         )
@@ -52,6 +61,9 @@
             when {{ phone_expr }} is null then null
             when trim({{ phone_expr }}) = '' then null
             when instr(trim({{ phone_expr }}), '@') > 0 then null
+            when trim({{ phone_expr }}) in ('0000000000', '1111111111', '2222222222', '3333333333', '4444444444', '5555555555', '6666666666', '7777777777', '8888888888', '9999999999') then null  -- All same digit
+            when trim({{ phone_expr }}) = '1234567890' then null  -- Sequential
+            when trim({{ phone_expr }}) = '0123456789' then null  -- Sequential with leading zero
             else trim({{ phone_expr }})
           end
         )
@@ -63,6 +75,9 @@
             when {{ phone_expr }} is null then null
             when trim({{ phone_expr }}) = '' then null
             when contains(trim({{ phone_expr }}), '@') then null
+            when trim({{ phone_expr }}) in ('0000000000', '1111111111', '2222222222', '3333333333', '4444444444', '5555555555', '6666666666', '7777777777', '8888888888', '9999999999') then null  -- All same digit
+            when trim({{ phone_expr }}) = '1234567890' then null  -- Sequential
+            when trim({{ phone_expr }}) = '0123456789' then null  -- Sequential with leading zero
             else trim({{ phone_expr }})
           end
         )

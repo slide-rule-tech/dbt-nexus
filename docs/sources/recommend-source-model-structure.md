@@ -51,32 +51,42 @@ select * from RAW_SCHEMA.SOURCE_RAW.TABLE2
 **Purpose**: Clean, standardized representations of business entities
 
 The normalized layer transforms raw data into clean, business-ready tables that
-closely mirror the original database structure. Usually this involves cleaning
-up the ELT formatted raw tables for deduplication, JSON extraction, aliasing,
-etc. Usually:
+closely mirror the original database structure. Each table represents a single
+entity from the source system (orders, customers, products, etc.) and remains
+separate. Usually this involves cleaning up the ELT formatted raw tables for
+deduplication, JSON extraction, aliasing, etc. Usually:
 
 - **Explicit field selection** - No `SELECT *` to ensure schema stability
-- **Proper joins** - Combines related tables (e.g., orders + customer data)
+- **Mirrors source schema** - Keeps tables separate (orders separate from
+  customers)
 - **Consistent naming** - Standardized column names across the pipeline
 - **Data type consistency** - Ensures compatible data types for downstream
   processing
-- **Deduplicating data** - deduplicate rows
+- **Deduplicating data** - Deduplicate rows
+- **No joins** - Joins happen in the intermediate layer, not here
 
 **Example**:
 
 ```sql
 -- source_orders.sql
 select
-    o.order_id,
-    o.customer_id,
-    o.order_date,
-    o.total_amount,
-    c.customer_name,
-    c.email,
-    c.phone_number
-from {{ ref('base_source_orders') }} o
-left join {{ ref('base_source_customers') }} c
-    on o.customer_id = c.customer_id
+    order_id,
+    customer_id,
+    order_date,
+    total_amount,
+    status
+from {{ ref('base_source_orders') }}
+qualify row_number() over (partition by order_id order by updated_at desc) = 1
+
+-- source_customers.sql
+select
+    customer_id,
+    customer_name,
+    email,
+    phone_number,
+    created_at
+from {{ ref('base_source_customers') }}
+qualify row_number() over (partition by customer_id order by updated_at desc) = 1
 ```
 
 ### 3. **Intermediate Layer** - Event-Type Specific Formatting
@@ -93,8 +103,12 @@ relevant:
 - membership_identifiers
 
 The intermediate layer contains specialized models that format data according to
-specific event types (appointments, payments, orders, etc.). This layer:
+specific event types (appointments, payments, orders, etc.). This is where joins
+between normalized tables occur to bring together related data for each event
+type. This layer:
 
+- **Joins normalized tables** - Combines related entities (orders + customers)
+  as needed for each event type
 - **Separates concerns** - Each event type has its own processing logic
 - **Enables independent development** - Teams can work on different event types
   without conflicts
@@ -123,12 +137,26 @@ with orders as (
     select * from {{ ref('source_orders') }}
 ),
 
+customers as (
+    select * from {{ ref('source_customers') }}
+),
+
+orders_with_customer_data as (
+    select
+        o.*,
+        c.customer_name,
+        c.email,
+        c.phone_number
+    from orders o
+    left join customers c on o.customer_id = c.customer_id
+),
+
 events as (
     select
         -- Nexus event standard fields
         {{ nexus.create_nexus_id('event', ['order_id', 'order_date']) }} as event_id,
         order_date as occurred_at,
-        'order' as type,
+        'order' as event_type,
         'order_placed' as event_name,
         'Order placed for ' || total_amount as event_description,
         'source' as source,
@@ -141,7 +169,7 @@ events as (
         email,
         phone_number
 
-    from orders
+    from orders_with_customer_data
     where order_date is not null
 )
 
@@ -250,7 +278,7 @@ models/sources/{source_name}/
 
 - Test each layer independently
 - Validate data quality at each transformation step
-- Ensure proper join logic in normalized layer
+- Ensure proper join logic in intermediate layer
 - Verify Nexus macro outputs in intermediate layer
 
 ## Common Patterns
@@ -258,35 +286,27 @@ models/sources/{source_name}/
 ### **E-commerce Sources**
 
 - **Base**: Raw order, customer, product tables
-- **Normalized**: Clean orders with customer data joined
-- **Intermediate**: Order events, customer identifiers/traits, product group
-  traits
+- **Normalized**: Clean orders and customer tables, separated (no joins)
+- **Intermediate**: Order events (with orders joined to customers), customer
+  identifiers/traits, product group traits
 - **Union**: Combined events and identity resolution models
 
 ### **CRM Sources**
 
 - **Base**: Raw contact, account, activity tables
-- **Normalized**: Clean contacts with account data
-- **Intermediate**: Activity events, contact identifiers/traits, account group
-  traits
+- **Normalized**: Clean contacts, accounts, and activities tables, separated (no
+  joins)
+- **Intermediate**: Activity events (with activities joined to contacts and
+  accounts), contact identifiers/traits, account group traits
 - **Union**: Combined events and identity resolution models
 
 ### **Event Tracking Sources**
 
 - **Base**: Raw event, user, session tables
-- **Normalized**: Clean events with user context
-- **Intermediate**: Formatted events, user identifiers/traits
+- **Normalized**: Clean events, users, and sessions tables, separated (no joins)
+- **Intermediate**: Formatted events (with events joined to users and sessions),
+  user identifiers/traits
 - **Union**: Combined events and identity resolution models
-
-## Migration Strategy
-
-When implementing this structure for existing sources:
-
-1. **Audit current models** - Identify which layer each model belongs to
-2. **Create base layer** - Extract raw table access into base models
-3. **Refactor normalized** - Clean up joins and field selection
-4. **Create intermediate** - Add event-type specific formatting
-5. **Update unions** - Use `dbt_utils.union_relations()` for combining
 
 This architecture provides a solid foundation for scalable, maintainable data
 pipelines that integrate seamlessly with the dbt-nexus identity resolution

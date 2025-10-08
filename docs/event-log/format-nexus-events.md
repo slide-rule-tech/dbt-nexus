@@ -19,6 +19,9 @@ process and resolve identities correctly.
 
 ## Required Event Schema
 
+**⚠️ CRITICAL FIELD NAMING**: The required field is `event_type`, NOT `type`.
+This is a common mistake that will cause schema validation errors.
+
 All events must follow the standard nexus event schema with these required
 fields:
 
@@ -28,7 +31,7 @@ fields:
 | ------------- | --------- | -------- | -------------------------------------------- | ------------------------------------------------------- |
 | `event_id`    | STRING    | ✅       | Unique event identifier                      | `evt_lobbie_abc123`                                     |
 | `occurred_at` | TIMESTAMP | ✅       | When the event occurred (business timestamp) | `2024-01-15 14:30:00`                                   |
-| `type`        | STRING    | ✅       | Event category/type                          | `appointment`, `communication`, `transaction`           |
+| `event_type`  | STRING    | ✅       | Event category/type                          | `appointment`, `communication`, `transaction`           |
 | `event_name`  | STRING    | ✅       | Specific event name                          | `appointment booked`, `email sent`, `payment completed` |
 | `source`      | STRING    | ✅       | Source system name                           | `lobbie`, `gmail`, `stripe`                             |
 
@@ -115,7 +118,7 @@ formatted_events as (
         -- Required nexus event fields
         {{ nexus.create_nexus_id('event', ['unique_id', 'timestamp_field']) }} as event_id,
         [timestamp_field] as occurred_at,
-        '[event_category]' as type,
+        '[event_category]' as event_type,
         '[event name]' as event_name,
         '[source_name]' as source,
 
@@ -157,7 +160,7 @@ appointment_events as (
         -- Nexus event standard fields
         {{ nexus.create_nexus_id('event', ['appointment_id', 'start_datetime']) }} as event_id,
         start_datetime as occurred_at,
-        'appointment' as type,
+        'appointment' as event_type,
         'appointment booked' as event_name,
         'Appointment booked in Lobbie system' as event_description,
         'lobbie' as source,
@@ -282,7 +285,7 @@ SELECT
     COUNT(*) as total_events,
     COUNT(event_id) as events_with_event_id,
     COUNT(occurred_at) as events_with_timestamp,
-    COUNT(type) as events_with_type,
+    COUNT(event_type) as events_with_event_type,
     COUNT(event_name) as events_with_event_name,
     COUNT(source) as events_with_source
 FROM your_schema.your_event_model;
@@ -320,6 +323,29 @@ the nexus identity resolution system:
 
 ## Common Issues and Solutions
 
+### Issue: Field name confusion - `type` vs `event_type`
+
+**Problem**: Using `type` instead of `event_type` in event models
+
+**Symptoms**:
+
+- Schema validation errors
+- Events not processing correctly in nexus pipeline
+- Missing event_type in final nexus tables
+
+**Solution**: Always use `event_type` as the field name:
+
+```sql
+-- ✅ Correct
+'contract' as event_type,
+
+-- ❌ Incorrect - will cause errors
+'contract' as type,
+```
+
+**Why this matters**: The nexus system expects `event_type` as a required field.
+Using `type` will cause the event to be rejected or not processed correctly.
+
 ### Issue: "create_nexus_id is undefined"
 
 **Solution**: Ensure the nexus package is properly installed:
@@ -350,7 +376,7 @@ CAST(timestamp_field AS TIMESTAMP) as occurred_at
 
 ```sql
 WHERE occurred_at IS NOT NULL
-  AND type IS NOT NULL
+  AND event_type IS NOT NULL
   AND event_name IS NOT NULL
   AND source IS NOT NULL
 ```

@@ -62,7 +62,7 @@ events as (
 
         -- Event metadata
         event_timestamp as occurred_at,
-        'event_type' as event_type,
+        'your_event_type' as event_type,
         'event_name' as event_name,
         'your_source' as source,
 

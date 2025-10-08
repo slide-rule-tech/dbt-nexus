@@ -6,6 +6,9 @@ summary: Quick reference for nexus event schema requirements
 
 # Event Schema Quick Reference
 
+**⚠️ CRITICAL FIELD NAMING**: The required field is `event_type`, NOT `type`.
+This is a common mistake that will cause schema validation errors.
+
 ## Required Fields
 
 | Field         | Type      | Description        | Example               |
