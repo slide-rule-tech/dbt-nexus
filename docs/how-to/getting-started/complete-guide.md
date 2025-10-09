@@ -337,7 +337,7 @@ vars:
   nexus:
     max_recursion: 5 # Control recursion depth for identity resolution
     entity_types: ["person", "group"]
-    
+
     # Define your data sources
     sources:
       shopify_partner:
@@ -345,19 +345,19 @@ vars:
         events: true
         entities: ["group"]
         relationships: false
-      
+
       gmail:
         enabled: true
         events: true
         entities: ["person"]
         relationships: false
-      
+
       manual:
         enabled: true
         events: true
         entities: ["person", "group"]
         relationships: true
-  
+
   # Optional: Override incremental behavior in development
   override_incremental: false # Set to true for full refresh in dev
 ```
@@ -368,8 +368,10 @@ Each source in the `nexus.sources` dictionary must specify:
 
 - **`enabled`**: Whether this source is active (true/false)
 - **`events`**: Whether this source provides event data
-- **`entities`**: Which entity types this source provides (e.g., ["person", "group"])
-- **`relationships`**: Whether this source provides entity relationships (person-group, etc.)
+- **`entities`**: Which entity types this source provides (e.g., ["person",
+  "group"])
+- **`relationships`**: Whether this source provides entity relationships
+  (person-group, etc.)
 
 ### Model Materialization
 

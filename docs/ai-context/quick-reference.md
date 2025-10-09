@@ -89,9 +89,11 @@ dbt test --select package:nexus
 - Events: `{source}_events`
 - Entity Identifiers: `{source}_entity_identifiers` (unified person + group)
 - Entity Traits: `{source}_entity_traits` (unified person + group)
-- Relationship Declarations: `{source}_relationship_declarations` (replaces membership_identifiers)
+- Relationship Declarations: `{source}_relationship_declarations` (replaces
+  membership_identifiers)
 
 #### Intermediate Layer (kept separate for DevX):
+
 - Person Identifiers: `{source}_*_person_identifiers`
 - Person Traits: `{source}_*_person_traits`
 - Group Identifiers: `{source}_*_group_identifiers`
