@@ -91,20 +91,22 @@ and joins:
 This strategy ensures compatibility with industry-standard event tracking while
 preventing column name conflicts during data unioning.
 
-#### Person Identifiers
+#### Entities (`nexus_entities`)
 
-**Purpose**: Normalized identifiers for individual entities
+**Purpose**: Unified table for all resolved entities (persons, groups, and
+custom entity types)
 
-| Column             | Type      | Description                   | Required | Notes                             |
-| ------------------ | --------- | ----------------------------- | -------- | --------------------------------- |
-| `id`               | STRING    | Unique identifier record      | ✅       | Primary key                       |
-| `event_id`         | STRING    | Reference to source event     | ✅       | Foreign key to events.id          |
-| `edge_id`          | STRING    | Groups related identifiers    | ✅       | Surrogate key for grouping        |
-| `identifier_type`  | STRING    | Type of identifier            | ✅       | e.g., 'email', 'phone', 'user_id' |
-| `identifier_value` | STRING    | Actual identifier value       | ✅       | e.g., 'john@example.com'          |
-| `source`           | STRING    | Source system                 | ✅       | Source attribution                |
-| `occurred_at`      | TIMESTAMP | When identifier was collected | ✅       | Business timestamp                |
-| `_ingested_at`     | TIMESTAMP | When processed by dbt         | ✅       | System timestamp                  |
+| Column             | Type      | Description                   | Required | Notes                              |
+| ------------------ | --------- | ----------------------------- | -------- | ---------------------------------- |
+| `entity_id`        | STRING    | Unique entity identifier      | ✅       | Primary key, varies by entity_type |
+| `entity_type`      | STRING    | Type of entity                | ✅       | 'person', 'group', etc.            |
+| `event_id`         | STRING    | Reference to source event     | ✅       | Foreign key to events.id           |
+| `edge_id`          | STRING    | Groups related identifiers    | ✅       | Surrogate key for grouping         |
+| `identifier_type`  | STRING    | Type of identifier            | ✅       | e.g., 'email', 'phone', 'user_id'  |
+| `identifier_value` | STRING    | Actual identifier value       | ✅       | e.g., 'john@example.com'           |
+| `source`           | STRING    | Source system                 | ✅       | Source attribution                 |
+| `occurred_at`      | TIMESTAMP | When identifier was collected | ✅       | Business timestamp                 |
+| `_ingested_at`     | TIMESTAMP | When processed by dbt         | ✅       | System timestamp                   |
 
 #### Person Traits
 
