@@ -92,15 +92,8 @@ qualify row_number() over (partition by customer_id order by updated_at desc) = 
 ### 3. **Intermediate Layer** - Event-Type Specific Formatting
 
 **Purpose**: Transform normalized data into Nexus event-log formats ready for
-Nexus processing. Creates the following models for each event type when
-relevant:
-
-- events
-- person_identifiers
-- person_traits
-- group_identifiers
-- group_traits
-- membership_identifiers
+Nexus processing. Creates intermediate models for each event type that extract
+identifiers and traits for different entity types (persons, groups, etc.).
 
 The intermediate layer contains specialized models that format data according to
 specific event types (appointments, payments, orders, etc.). This is where joins
@@ -178,10 +171,19 @@ select * from events
 
 ### 4. **Unioned Layer** - Nexus-Ready Aggregations
 
-**Purpose**: Combine all event types into final Nexus-compatible tables
+**Purpose**: Combine all event types and entity types into final
+Nexus-compatible tables
 
-The unioned layer uses `dbt_utils.union_relations()` to combine intermediate
-models into final, production-ready tables. This approach provides:
+The unioned layer uses `dbt_utils.union_relations()` or simple UNION ALL to
+combine intermediate models into final, production-ready tables. For the new
+entity-centric architecture, this layer creates:
+
+- `source_events` - Union of all event types
+- `source_entity_identifiers` - Union of all person and group identifiers
+- `source_entity_traits` - Union of all person and group traits
+- `source_relationship_declarations` - All entity relationships
+
+This approach provides:
 
 - **Robust unioning** - `dbt_utils.union_relations()` handles schema differences
   automatically
@@ -196,7 +198,7 @@ models into final, production-ready tables. This approach provides:
 -- source_events.sql
 {{ config(
     materialized='table',
-    tags=['event-processing']
+    tags=['nexus', 'events', 'source']
 ) }}
 
 {{ dbt_utils.union_relations([
@@ -206,6 +208,73 @@ models into final, production-ready tables. This approach provides:
 ]) }}
 
 order by occurred_at desc
+
+-- source_entity_identifiers.sql
+{{ config(
+    materialized='table',
+    tags=['nexus', 'entity_identifiers', 'source']
+) }}
+
+-- Union person and group identifiers from all event types
+with person_identifiers as (
+    select
+        {{ create_nexus_id('entity_identifier', [...]) }} as entity_identifier_id,
+        event_id,
+        event_id as edge_id,
+        'person' as entity_type,
+        'email' as identifier_type,
+        customer_email as identifier_value,
+        'source' as source,
+        order_date as occurred_at,
+        _ingested_at,
+        'customer' as role
+    from {{ ref('source_order_events') }}
+    where customer_email is not null
+),
+
+group_identifiers as (
+    select
+        {{ create_nexus_id('entity_identifier', [...]) }} as entity_identifier_id,
+        event_id,
+        event_id as edge_id,
+        'group' as entity_type,
+        'domain' as identifier_type,
+        company_domain as identifier_value,
+        'source' as source,
+        order_date as occurred_at,
+        _ingested_at,
+        'organization' as role
+    from {{ ref('source_order_events') }}
+    where company_domain is not null
+)
+
+select * from person_identifiers
+union all
+select * from group_identifiers
+
+-- source_entity_traits.sql
+-- Similar structure unioning person and group traits
+
+-- source_relationship_declarations.sql
+select
+    {{ create_nexus_id('relationship_declaration', [...]) }} as relationship_declaration_id,
+    event_id,
+    occurred_at,
+    customer_email as entity_a_identifier,
+    'email' as entity_a_identifier_type,
+    'person' as entity_a_type,
+    'customer' as entity_a_role,
+    company_domain as entity_b_identifier,
+    'domain' as entity_b_identifier_type,
+    'group' as entity_b_type,
+    'organization' as entity_b_role,
+    'customer_organization' as relationship_type,
+    'a_to_b' as relationship_direction,
+    true as is_active,
+    'source' as source
+from {{ ref('source_order_events') }}
+where customer_email is not null
+    and company_domain is not null
 ```
 
 ## Why This Architecture?
@@ -250,12 +319,19 @@ models/sources/{source_name}/
 │   └── {source}_customers.sql
 ├── intermediate/
 │   ├── {source}_order_events.sql
-│   ├── {source}_order_person_identifiers.sql
-│   ├── {source}_order_person_traits.sql
-│   ├── {source}_order_group_identifiers.sql
-│   └── {source}_order_group_traits.sql
-└── {source}_events.sql
+│   ├── {source}_payment_events.sql
+│   └── {source}_support_events.sql
+├── {source}_events.sql                     (unions all event types)
+├── {source}_entity_identifiers.sql         (unions person + group identifiers)
+├── {source}_entity_traits.sql              (unions person + group traits)
+└── {source}_relationship_declarations.sql  (person-group and other relationships)
 ```
+
+**Note**: The intermediate layer no longer creates separate
+`{event_type}_person_identifiers` and `{event_type}_group_identifiers` models.
+Instead, each intermediate event model contains the logic to extract identifiers
+and traits for multiple entity types, and the unioned layer combines them into
+unified entity models.
 
 ## Best Practices
 
@@ -263,9 +339,12 @@ models/sources/{source_name}/
 
 - **Base models**: `base_{source}_{table_name}.sql`
 - **Normalized models**: `{source}_{entity_name}.sql`
-- **Intermediate models**: `{source}_{event_type}_{model_type}.sql`
-- **Union models**: `{source}_events.sql`, `{source}_person_identifiers.sql`,
-  etc.
+- **Intermediate models**: `{source}_{event_type}_events.sql`
+- **Union models**:
+  - `{source}_events.sql` - All events
+  - `{source}_entity_identifiers.sql` - All entity identifiers (person + group)
+  - `{source}_entity_traits.sql` - All entity traits (person + group)
+  - `{source}_relationship_declarations.sql` - All relationships
 
 ### **Configuration**
 
@@ -287,9 +366,15 @@ models/sources/{source_name}/
 
 - **Base**: Raw order, customer, product tables
 - **Normalized**: Clean orders and customer tables, separated (no joins)
-- **Intermediate**: Order events (with orders joined to customers), customer
-  identifiers/traits, product group traits
-- **Union**: Combined events and identity resolution models
+- **Intermediate**: Order events (with orders joined to customers), payment
+  events, etc.
+- **Union**:
+  - `source_events.sql` - All event types
+  - `source_entity_identifiers.sql` - Person (customer emails) + Group (company
+    domains) identifiers
+  - `source_entity_traits.sql` - Person names, emails + Group company names,
+    domains
+  - `source_relationship_declarations.sql` - Customer-to-company relationships
 
 ### **CRM Sources**
 
@@ -297,16 +382,25 @@ models/sources/{source_name}/
 - **Normalized**: Clean contacts, accounts, and activities tables, separated (no
   joins)
 - **Intermediate**: Activity events (with activities joined to contacts and
-  accounts), contact identifiers/traits, account group traits
-- **Union**: Combined events and identity resolution models
+  accounts)
+- **Union**:
+  - `source_events.sql` - All activity types
+  - `source_entity_identifiers.sql` - Person (contact emails) + Group (account
+    domains) identifiers
+  - `source_entity_traits.sql` - Person contact details + Group account details
+  - `source_relationship_declarations.sql` - Contact-to-account relationships
 
 ### **Event Tracking Sources**
 
 - **Base**: Raw event, user, session tables
 - **Normalized**: Clean events, users, and sessions tables, separated (no joins)
-- **Intermediate**: Formatted events (with events joined to users and sessions),
-  user identifiers/traits
-- **Union**: Combined events and identity resolution models
+- **Intermediate**: Formatted events (with events joined to users and sessions)
+- **Union**:
+  - `source_events.sql` - All event types (page views, tracks, etc.)
+  - `source_entity_identifiers.sql` - Person (user IDs, emails, anonymous IDs)
+    identifiers
+  - `source_entity_traits.sql` - Person user traits
+  - `source_relationship_declarations.sql` - User relationships (if applicable)
 
 This architecture provides a solid foundation for scalable, maintainable data
 pipelines that integrate seamlessly with the dbt-nexus identity resolution

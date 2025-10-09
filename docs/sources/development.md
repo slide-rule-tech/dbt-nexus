@@ -180,17 +180,9 @@ with orders as (
 )
 -- ... event logic
 
--- intermediate/source_order_person_identifiers.sql
-{{ nexus.unpivot_identifiers(
-    model_name='source_order_events',  -- ✅ Already filtered!
-    -- ... config
-) }}
-
--- intermediate/source_order_person_traits.sql
-{{ nexus.unpivot_traits(
-    model_name='source_order_events',  -- ✅ Already filtered!
-    -- ... config
-) }}
+-- Note: With entity-centric architecture, identifiers/traits are extracted
+-- in the source union models (source_entity_identifiers.sql, source_entity_traits.sql)
+-- rather than in separate intermediate models per event type.
 
 -- source_events.sql (union layer)
 {{ dbt_utils.union_relations([
@@ -313,7 +305,8 @@ from {{ ref('source_events') }}
 ```sql
 -- Ensure identifiers match filtered events
 select count(distinct event_id) as unique_event_ids
-from {{ ref('source_person_identifiers') }}
+from {{ ref('source_entity_identifiers') }}
+where entity_type = 'person'
 
 -- Should match event count (assuming 1:1 relationship)
 select count(*) as total_events
