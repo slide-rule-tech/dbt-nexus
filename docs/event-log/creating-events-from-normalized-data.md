@@ -15,17 +15,17 @@ Your normalized table typically has:
 
 - A primary identifier (e.g., `appointment_id`, `order_id`, `booking_id`)
 - A `status` column (e.g., "scheduled", "confirmed", "completed", "cancelled")
-- A `created_on` timestamp (when the record was created)
-- A `last_updated_on` timestamp (when the status was last changed)
+- A `created_at` timestamp (when the record was created)
+- A `last_updated_at` timestamp (when the status was last changed)
 
 ### Target Event Structure
 
 You want to generate events that capture the lifecycle:
 
 1. **Initial Event**: Always create a "created" or "scheduled" event at the
-   `created_on` timestamp
+   `created_at` timestamp
 2. **Status Events**: For records that have progressed beyond the initial
-   status, create an event at the `last_updated_on` timestamp
+   status, create an event at the `last_updated_at` timestamp
 
 ## Implementation
 
@@ -63,7 +63,7 @@ initial_events as (
     select
         -- Generate consistent event_id (important for deduplication)
         {{ nexus.create_nexus_id('event', ['appointment_id', "'appointment scheduled'"]) }} as event_id,
-        created_on as occurred_at,
+        created_at as occurred_at,
         'appointment' as event_type,
         'appointment scheduled' as event_name,
         'appointment scheduled for ' || appointment_type || ' at ' || location_name as event_description,
@@ -83,11 +83,11 @@ initial_events as (
         location_name,
 
         -- Timestamps (keep for reference)
-        created_on,
-        last_updated_on
+        created_at,
+        last_updated_at
 
     from joined_data
-    where created_on is not null
+    where created_at is not null
       and location_id is not null
 )
 ```
@@ -101,7 +101,7 @@ status_events as (
     select
         -- Generate consistent event_id based on status
         {{ nexus.create_nexus_id('event', ['appointment_id', "'appointment ' || appointment_status"]) }} as event_id,
-        last_updated_on as occurred_at,
+        last_updated_at as occurred_at,
         'appointment' as event_type,
         'appointment ' || appointment_status as event_name,
         'appointment ' || appointment_status || ' for ' || appointment_type || ' at ' || location_name as event_description,
@@ -121,12 +121,12 @@ status_events as (
         location_name,
 
         -- Timestamps
-        created_on,
-        last_updated_on
+        created_at,
+        last_updated_at
 
     from joined_data
     where appointment_status != 'scheduled'  -- CRITICAL: Avoid duplicating initial events
-      and last_updated_on is not null
+      and last_updated_at is not null
       and location_id is not null
 )
 ```
@@ -172,16 +172,16 @@ generation:
 {{ nexus.create_nexus_id('event', ['record_id', "'prefix ' || status_column"]) }}
 ```
 
-**Don't Include Timestamps**: Notice we don't include `created_on` or
-`last_updated_on` in the event_id generation. This ensures that if the same
+**Don't Include Timestamps**: Notice we don't include `created_at` or
+`last_updated_at` in the event_id generation. This ensures that if the same
 status appears multiple times, you generate the same event_id, making duplicates
 detectable. If there are true duplicates in the underlying normalized data, fix
 that in normalization.
 
 ### 3. Timestamp Selection
 
-- **Initial Events**: Always use `created_on` for `occurred_at`
-- **Status Events**: Always use `last_updated_on` for `occurred_at`
+- **Initial Events**: Always use `created_at` for `occurred_at`
+- **Status Events**: Always use `last_updated_at` for `occurred_at`
 
 This ensures chronological accuracy and allows you to track when each status
 change actually occurred.
@@ -215,7 +215,7 @@ joined_data as (
 initial_events as (
     select
         {{ nexus.create_nexus_id('event', ['order_id', "'order placed'"]) }} as event_id,
-        created_on as occurred_at,
+        created_at as occurred_at,
         'order' as event_type,
         'order placed' as event_name,
         'order placed for ' || customer_name as event_description,
@@ -229,11 +229,11 @@ initial_events as (
         customer_id,
         customer_name,
         order_total,
-        created_on,
-        last_updated_on
+        created_at,
+        last_updated_at
 
     from joined_data
-    where created_on is not null
+    where created_at is not null
       and customer_id is not null
 ),
 
@@ -241,7 +241,7 @@ initial_events as (
 status_events as (
     select
         {{ nexus.create_nexus_id('event', ['order_id', "'order ' || order_status"]) }} as event_id,
-        last_updated_on as occurred_at,
+        last_updated_at as occurred_at,
         'order' as event_type,
         'order ' || order_status as event_name,
         'order ' || order_status || ' for ' || customer_name as event_description,
@@ -255,12 +255,12 @@ status_events as (
         customer_id,
         customer_name,
         order_total,
-        created_on,
-        last_updated_on
+        created_at,
+        last_updated_at
 
     from joined_data
     where order_status != 'placed'  -- Avoid duplicating initial events
-      and last_updated_on is not null
+      and last_updated_at is not null
       and customer_id is not null
 )
 
@@ -364,13 +364,13 @@ select
     order_id,
     event_name,
     occurred_at,
-    created_on,
-    last_updated_on,
+    created_at,
+    last_updated_at,
     case
         when event_name = 'order placed' then
-            case when occurred_at = created_on then 'CORRECT' else 'WRONG' end
+            case when occurred_at = created_at then 'CORRECT' else 'WRONG' end
         else
-            case when occurred_at = last_updated_on then 'CORRECT' else 'WRONG' end
+            case when occurred_at = last_updated_at then 'CORRECT' else 'WRONG' end
     end as timestamp_check
 from order_events
 where order_id in (
@@ -434,7 +434,7 @@ from (
 
 ```sql
 -- DON'T DO THIS
-{{ nexus.create_nexus_id('event', ['order_id', 'created_on', "'order placed'"]) }}
+{{ nexus.create_nexus_id('event', ['order_id', 'created_at', "'order placed'"]) }}
 ```
 
 This creates unique event_ids even for duplicate events, making it impossible to
@@ -459,7 +459,7 @@ This creates duplicate events for records still in their initial state.
 -- DON'T DO THIS
 initial_events as (
     select
-        last_updated_on as occurred_at,  -- WRONG: should be created_on
+        last_updated_at as occurred_at,  -- WRONG: should be created_at
         ...
 )
 ```
@@ -473,8 +473,8 @@ For a properly implemented pattern:
 - **Records in initial status**: 1 event (initial event only)
 - **Records that have changed status**: 2 events (initial + current status)
 - **No duplicates**: Each record should have at most 2 events
-- **Correct timestamps**: Initial events use `created_on`, status events use
-  `last_updated_on`
+- **Correct timestamps**: Initial events use `created_at`, status events use
+  `last_updated_at`
 - **Chronological order**: Events should be ordered by `occurred_at`
 
 ## Summary
