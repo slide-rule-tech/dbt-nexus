@@ -51,7 +51,7 @@ with source_data as (
     {% else %}
     '{{ identifier_column }}' as identifier_type,
     {% endif %}
-    identifier_column as identifier_value,
+    {{ nexus.safe_cast_with_null_strings('identifier_column', api.Column.translate_type("string")) }} as identifier_value,
     {% if col in column_to_trait_name %}
     '{{ column_to_trait_name[col] }}' as trait_name,
     {% else %}
