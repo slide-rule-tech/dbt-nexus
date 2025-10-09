@@ -1,12 +1,34 @@
 version: 2
 
 sources:
-  - name: google_calendar
-    description: "Google Calendar events synced via Nango integration"
+  - name:
+      "{{ var('nexus', {}).get('google_calendar', {}).get('location',
+      {}).get('schema', 'google_calendar') }}"
+    description: "Google Calendar events synced via domain-wide delegation"
     tables:
-      - name: calendar_events
-        description: "Raw Google Calendar events from Nango sync"
+      - name:
+          "{{ var('nexus', {}).get('google_calendar', {}).get('location',
+          {}).get('table', 'calendar_events') }}"
+        description: "Raw Google Calendar events from Google Workspace sync"
         columns:
+          - name: connection_id
+            description: "Connection identifier"
+            data_type: string
+          - name: first_seen_at
+            description: "Timestamp when the record was first seen"
+            data_type: timestamp
+          - name: last_modified_at
+            description: "Timestamp when the record was last modified"
+            data_type: string
+          - name: last_action
+            description: "Last action performed on the record"
+            data_type: string
+          - name: deleted_at
+            description: "Timestamp when the record was deleted (nullable)"
+            data_type: timestamp
+          - name: cursor
+            description: "Sync cursor for incremental processing"
+            data_type: string
           - name: record
             description: "JSON record from Google Calendar API"
             data_type: json
