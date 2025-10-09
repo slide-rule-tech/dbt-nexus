@@ -1,7 +1,7 @@
 {% macro snowflake__resolve_identifiers(entity_type, identifiers_table, edges_table, max_recursion=10) %}
 
 with recursive recursive_components as (
-    -- Base case : start from every identifier that appears in the raw table.
+    -- Base case : start from every identifier that appears in the raw table for this entity_type.
     select distinct
       identifier_type  as component_identifier_type,
       identifier_value as component_identifier_value,
@@ -11,6 +11,7 @@ with recursive recursive_components as (
       identifier_type || ':' || identifier_value as path,
       0 as recursion_level
     from {{ ref(identifiers_table) }}
+    where entity_type = '{{ entity_type }}'
 
     union all
 
@@ -70,6 +71,7 @@ component_mapping as (
 
 entity_identifiers as (
   select * from {{ ref(identifiers_table) }}
+  where entity_type = '{{ entity_type }}'
 ),
 
 resolved_identifiers as (
