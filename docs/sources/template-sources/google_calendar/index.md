@@ -10,22 +10,23 @@ summary:
 
 The **Google Calendar Template Source** provides instant integration with Google
 Calendar data through the Nango ETL pipeline. It processes calendar events into
-meeting events, extracts attendee information, and identifies internal vs
-external meetings - all through simple configuration.
+meeting events, extracts entity identifiers for people and groups, and creates
+relationship declarations - all through simple configuration.
 
 ## Overview
 
 The Google Calendar template source transforms raw calendar data into the nexus
-framework:
+framework using the v0.3.0 entity-centric architecture:
 
 - **📅 Meeting Events**: Each calendar event becomes an `external_meeting` or
   `internal_meeting`
-- **👥 Attendee Tracking**: Extracts organizers, creators, and attendees as
-  participants
-- **🏢 Organization Detection**: Creates groups from attendee email domains
-- **🔗 Participation Links**: Connects people to meetings they attended
-- **🏷️ Meeting Context**: Captures meeting details and external participant
-  flags
+- **👥 Attendee Entities**: Extracts organizers, creators, and attendees as
+  person entities
+- **🏢 Organization Entities**: Creates groups from attendee email domains
+- **🔗 Relationships**: Links people to their organizations via email domains
+  (membership type)
+- **🏷️ Entity Traits**: Captures meeting participant names and emails for all
+  entities
 
 ## Quick Start
 
@@ -49,26 +50,28 @@ dbt run --select package:nexus
 
 ```sql
 -- View recent calendar events
-SELECT * FROM nexus_events
+SELECT * FROM {{ ref('nexus_events') }}
 WHERE source = 'google_calendar'
 ORDER BY occurred_at DESC
 LIMIT 10;
 
--- Find external meetings
+-- Find external meetings with attendee details
 SELECT
-    e.event_description as meeting_title,
-    e.occurred_at,
-    COUNT(DISTINCT p.id) as attendee_count,
-    COUNT(DISTINCT CASE WHEN pp.role = 'organizer' THEN p.id END) as organizer_count,
-    COUNT(DISTINCT CASE WHEN pp.role = 'attendee' THEN p.id END) as attendee_count_regular,
-    COUNT(DISTINCT CASE WHEN pp.role = 'optional_attendee' THEN p.id END) as optional_attendee_count
-FROM nexus_events e
-JOIN nexus_person_participants pp ON e.id = pp.event_id
-JOIN nexus_persons p ON pp.person_id = p.id
-WHERE e.source = 'google_calendar'
-AND e.event_name = 'external_meeting'
-GROUP BY e.id, e.event_description, e.occurred_at
-ORDER BY e.occurred_at DESC;
+    ev.event_description as meeting_title,
+    ev.occurred_at,
+    COUNT(DISTINCT CASE WHEN ei.entity_type = 'person' THEN ei.identifier_value END) as person_count,
+    COUNT(DISTINCT CASE WHEN ei.role = 'organizer' THEN ei.identifier_value END) as organizer_count,
+    COUNT(DISTINCT CASE WHEN ei.role = 'attendee' THEN ei.identifier_value END) as attendee_count,
+    ARRAY_AGG(DISTINCT e.email ORDER BY e.email) as attendee_emails
+FROM {{ ref('nexus_events') }} ev
+JOIN {{ ref('nexus_entity_identifiers') }} ei ON ev.event_id = ei.event_id
+LEFT JOIN {{ ref('nexus_entities') }} e
+    ON ei.identifier_value = e.email
+    AND e.entity_type = 'person'
+WHERE ev.source = 'google_calendar'
+  AND ev.event_name = 'external_meeting'
+GROUP BY ev.event_id, ev.event_description, ev.occurred_at
+ORDER BY ev.occurred_at DESC;
 ```
 
 ## Configuration
@@ -164,9 +167,12 @@ The `record` column should contain Google Calendar API event format:
 
 ## Generated Models
 
-### Base Model: `google_calendar_events_base`
+Google Calendar uses the **four-layer source architecture** with special naming
+to avoid conflicts:
 
-Transforms raw Google Calendar JSON into structured events:
+### Layer 1: Base - `google_calendar_events_base.sql`
+
+Transforms raw Google Calendar JSON into structured events.
 
 **Key Features:**
 
@@ -174,29 +180,36 @@ Transforms raw Google Calendar JSON into structured events:
 - Extracts organizer, creator, and attendee information
 - Detects external meetings based on `internal_domains`
 - Creates structured arrays for attendees with metadata
-- Deduplicates events by latest start time
 
-**Output Schema:**
+### Layer 2: Normalized - `google_calendar_events_normalized.sql`
 
-```sql
-nexus_event_id         -- Unique identifier for nexus processing
-calendar_event_id      -- Original Google Calendar event ID
-summary                -- Meeting title
-description            -- Meeting description
-location               -- Meeting location
-start_time             -- Meeting start timestamp
-end_time               -- Meeting end timestamp
-is_all_day             -- Boolean for all-day events
-organizer              -- STRUCT with email, name, domain, is_internal
-creator                -- STRUCT with email, name, domain, is_internal
-attendees              -- ARRAY of attendee STRUCTs
-has_external_attendees -- Boolean for external meeting detection
-event_name             -- "external_meeting" or "internal_meeting"
-event_description      -- Meeting summary
-source                 -- "google_calendar"
-```
+Clean, deduplicated calendar events ready for processing.
 
-### Events: `google_calendar_events`
+**Special naming**: Note the `_normalized` suffix to avoid conflict with
+"events" concept.
+
+### Layer 3: Intermediate - 6 Models
+
+Separate person/group logic for better debugging and transparency:
+
+- `google_calendar_event_events.sql` - Calendar events → Nexus events (note:
+  double "event")
+- `google_calendar_person_identifiers.sql` - Organizer/creator/attendee
+  identifiers
+- `google_calendar_group_identifiers.sql` - Domain identifiers (filtered)
+- `google_calendar_person_traits.sql` - Participant names and emails
+- `google_calendar_group_traits.sql` - Domain names
+- `google_calendar_event_relationship_declarations.sql` - Person→domain
+  memberships
+
+**Special naming**: `google_calendar_event_events` uses double "event" -
+calendar events transformed into nexus events.
+
+### Layer 4: Union - 4 Models (Nexus Integration)
+
+These models feed directly into the nexus pipeline:
+
+#### `google_calendar_events`
 
 Creates nexus-compatible events:
 
@@ -206,114 +219,81 @@ Creates nexus-compatible events:
 - `internal_meeting` (significance: 2) - Only internal attendees
 
 ```sql
-event_id               -- Reference to calendar event
+event_id               -- Unique event identifier (evt_ prefix)
 event_name             -- "external_meeting" or "internal_meeting"
 occurred_at            -- Meeting start time
 event_description      -- Meeting summary
-significance           -- 3 for external, 2 for internal
+event_significance     -- 3 for external, 2 for internal
 event_type             -- "calendar_event"
 source                 -- "google_calendar"
 ```
 
-### Person Identifiers: `google_calendar_person_identifiers`
+#### `google_calendar_entity_identifiers`
 
-Extracts email addresses from all meeting participants with role context:
+Unified person + group identifiers:
+
+```sql
+entity_identifier_id   -- Unique identifier (ent_idfr_ prefix)
+event_id               -- Reference to calendar event
+edge_id                -- Groups related identifiers
+entity_type            -- "person" or "group"
+identifier_type        -- "email" or "domain"
+identifier_value       -- Email address or domain
+role                   -- Participation role (see below)
+occurred_at            -- Meeting start time
+source                 -- "google_calendar"
+```
 
 **Role Types:**
 
-- `organizer` - Person who organized the meeting
-- `creator` - Person who created the calendar event
-- `attendee` - Person who attended the meeting
-- `optional_attendee` - Person who was optionally invited
+- Person roles: `organizer`, `creator`, `attendee`
+- Group roles: `organizer_domain`, `creator_domain`, `attendee_domain`
 
-**Sources:**
+#### `google_calendar_entity_traits`
 
-- Meeting organizer email
-- Meeting creator email
-- All attendee emails
+Unified person + group traits:
 
 ```sql
+entity_trait_id        -- Unique trait identifier (ent_tr_ prefix)
 event_id               -- Reference to calendar event
-edge_id                 -- Groups related identifiers
-identifier_type        -- "email"
-identifier_value       -- Email address
-role                   -- "organizer", "creator", "attendee", or "optional_attendee"
-occurred_at            -- Meeting start time
-source                 -- "google_calendar"
-```
-
-### Person Traits: `google_calendar_person_traits`
-
-Captures participant information:
-
-**Trait Types:**
-
-- `email` - Email address
-- `display_name` - Display name from calendar
-
-```sql
-event_id               -- Reference to calendar event
-edge_id                 -- Groups related traits
-trait_name             -- "email" or "display_name"
+entity_type            -- "person" or "group"
+identifier_type        -- "email" or "domain"
+identifier_value       -- Email address or domain
+trait_name             -- "name", "email" (for persons) or "name" (for domains)
 trait_value            -- The trait value
+role                   -- Participation role
 occurred_at            -- Meeting start time
 source                 -- "google_calendar"
 ```
 
-### Group Identifiers: `google_calendar_group_identifiers`
+#### `google_calendar_relationship_declarations`
 
-Creates groups from email domains (excludes generic domains):
+Person→group relationship declarations:
 
-**Generic Domain Filter:** Automatically excludes common email providers:
+```sql
+relationship_declaration_id  -- Unique ID (rel_decl_ prefix)
+event_id                     -- Reference to calendar event
+occurred_at                  -- Meeting start time
+entity_a_identifier          -- Person email address
+entity_a_identifier_type     -- "email"
+entity_a_type                -- "person"
+entity_a_role                -- "member"
+entity_b_identifier          -- Email domain
+entity_b_identifier_type     -- "domain"
+entity_b_type                -- "group"
+entity_b_role                -- "organization"
+relationship_type            -- "membership"
+relationship_direction       -- "a_to_b"
+is_active                    -- true
+source                       -- "google_calendar"
+```
+
+**Filtered Generic Domains:**
 
 - gmail.com, yahoo.com, hotmail.com, outlook.com
 - aol.com, icloud.com, me.com, live.com, msn.com
 - googlemail.com, ymail.com, rocketmail.com, protonmail.com
 - mail.com, zoho.com
-
-```sql
-event_id               -- Reference to calendar event
-edge_id                 -- Groups related identifiers
-identifier_type        -- "domain"
-identifier_value       -- Email domain
-occurred_at            -- Meeting start time
-source                 -- "google_calendar"
-```
-
-### Group Traits: `google_calendar_group_traits`
-
-Domain information for organizations:
-
-```sql
-event_id               -- Reference to calendar event
-edge_id                 -- Groups related traits
-trait_name             -- "domain"
-trait_value            -- Domain name
-occurred_at            -- Meeting start time
-source                 -- "google_calendar"
-```
-
-### Membership Identifiers: `google_calendar_membership_identifiers`
-
-Links people to organizations via meeting participation:
-
-**Role Types:**
-
-- `organizer` - Meeting organizer
-- `creator` - Meeting creator
-- `attendee` - Meeting attendee
-- `optional_attendee` - Optional meeting attendee
-
-```sql
-event_id               -- Reference to calendar event
-occurred_at            -- Meeting start time
-person_identifier      -- Email address
-person_identifier_type -- "email"
-group_identifier       -- Email domain
-group_identifier_type  -- "domain"
-role                   -- Participation role
-source                 -- "google_calendar"
-```
 
 ## Use Cases
 
@@ -322,17 +302,21 @@ source                 -- "google_calendar"
 ```sql
 -- External meeting frequency by person
 SELECT
-    p.name,
-    p.email,
-    COUNT(*) as external_meetings,
-    COUNT(DISTINCT DATE(e.occurred_at)) as meeting_days
-FROM nexus_events e
-JOIN nexus_person_participants pp ON e.id = pp.event_id
-JOIN nexus_persons p ON pp.person_id = p.id
-WHERE e.source = 'google_calendar'
-AND e.event_name = 'external_meeting'
-AND e.occurred_at >= current_date - interval 30 days
-GROUP BY p.name, p.email
+    e.name,
+    e.email,
+    COUNT(DISTINCT ev.event_id) as external_meetings,
+    COUNT(DISTINCT DATE(ev.occurred_at)) as meeting_days,
+    MAX(ev.occurred_at) as last_meeting
+FROM {{ ref('nexus_entities') }} e
+JOIN {{ ref('nexus_entity_identifiers') }} ei
+    ON ei.identifier_value = e.email
+JOIN {{ ref('nexus_events') }} ev
+    ON ev.event_id = ei.event_id
+WHERE e.entity_type = 'person'
+  AND ev.source = 'google_calendar'
+  AND ev.event_name = 'external_meeting'
+  AND ev.occurred_at >= CURRENT_DATE - INTERVAL 30 DAY
+GROUP BY e.entity_id, e.name, e.email
 ORDER BY external_meetings DESC;
 ```
 
@@ -341,20 +325,23 @@ ORDER BY external_meetings DESC;
 ```sql
 -- Track meetings with specific customer domain
 SELECT
-    e.occurred_at,
-    e.event_description as meeting_title,
-    COUNT(DISTINCT CASE WHEN rpi.identifier_value LIKE '%@client.com' THEN p.id END) as client_attendees,
-    COUNT(DISTINCT CASE WHEN rpi.identifier_value LIKE '%@yourcompany.com' THEN p.id END) as internal_attendees
-FROM nexus_events e
-JOIN nexus_group_participants gp ON e.id = gp.event_id
-JOIN nexus_groups g ON gp.group_id = g.id
-JOIN nexus_person_participants pp ON e.id = pp.event_id
-JOIN nexus_persons p ON pp.person_id = p.id
-JOIN nexus_resolved_person_identifiers rpi ON p.id = rpi.person_id
-WHERE e.source = 'google_calendar'
-AND g.domain = 'client.com'
-GROUP BY e.id, e.occurred_at, e.event_description
-ORDER BY e.occurred_at DESC;
+    ev.occurred_at,
+    ev.event_description as meeting_title,
+    COUNT(DISTINCT CASE WHEN e.domain = 'client.com' THEN e.entity_id END) as client_attendees,
+    COUNT(DISTINCT CASE WHEN e.domain IN ('yourcompany.com') THEN e.entity_id END) as internal_attendees
+FROM {{ ref('nexus_events') }} ev
+JOIN {{ ref('nexus_entity_identifiers') }} ei ON ev.event_id = ei.event_id
+JOIN {{ ref('nexus_entities') }} e
+    ON ei.identifier_value IN (e.email, e.domain)
+WHERE ev.source = 'google_calendar'
+  AND EXISTS (
+      SELECT 1 FROM {{ ref('nexus_entity_identifiers') }} ei2
+      WHERE ei2.event_id = ev.event_id
+        AND ei2.identifier_value = 'client.com'
+        AND ei2.entity_type = 'group'
+  )
+GROUP BY ev.event_id, ev.occurred_at, ev.event_description
+ORDER BY ev.occurred_at DESC;
 ```
 
 ## Performance Optimization

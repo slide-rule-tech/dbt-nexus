@@ -4,16 +4,168 @@ sources:
   - name:
       "{{ var('nexus', {}).get('gmail', {}).get('location', {}).get('schema',
       'gmail') }}"
-    description: "Gmail messages synced via Nango integration"
     tables:
       - name:
           "{{ var('nexus', {}).get('gmail', {}).get('location', {}).get('table',
           'messages') }}"
-        description: "Raw Gmail messages from Nango sync"
-        columns:
-          - name: record
-            description: "JSON record from Gmail API"
-            data_type: json
-          - name: synced_at
-            description: "Timestamp when the record was synced"
-            data_type: timestamp
+
+models:
+  # Union Layer Tests - Events
+  - name: gmail_events
+    description: "Union layer - All Gmail event types combined"
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description: "Unique nexus event identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_%'"
+              config:
+                severity: warn
+      - name: occurred_at
+        description: "Timestamp when the event occurred"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: event_type
+        description: "Type of event"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  # Union Layer Tests - Entity Identifiers
+  - name: gmail_entity_identifiers
+    description: "Union layer - All person and group identifiers from Gmail"
+    tests:
+      - unique:
+          column_name: entity_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: entity_identifier_id
+        description: "Unique nexus entity identifier ID"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'ent_idfr_%'"
+              config:
+                severity: warn
+      - name: entity_type
+        description: "Type of entity"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["person", "group"]
+              config:
+                severity: error
+      - name: identifier_type
+        description: "Type of identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: identifier_value
+        description: "Value of the identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  # Union Layer Tests - Entity Traits
+  - name: gmail_entity_traits
+    description: "Union layer - All person and group traits from Gmail"
+    tests:
+      - unique:
+          column_name: entity_trait_id
+          config:
+            severity: error
+    columns:
+      - name: entity_trait_id
+        description: "Unique nexus entity trait ID"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'ent_tr_%'"
+              config:
+                severity: warn
+      - name: entity_type
+        description: "Type of entity"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["person", "group"]
+              config:
+                severity: error
+      - name: trait_name
+        description: "Name of the trait"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: trait_value
+        description: "Value of the trait"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  # Union Layer Tests - Relationship Declarations
+  - name: gmail_relationship_declarations
+    description: "Union layer - All relationship declarations from Gmail"
+    tests:
+      - unique:
+          column_name: relationship_declaration_id
+          config:
+            severity: error
+    columns:
+      - name: relationship_declaration_id
+        description: "Unique nexus relationship declaration ID"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'rel_decl_%'"
+              config:
+                severity: warn
+      - name: entity_a_identifier
+        description: "Identifier value for entity A"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: entity_b_identifier
+        description: "Identifier value for entity B"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: entity_a_type
+        description: "Entity type for entity A"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: entity_b_type
+        description: "Entity type for entity B"
+        tests:
+          - not_null:
+              config:
+                severity: error

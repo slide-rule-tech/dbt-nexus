@@ -31,13 +31,15 @@ packages:
 ```yaml
 # dbt_project.yml
 vars:
-  nexus_max_recursion: 5
-  sources:
-    - name: "your_source"
-      events: true
-      persons: true
-      groups: false
-      memberships: true
+  nexus:
+    max_recursion: 5
+    entity_types: ["person", "group"]
+    sources:
+      your_source:
+        enabled: true
+        events: true
+        entities: ["person"]
+        relationships: true
 
 models:
   nexus:
@@ -82,14 +84,19 @@ dbt test --select package:nexus
 
 ## Model Naming Conventions
 
-### Source Models
+### Source Models (v0.3.0 Entity-Centric Architecture)
 
 - Events: `{source}_events`
-- Person Identifiers: `{source}_person_identifiers`
-- Person Traits: `{source}_person_traits`
-- Group Identifiers: `{source}_group_identifiers`
-- Group Traits: `{source}_group_traits`
-- Memberships: `{source}_membership_identifiers`
+- Entity Identifiers: `{source}_entity_identifiers` (unified person + group)
+- Entity Traits: `{source}_entity_traits` (unified person + group)
+- Relationship Declarations: `{source}_relationship_declarations` (replaces membership_identifiers)
+
+#### Intermediate Layer (kept separate for DevX):
+- Person Identifiers: `{source}_*_person_identifiers`
+- Person Traits: `{source}_*_person_traits`
+- Group Identifiers: `{source}_*_group_identifiers`
+- Group Traits: `{source}_*_group_traits`
+- Relationships: `{source}_*_relationship_declarations`
 
 ### Event Column Naming Strategy
 

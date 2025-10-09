@@ -3,7 +3,8 @@
 with traits as (
     select
         *
-    from {{ ref('nexus_' ~ entity_type ~ '_traits') }}
+    from {{ ref('nexus_entity_traits') }}
+    where entity_type = '{{ entity_type }}'
 ),
 
 entity_identifiers as (

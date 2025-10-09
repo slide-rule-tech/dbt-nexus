@@ -12,12 +12,13 @@ summary: Step-by-step guides for frequent implementation tasks with dbt-nexus.
 
 ```yaml
 vars:
-  sources:
-    - name: "your_source_name"
-      events: true
-      persons: true
-      groups: false
-      memberships: true
+  nexus:
+    sources:
+      your_source_name:
+        enabled: true
+        events: true
+        entities: ["person"]
+        relationships: true
 ```
 
 ### Step 2: Create Four-Layer Architecture

@@ -29,13 +29,17 @@ by providing:
 
 ## Available Template Sources
 
-| Source                              | Status         | Events | Persons | Groups | Memberships | Attribution |
-| ----------------------------------- | -------------- | ------ | ------- | ------ | ----------- | ----------- |
-| [Gmail](gmail/)                     | ✅ Ready       | ✅     | ✅      | ✅     | ✅          | ❌          |
-| [Google Calendar](google_calendar/) | ✅ Ready       | ✅     | ✅      | ✅     | ✅          | ❌          |
-| [Segment](segment/)                 | ✅ Ready       | ✅     | ✅      | ❌     | ❌          | ✅          |
-| Stripe                              | 🚧 Coming Soon | ✅     | ✅      | ✅     | ❌          | ❌          |
-| Shopify                             | 🚧 Coming Soon | ✅     | ❌      | ✅     | ❌          | ❌          |
+| Source                              | Status         | Events | Entities (P/G) | Relationships | Attribution |
+| ----------------------------------- | -------------- | ------ | -------------- | ------------- | ----------- |
+| [Gmail](gmail/)                     | ✅ Complete    | ✅     | ✅ (P+G)       | ✅            | ❌          |
+| [Google Calendar](google_calendar/) | ✅ Complete    | ✅     | ✅ (P+G)       | ✅            | ❌          |
+| [Segment](segment/)                 | ⏸️ Pending     | ✅     | ✅ (P)         | ❌            | ✅          |
+| Stripe                              | 🚧 Coming Soon | ✅     | ✅ (P+G)       | ❌            | ❌          |
+| Shopify                             | 🚧 Coming Soon | ✅     | ✅ (G)         | ❌            | ❌          |
+
+**v0.3.0 Architecture**: All active template sources use the new entity-centric
+model with unified `entity_identifiers`, `entity_traits`, and
+`relationship_declarations`. P=Person, G=Group entity types.
 
 ## Prerequisites
 
@@ -76,24 +80,42 @@ dbt-nexus/models/sources/
 ├── gmail/
 │   ├── base/
 │   │   └── gmail_messages_base.sql
-│   ├── gmail_events.sql
-│   ├── gmail_person_identifiers.sql
-│   ├── gmail_person_traits.sql
-│   ├── gmail_group_identifiers.sql
-│   ├── gmail_group_traits.sql
-│   ├── gmail_membership_identifiers.sql
+│   ├── normalized/
+│   │   └── gmail_messages.sql
+│   ├── intermediate/
+│   │   ├── gmail_message_events.sql
+│   │   ├── gmail_message_person_identifiers.sql
+│   │   ├── gmail_message_group_identifiers.sql
+│   │   ├── gmail_message_person_traits.sql
+│   │   ├── gmail_message_group_traits.sql
+│   │   └── gmail_message_relationship_declarations.sql
+│   ├── gmail_events.sql (union layer)
+│   ├── gmail_entity_identifiers.sql (union layer - person + group)
+│   ├── gmail_entity_traits.sql (union layer - person + group)
+│   ├── gmail_relationship_declarations.sql (union layer)
 │   └── gmail.yml
 └── google_calendar/
     ├── base/
     │   └── google_calendar_events_base.sql
-    ├── google_calendar_events.sql
-    ├── google_calendar_person_identifiers.sql
-    ├── google_calendar_person_traits.sql
-    ├── google_calendar_group_identifiers.sql
-    ├── google_calendar_group_traits.sql
-    ├── google_calendar_membership_identifiers.sql
+    ├── normalized/
+    │   └── google_calendar_events_normalized.sql
+    ├── intermediate/
+    │   ├── google_calendar_event_events.sql
+    │   ├── google_calendar_person_identifiers.sql
+    │   ├── google_calendar_group_identifiers.sql
+    │   ├── google_calendar_person_traits.sql
+    │   ├── google_calendar_group_traits.sql
+    │   └── google_calendar_event_relationship_declarations.sql
+    ├── google_calendar_events.sql (union layer)
+    ├── google_calendar_entity_identifiers.sql (union layer - person + group)
+    ├── google_calendar_entity_traits.sql (union layer - person + group)
+    ├── google_calendar_relationship_declarations.sql (union layer)
     └── google_calendar.yml
 ```
+
+**v0.3.0 Architecture**: Four-layer structure (Base → Normalized → Intermediate
+→ Union) with 4 union layer models feeding into nexus. Person/group logic stays
+separate in intermediate layer for DevX, unified at union layer for efficiency.
 
 ### 2. **Conditional Compilation**
 
@@ -210,21 +232,65 @@ vars:
 
 ## Integration with Nexus Pipeline
 
-When enabled, template sources automatically integrate with the nexus pipeline:
+When enabled, template sources automatically integrate with the nexus pipeline
+through the four-layer architecture:
 
 ```mermaid
 graph TD
-    A[Template Source<br/>gmail_events.sql] --> B[Core Event Log<br/>nexus_events]
-    C[Template Source<br/>gmail_person_identifiers.sql] --> D[Identity Resolution<br/>nexus_resolved_person_identifiers]
-    D --> E[Final Tables<br/>nexus_persons]
-    B --> F[Final Tables<br/>nexus_events]
+    subgraph Source["Template Source (Gmail)"]
+        A1[Base<br/>gmail_messages_base] --> A2[Normalized<br/>gmail_messages]
+        A2 --> A3[Intermediate<br/>6 models]
+        A3 --> A4[Union<br/>4 models]
+    end
 
-    style A fill:#e1f5fe
-    style C fill:#e1f5fe
-    style B fill:#f3e5f5
-    style D fill:#f3e5f5
-    style E fill:#e8f5e8
-    style F fill:#e8f5e8
+    subgraph Nexus["Nexus Core"]
+        B1[Events<br/>nexus_events]
+        B2[Identifiers<br/>nexus_entity_identifiers]
+        B3[Traits<br/>nexus_entity_traits]
+        B4[Relationships<br/>nexus_relationship_declarations]
+    end
+
+    subgraph Resolution["Identity Resolution"]
+        C1[Edges<br/>nexus_entity_identifiers_edges]
+        C2[Resolved<br/>nexus_resolved_person_identifiers]
+        C3[Resolved<br/>nexus_resolved_group_identifiers]
+        C4[Resolved Traits<br/>nexus_resolved_entity_traits]
+        C5[Resolved Relationships<br/>nexus_resolved_relationship_declarations]
+    end
+
+    subgraph Final["Final Tables"]
+        D1[Entities<br/>nexus_entities]
+        D2[Relationships<br/>nexus_relationships]
+    end
+
+    A4 --> B1
+    A4 --> B2
+    A4 --> B3
+    A4 --> B4
+
+    B2 --> C1
+    C1 --> C2
+    C1 --> C3
+    B3 --> C4
+    B4 --> C5
+
+    C2 --> D1
+    C3 --> D1
+    C4 --> D1
+    C5 --> D2
+
+    style A4 fill:#e1f5fe
+    style B1 fill:#f3e5f5
+    style B2 fill:#f3e5f5
+    style B3 fill:#f3e5f5
+    style B4 fill:#f3e5f5
+    style C1 fill:#fff3e0
+    style C2 fill:#fff3e0
+    style C3 fill:#fff3e0
+    style C4 fill:#fff3e0
+    style C5 fill:#fff3e0
+    style D1 fill:#e8f5e8
+    style D2 fill:#e8f5e8
 ```
 
 ## Required Variables
@@ -263,16 +329,23 @@ ORDER BY occurred_at DESC;
 
 ```sql
 -- models/analytics/communication_summary.sql
+-- Example: Combine email and calendar data for person communication analysis
 SELECT
-    p.name,
-    p.email,
-    COUNT(CASE WHEN e.source = 'gmail' THEN 1 END) as email_count,
-    COUNT(CASE WHEN e.source = 'google_calendar' THEN 1 END) as meeting_count
-FROM {{ ref('persons') }} p
-JOIN {{ ref('person_participants') }} pp ON p.id = pp.person_id
-JOIN {{ ref('events') }} e ON pp.event_id = e.id
-WHERE e.occurred_at >= current_date - interval 30 days
-GROUP BY p.name, p.email
+    e.name,
+    e.email,
+    COUNT(DISTINCT CASE WHEN ev.source = 'gmail' THEN ev.event_id END) as email_count,
+    COUNT(DISTINCT CASE WHEN ev.source = 'google_calendar' THEN ev.event_id END) as meeting_count,
+    MAX(ev.occurred_at) as last_activity
+FROM {{ ref('nexus_entities') }} e
+JOIN {{ ref('nexus_events') }} ev
+    ON ev.event_id IN (
+        SELECT event_id FROM {{ ref('nexus_entity_identifiers') }}
+        WHERE identifier_value = e.email
+    )
+WHERE e.entity_type = 'person'
+  AND ev.occurred_at >= CURRENT_DATE - INTERVAL 30 DAY
+GROUP BY e.entity_id, e.name, e.email
+ORDER BY last_activity DESC
 ```
 
 ## Benefits
@@ -330,7 +403,7 @@ dbt list --select package:nexus --output name | grep -E "(gmail|google_calendar)
 dbt compile --select gmail_messages_base
 
 # Run specific template source
-dbt run --select gmail_events
+dbt run --select gmail_entity_identifiers+
 ```
 
 ## Migration from Custom Sources

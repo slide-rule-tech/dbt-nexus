@@ -10,8 +10,9 @@ summary:
 
 The Nexus identity resolution algorithm transforms source-specific identifiers
 into unified entities through a multi-step process. This document explains how
-the algorithm works using group (location) identifiers as an example, though the
-same process applies to persons and memberships.
+the algorithm works using the v0.3.0 entity-centric architecture, where all
+entity types (persons, groups, custom entities) flow through a unified pipeline
+before being resolved separately by `entity_type` for optimal performance.
 
 This explanation covers the complete pipeline from raw source data to final
 entity tables, with real performance metrics and data examples from production
@@ -19,67 +20,66 @@ usage.
 
 ## Algorithm Steps
 
-### Step 0: Source Identifier Formatting (`*_group_identifiers`)
+### Step 0: Source Identifier Formatting (`*_entity_identifiers`)
 
 **Purpose**: Transform source-specific data into the standardized Nexus
 identifier format required by the algorithm. All you have to do to include a new
 source in identity resolution is format your identifier data correctly here.
 
-**Process**: Each source system creates a `*_group_identifiers` table that
-follows the Nexus schema. The `unpivot_identifiers` macro simplifies this
-process by automatically converting columnar identifier data into the required
-row-based format.
+**Process**: Each source system creates a unified `*_entity_identifiers` table
+that combines all entity types (persons, groups, etc.) with an `entity_type`
+field. The `unpivot_identifiers` macro simplifies this process by automatically
+converting columnar identifier data into the required row-based format.
 
 **Required Schema**:
 
 ```sql
-event_id         -- Links identifiers to specific events
-edge_id          -- Groups identifiers that should be connected (typically event_id)
-identifier_type  -- The type of identifier (e.g., 'location_id', 'location_uuid')
-identifier_value -- The actual identifier value
-role            -- The entity's role in the event (optional)
-occurred_at     -- Event timestamp (for metadata)
-source          -- Source system name
+entity_identifier_id -- Unique identifier (ent_idfr_ prefix)
+event_id            -- Links identifiers to specific events
+edge_id             -- Groups identifiers that should be connected (typically event_id)
+entity_type         -- Type of entity: 'person', 'group', etc.
+identifier_type     -- The type of identifier (e.g., 'email', 'domain', 'location_id')
+identifier_value    -- The actual identifier value
+role                -- The entity's role in the event (optional)
+occurred_at         -- Event timestamp (for metadata)
+source              -- Source system name
 ```
 
-**Example Implementation** (Lobbie locations):
+**Example Implementation** (Gmail persons and groups):
 
 ```sql
--- models/sources/lobbie/lobbie_group_identifiers.sql
-{{ nexus.unpivot_identifiers(
-    model_name='lobbie_events',
-    event_id_field='event_id',
-    edge_id_field='event_id',
-    columns=['location_id', 'location_lobbie_integration_uuid'],
-    additional_columns=['occurred_at', 'source'],
-    role_column="'location'"
-) }}
+-- models/sources/gmail/gmail_entity_identifiers.sql
+{{ dbt_utils.union_relations([
+    ref('gmail_message_person_identifiers'),
+    ref('gmail_message_group_identifiers')
+]) }}
 ```
 
-**What the Macro Does**:
-
-1. **Column Detection**: Automatically identifies identifier columns from the
-   source model
-2. **Unpivoting**: Converts each identifier column into separate rows
-3. **Standardization**: Applies consistent naming and typing
-4. **Filtering**: Removes null values and metadata columns
-
-**Input Data** (from `lobbie_events`):
+This unions intermediate models that extract identifiers:
 
 ```sql
-event_id                     | location_id | location_lobbie_integration_uuid           | occurred_at | source
-evt_lobbie_5794cc43e8...     | 1190        | 5b283546-34c3-4d80-9c56-3cb9a8636f19      | 2025-01-20  | lobbie
-evt_lobbie_bbfc0469c0...     | 339         | 2d08a33b-d1d6-4bf8-9ce0-d6d416ba5c79      | 2025-01-20  | lobbie
+-- gmail_message_person_identifiers.sql (excerpt)
+SELECT
+    {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'sender.email', "'person'", "'sender'"]) }} as entity_identifier_id,
+    event_id,
+    event_id as edge_id,
+    'person' as entity_type,
+    'email' as identifier_type,
+    sender.email as identifier_value,
+    'sender' as role,
+    occurred_at,
+    'gmail' as source
+FROM gmail_message_events
+WHERE sender.email IS NOT NULL
 ```
 
-**Output Data** (standardized identifiers):
+**Output Data** (unified entity identifiers):
 
 ```sql
-event_id                     | edge_id                  | identifier_type                    | identifier_value                   | role     | occurred_at | source
-evt_lobbie_5794cc43e8...     | evt_lobbie_5794cc43e8... | location_id                        | 1190                               | location | 2025-01-20  | lobbie
-evt_lobbie_5794cc43e8...     | evt_lobbie_5794cc43e8... | location_lobbie_integration_uuid   | 5b283546-34c3-4d80-9c56-3cb9a8... | location | 2025-01-20  | lobbie
-evt_lobbie_bbfc0469c0...     | evt_lobbie_bbfc0469c0... | location_id                        | 339                                | location | 2025-01-20  | lobbie
-evt_lobbie_bbfc0469c0...     | evt_lobbie_bbfc0469c0... | location_lobbie_integration_uuid   | 2d08a33b-d1d6-4bf8-9ce0-d6d416... | location | 2025-01-20  | lobbie
+entity_identifier_id         | event_id           | edge_id            | entity_type | identifier_type | identifier_value      | role          | occurred_at | source
+ent_idfr_a1b2c3d4...         | evt_gmail_123...   | evt_gmail_123...   | person      | email           | john@company.com      | sender        | 2025-01-20  | gmail
+ent_idfr_e5f6g7h8...         | evt_gmail_123...   | evt_gmail_123...   | group       | domain          | company.com           | sender_domain | 2025-01-20  | gmail
+ent_idfr_i9j0k1l2...         | evt_notion_456...  | evt_notion_456...  | person      | email           | john@company.com      | contact       | 2025-01-21  | notion
 ```
 
 **Key Parameters**:
@@ -96,14 +96,13 @@ evt_lobbie_bbfc0469c0...     | evt_lobbie_bbfc0469c0... | location_lobbie_integr
 **Result**: Standardized identifier format that can be automatically processed
 by the identity resolution algorithm.
 
-### Step 1: Source Identifier Collection (`nexus_group_identifiers`)
+### Step 1: Source Identifier Collection (`nexus_entity_identifiers`)
 
-**Purpose**: Union all group identifiers from different source systems into a
-single table.
+**Purpose**: Union all entity identifiers from different source systems into a
+single table containing all entity types.
 
-**Process**: The `process_entity_identifiers('group')` macro collects
-identifiers from all source tables that follow the naming pattern
-`*_group_identifiers`.
+**Process**: The `process_entity_identifiers()` macro collects identifiers from
+all enabled sources that have entity identifier models (`*_entity_identifiers`).
 
 **Example Data** (from Lobbie appointments):
 

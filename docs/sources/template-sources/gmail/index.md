@@ -10,20 +10,20 @@ summary:
 
 The **Gmail Template Source** provides instant integration with Gmail data
 through the Nango ETL pipeline. It processes email messages into events,
-extracts person and group identifiers, and creates participation relationships -
-all through simple configuration.
+extracts entity identifiers for both people and groups, and creates relationship
+declarations - all through simple configuration.
 
 ## Overview
 
 The Gmail template source transforms raw Gmail message data into the nexus
-framework:
+framework using the v0.3.0 entity-centric architecture:
 
 - **📧 Email Events**: Each message becomes a `message_sent` event
-- **👤 Person Identifiers**: Extracts email addresses from senders and
-  recipients
-- **🏢 Group Identifiers**: Creates groups from non-generic email domains
-- **🔗 Memberships**: Links people to their organizations via email domains
-- **🏷️ Traits**: Captures names and email addresses as person traits
+- **👤 Person Entities**: Extracts email addresses from senders and recipients
+- **🏢 Group Entities**: Creates groups from non-generic email domains
+- **🔗 Relationships**: Links people to their organizations via email domains
+  (membership type)
+- **🏷️ Entity Traits**: Captures names and email addresses for all entities
 
 ## Quick Start
 
@@ -47,23 +47,25 @@ dbt run --select package:nexus
 
 ```sql
 -- View recent Gmail events
-SELECT * FROM nexus_events
+SELECT * FROM {{ ref('nexus_events') }}
 WHERE source = 'gmail'
 ORDER BY occurred_at DESC
 LIMIT 10;
 
--- See email participants
+-- See email participants with entity information
 SELECT
-    e.event_description as subject,
-    e.occurred_at,
-    p.name,
-    p.email,
-    pp.role
-FROM nexus_events e
-JOIN nexus_person_participants pp ON e.id = pp.event_id
-JOIN nexus_persons p ON pp.person_id = p.id
-WHERE e.source = 'gmail'
-ORDER BY e.occurred_at DESC;
+    ev.event_description as subject,
+    ev.occurred_at,
+    e.name,
+    e.email,
+    ei.role
+FROM {{ ref('nexus_events') }} ev
+JOIN {{ ref('nexus_entity_identifiers') }} ei ON ev.event_id = ei.event_id
+JOIN {{ ref('nexus_entities') }} e ON ei.identifier_value = e.email
+WHERE ev.source = 'gmail'
+  AND e.entity_type = 'person'
+ORDER BY ev.occurred_at DESC
+LIMIT 20;
 ```
 
 ## Configuration
@@ -136,38 +138,46 @@ The `record` column should contain Gmail API message format:
 
 ## Generated Models
 
-### Base Model: `gmail_messages_base`
+Gmail uses the **four-layer source architecture** for optimal DevX and
+performance:
 
-Transforms raw Gmail JSON into structured data:
+### Layer 1: Base - `gmail_messages_base.sql`
+
+Transforms raw Gmail JSON into structured data.
 
 **Key Features:**
 
 - Parses email addresses using `parse_gmail_email()` macro
 - Extracts names using `extract_gmail_name()` macro
 - Identifies internal vs external participants
-- Filters generic email domains (gmail.com, yahoo.com, etc.)
-- Deduplicates messages by latest timestamp
+- Filters generic email domains
+- Creates sender/recipients STRUCTs
 
-**Output Schema:**
+### Layer 2: Normalized - `gmail_messages.sql`
 
-```sql
-event_id               -- Unique identifier for nexus processing
-message_id             -- Original Gmail message ID
-thread_id              -- Gmail thread ID
-subject                -- Email subject line
-body                   -- Email body content
-sender                 -- STRUCT with email, name, domain, flags
-recipients             -- ARRAY of recipient STRUCTs
-occurred_at            -- When email was sent
-source                 -- "gmail"
-```
+Clean, deduplicated messages ready for processing.
 
-### Events: `gmail_events`
+### Layer 3: Intermediate - 6 Models
+
+Separate person/group logic for better debugging and transparency:
+
+- `gmail_message_events.sql` - Message events with metadata
+- `gmail_message_person_identifiers.sql` - Sender/recipient email identifiers
+- `gmail_message_group_identifiers.sql` - Domain identifiers (filtered)
+- `gmail_message_person_traits.sql` - Names and emails
+- `gmail_message_group_traits.sql` - Domain names
+- `gmail_message_relationship_declarations.sql` - Person→domain memberships
+
+### Layer 4: Union - 4 Models (Nexus Integration)
+
+These models feed directly into the nexus pipeline:
+
+#### `gmail_events`
 
 Creates nexus-compatible events:
 
 ```sql
-event_id               -- Reference to base model
+event_id               -- Unique event identifier (evt_ prefix)
 event_name             -- "message_sent"
 occurred_at            -- Email send time
 event_description      -- Email subject
@@ -175,113 +185,103 @@ event_type             -- "email"
 source                 -- "gmail"
 ```
 
-### Person Identifiers: `gmail_person_identifiers`
+#### `gmail_entity_identifiers`
 
-Extracts email addresses from senders and recipients with role context:
+Unified person + group identifiers:
+
+```sql
+entity_identifier_id   -- Unique identifier (ent_idfr_ prefix)
+event_id               -- Reference to email event
+edge_id                -- Groups related identifiers
+entity_type            -- "person" or "group"
+identifier_type        -- "email" or "domain"
+identifier_value       -- Email address or domain
+role                   -- "sender", "recipient", "sender_domain", "recipient_domain"
+occurred_at            -- Email timestamp
+source                 -- "gmail"
+```
 
 **Role Types:**
 
-- `sender` - Person who sent the email
-- `recipient` - Person who received the email
+- Person roles: `sender`, `recipient`
+- Group roles: `sender_domain`, `recipient_domain`
+
+#### `gmail_entity_traits`
+
+Unified person + group traits:
 
 ```sql
+entity_trait_id        -- Unique trait identifier (ent_tr_ prefix)
 event_id               -- Reference to email event
-edge_id                 -- Groups related identifiers
-identifier_type        -- "email"
-identifier_value       -- Email address
-role                   -- "sender" or "recipient"
-occurred_at            -- Email timestamp
-source                 -- "gmail"
-```
-
-### Person Traits: `gmail_person_traits`
-
-Captures person information:
-
-**Trait Types:**
-
-- `email` - Email address
-- `full_name` - Display name from email
-
-```sql
-event_id               -- Reference to email event
-edge_id                 -- Groups related traits
-trait_name             -- "email" or "full_name"
+entity_type            -- "person" or "group"
+identifier_type        -- "email" or "domain"
+identifier_value       -- Email address or domain
+trait_name             -- "name", "email", or "name" (for domains)
 trait_value            -- The trait value
+role                   -- Role in the email
 occurred_at            -- Email timestamp
 source                 -- "gmail"
 ```
 
-### Group Identifiers: `gmail_group_identifiers`
+#### `gmail_relationship_declarations`
 
-Creates groups from email domains (excludes generic providers):
+Person→group relationship declarations:
 
-**Filtered Domains:**
+```sql
+relationship_declaration_id  -- Unique ID (rel_decl_ prefix)
+event_id                     -- Reference to email event
+occurred_at                  -- Email timestamp
+entity_a_identifier          -- Person email address
+entity_a_identifier_type     -- "email"
+entity_a_type                -- "person"
+entity_a_role                -- "member"
+entity_b_identifier          -- Email domain
+entity_b_identifier_type     -- "domain"
+entity_b_type                -- "group"
+entity_b_role                -- "organization"
+relationship_type            -- "membership"
+relationship_direction       -- "a_to_b"
+is_active                    -- true
+source                       -- "gmail"
+```
+
+**Filtered Generic Domains:**
 
 - gmail.com, yahoo.com, hotmail.com, outlook.com
 - aol.com, icloud.com, me.com, live.com, msn.com
 - googlemail.com, ymail.com, rocketmail.com, protonmail.com
 - mail.com, zoho.com
 
-```sql
-event_id               -- Reference to email event
-edge_id                 -- Groups related identifiers
-identifier_type        -- "domain"
-identifier_value       -- Email domain
-occurred_at            -- Email timestamp
-source                 -- "gmail"
-```
-
-### Group Traits: `gmail_group_traits`
-
-Domain information for organizations:
-
-```sql
-event_id               -- Reference to email event
-edge_id                 -- Groups related traits
-trait_name             -- "domain"
-trait_value            -- Domain name
-occurred_at            -- Email timestamp
-source                 -- "gmail"
-```
-
-### Membership Identifiers: `gmail_membership_identifiers`
-
-Links people to organizations via email domains:
-
-```sql
-event_id               -- Reference to email event
-occurred_at            -- Email timestamp
-person_identifier      -- Email address
-person_identifier_type -- "email"
-group_identifier       -- Email domain
-group_identifier_type  -- "domain"
-role                   -- "sender" or "recipient"
-source                 -- "gmail"
-```
-
 ## Integration Examples
 
 ### Customer Communication Timeline
 
 ```sql
--- View all email communication with a customer
-WITH customer_emails AS (
-    SELECT DISTINCT person_id
-    FROM nexus_resolved_person_identifiers
-    WHERE identifier_value = 'customer@client.com'
+-- View all email communication with a specific customer
+WITH customer AS (
+    SELECT entity_id, email, name
+    FROM {{ ref('nexus_entities') }}
+    WHERE email = 'customer@client.com'
+      AND entity_type = 'person'
 )
 
 SELECT
     e.occurred_at,
     e.event_description as subject,
     sender.email as from_email,
-    recipients.email as to_email
-FROM nexus_events e
-JOIN nexus_person_participants pp ON e.id = pp.event_id
-JOIN customer_emails c ON pp.person_id = c.person_id
-JOIN nexus_resolved_person_identifiers sender ON sender.person_id = pp.person_id
-JOIN nexus_resolved_person_identifiers recipients ON recipients.person_id != pp.person_id
+    sender.name as from_name,
+    customer.email as customer_email
+FROM {{ ref('nexus_events') }} e
+JOIN {{ ref('nexus_entity_identifiers') }} ei ON e.event_id = ei.event_id
+JOIN customer ON ei.identifier_value = customer.email
+LEFT JOIN {{ ref('nexus_entities') }} sender
+    ON sender.entity_type = 'person'
+    AND EXISTS (
+        SELECT 1 FROM {{ ref('nexus_entity_identifiers') }} ei2
+        WHERE ei2.event_id = e.event_id
+          AND ei2.identifier_value = sender.email
+          AND ei2.role = 'sender'
+    )
 WHERE e.source = 'gmail'
 ORDER BY e.occurred_at DESC;
 ```
@@ -289,20 +289,27 @@ ORDER BY e.occurred_at DESC;
 ### Email Domain Analysis
 
 ```sql
--- Analyze email communication by domain
+-- Analyze email communication by domain with relationship data
 SELECT
-    g.domain,
-    COUNT(DISTINCT e.id) as email_count,
-    COUNT(DISTINCT p.id) as unique_people,
+    g.name as domain,
+    COUNT(DISTINCT e.event_id) as email_count,
+    COUNT(DISTINCT p.entity_id) as unique_people,
     MIN(e.occurred_at) as first_contact,
     MAX(e.occurred_at) as last_contact
-FROM nexus_events e
-JOIN nexus_group_participants gp ON e.id = gp.event_id
-JOIN nexus_groups g ON gp.group_id = g.id
-JOIN nexus_person_participants pp ON e.id = pp.event_id
-JOIN nexus_persons p ON pp.person_id = p.id
+FROM {{ ref('nexus_events') }} e
+JOIN {{ ref('nexus_entity_identifiers') }} gei
+    ON e.event_id = gei.event_id
+    AND gei.entity_type = 'group'
+JOIN {{ ref('nexus_entities') }} g
+    ON gei.identifier_value = g.domain
+    AND g.entity_type = 'group'
+JOIN {{ ref('nexus_relationships') }} r
+    ON r.entity_b_id = g.entity_id
+JOIN {{ ref('nexus_entities') }} p
+    ON r.entity_a_id = p.entity_id
+    AND p.entity_type = 'person'
 WHERE e.source = 'gmail'
-GROUP BY g.domain
+GROUP BY g.entity_id, g.name
 ORDER BY email_count DESC;
 ```
 

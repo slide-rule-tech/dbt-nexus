@@ -10,6 +10,210 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-10-09
+
+### Major Architectural Refactor: Entity-Centric Model 🎯
+
+This release represents a fundamental architectural shift from separate
+person/group/membership models to a unified entity-centric architecture. This is
+a **BREAKING CHANGE** that requires migration.
+
+#### Added ✨
+
+- **Unified Entity Model**: Single `nexus_entities` table with `entity_type`
+  field replaces separate `nexus_persons` and `nexus_groups` tables
+- **Universal Relationships**: `nexus_relationships` table replaces
+  `nexus_memberships` with support for any entity-to-entity relationship type
+- **Four-Layer Source Architecture**: Base → Normalized → Intermediate → Union
+  structure for better developer experience and debugging
+- **Entity-Centric Macros**:
+  - `process_entity_identifiers()` - Unions all source entity identifiers (no
+    entity_type parameter needed)
+  - `process_entity_traits()` - Unions all source entity traits (no entity_type
+    parameter needed)
+  - `process_relationship_declarations()` - Unions all source relationship
+    declarations
+  - `resolve_entity_traits()` - Single-pass trait resolution for all entity
+    types (50% reduction vs separate resolution)
+  - `finalize_entities()` - Creates unified entities table from resolved
+    identifiers and traits
+  - `finalize_relationships()` - Creates relationships table from resolved
+    declarations
+- **Parallel Entity Resolution**: Separate identity resolution per entity_type
+  for performance and debugging
+  - `nexus_resolved_person_identifiers` - Resolves person entities
+  - `nexus_resolved_group_identifiers` - Resolves group entities
+  - Both use shared `nexus_entity_identifiers_edges` table with entity_type
+    filtering
+- **New ID Prefixes**: More descriptive prefixes for better identification
+  - `ent_idfr_` - Entity identifiers (replaces `per_idfr_` and `grp_idfr_`)
+  - `ent_tr_` - Entity traits (replaces `per_tr_` and `grp_tr_`)
+  - `rel_decl_` - Relationship declarations (replaces `mem_idfr_`)
+  - `rel_` - Resolved relationships (replaces `mem_`)
+- **Template Source Migrations**: Gmail and Google Calendar fully migrated to
+  new architecture
+  - 26/26 tests passing for Gmail
+  - 26/26 tests passing for Google Calendar
+  - Four-layer structure implemented: Base → Normalized → Intermediate → Union
+  - Person/group logic kept separate in intermediate layer for DevX
+- **Configuration Enhancements**:
+  - **Unified Configuration Structure**: All nexus settings now under single
+    `nexus:` variable
+  - `nexus.max_recursion` replaces `nexus_max_recursion`
+  - `nexus.entity_types` replaces `nexus_entity_types`
+  - `nexus.sources` dictionary replaces both `sources` list and duplicate
+    `nexus.{source}.enabled` patterns
+  - Single source of truth for all source configuration (enabled status, events,
+    entities, relationships)
+  - Backward compatibility maintained - macros check both old and new patterns
+
+#### Changed 🔄
+
+- **BREAKING**: `nexus_persons` and `nexus_groups` tables replaced by
+  `nexus_entities` with `entity_type` column
+  - Filter by `entity_type = 'person'` for person data
+  - Filter by `entity_type = 'group'` for group data
+  - Legacy views provided for backward compatibility in client projects
+- **BREAKING**: `nexus_memberships` replaced by `nexus_relationships` with
+  flexible relationship modeling
+  - `relationship_type` field supports any relationship (not just memberships)
+  - `entity_a_id` / `entity_b_id` replace `person_id` / `group_id`
+  - Supports any entity type combinations (person-person, group-group, etc.)
+- **BREAKING**: Source models now use 4 union layer models instead of 7 (43%
+  reduction):
+  - `{source}_events` - Event data
+  - `{source}_entity_identifiers` - Unified person + group identifiers
+  - `{source}_entity_traits` - Unified person + group traits
+  - `{source}_relationship_declarations` - Replaces membership_identifiers
+  - **Old structure** (deprecated): Separate `*_person_identifiers`,
+    `*_person_traits`, `*_group_identifiers`, `*_group_traits`,
+    `*_membership_identifiers` models
+- **BREAKING**: ID prefixes changed for all entity-related records
+  - Existing IDs will not match after migration
+  - `create_nexus_id` macro updated with new prefixes
+- **BREAKING**: Macro signatures simplified:
+  - `process_entity_identifiers()` - No longer takes entity_type parameter
+  - `process_entity_traits()` - No longer takes entity_type parameter
+  - Filtering by entity_type happens within resolution macros
+- **BREAKING**: Configuration structure completely redesigned in
+  `dbt_project.yml`:
+  - **Old**: Separate `nexus_max_recursion`, `nexus_entity_types`, and `sources`
+    list variables
+  - **New**: Unified `nexus` config with `max_recursion`, `entity_types`, and
+    `sources` dictionary
+  - Example:
+    ```yaml
+    nexus:
+      max_recursion: 3
+      entity_types: ["person", "group"]
+      sources:
+        gmail:
+          enabled: true
+          events: true
+          entities: ["person", "group"]
+          relationships: true
+    ```
+  - **Backward Compatibility**: Macros support both old and new patterns for
+    gradual migration
+- Identity resolution now filters by `entity_type` within unified
+  `nexus_entity_identifiers_edges` table
+  - Single edges table for all entity types (instead of separate person/group
+    edges tables)
+  - `entity_type` included in edge uniqueness hash to prevent collisions
+- Trait resolution consolidated to single `nexus_resolved_entity_traits` model
+  - Replaces separate `nexus_resolved_person_traits` and
+    `nexus_resolved_group_traits`
+  - More efficient single-pass resolution
+- Edge creation macro updated to include `entity_type` in uniqueness hash
+  - Prevents edge ID collisions between entity types with similar identifiers
+
+#### Deprecated ⚠️
+
+- Separate person/group/membership models throughout the pipeline
+  - Legacy compatibility views provided in client projects:
+    - `persons` view filters `nexus_entities WHERE entity_type = 'person'`
+    - `groups` view filters `nexus_entities WHERE entity_type = 'group'`
+    - `memberships` view filters
+      `nexus_relationships WHERE relationship_type = 'membership'`
+- Old macro signatures with entity_type parameters
+
+#### Migration Guide 📋
+
+**For Core Package Users (BREAKING - Migration Required)**:
+
+See [v2-entities-relationships.md](migrations/v2-entities-relationships.md) for
+complete migration guide.
+
+**Key Steps**:
+
+1. Update `dbt_project.yml` sources configuration
+2. Migrate source models to four-layer structure
+3. Update queries to use `nexus_entities` and `nexus_relationships`
+4. Update ID prefix patterns in tests
+5. Remove deprecated models
+
+**For Client Projects**:
+
+- Legacy views automatically created for smooth transition
+- Update queries incrementally to use new tables
+- No immediate action required
+
+#### Performance Impact ⚡
+
+- **Model count per source**: 7 → 4 models (43% reduction at union layer)
+- **Identity resolution**: Parallel execution per entity_type for better
+  performance
+- **Trait resolution**: Single pass instead of per-type (50% model reduction)
+- **Recursion optimization**: Set `nexus_max_recursion: 3` for large datasets
+  (26k+ identifiers)
+  - Without limit: 5-minute timeout on 26k identifiers
+  - With limit: 19 seconds for person resolution, similar for groups
+- **Edge table consolidation**: Single `nexus_entity_identifiers_edges` instead
+  of separate person/group edges
+- **Deduplication**: Built-in SELECT DISTINCT for attendee/recipient arrays
+
+#### Data Quality Improvements 🛡️
+
+- **Role-based ID generation**: Prevents duplicate IDs when same entity has
+  multiple roles in one event
+- **Attendee deduplication**: Handles duplicate entries in recipient/attendee
+  arrays
+- **Entity type filtering**: Prevents edge collisions between entity types
+- **Comprehensive testing**: 26 tests per template source (Gmail, Google
+  Calendar)
+  - All ID prefix patterns validated
+  - Entity type constraints enforced
+  - Uniqueness and not-null tests for all union layer models
+
+#### Template Sources Updated 📧📅
+
+**Gmail Template Source**:
+
+- Migrated to four-layer architecture
+- 12 total models (1 base + 1 normalized + 6 intermediate + 4 union)
+- 26/26 tests passing
+- 26,600 identifiers processed (11k person, 15.6k group)
+- Special handling for duplicate recipients in email arrays
+
+**Google Calendar Template Source**:
+
+- Migrated to four-layer architecture
+- 12 total models (1 base + 1 normalized + 6 intermediate + 4 union)
+- 26/26 tests passing
+- 24,200 identifiers processed (14.9k person, 9.3k group)
+- Special naming: `google_calendar_events_normalized`,
+  `google_calendar_event_events`
+- Deduplication for duplicate attendees in calendar events
+
+#### Backward Compatibility ⚠️
+
+- **Core Package**: NO backward compatibility - requires migration to v0.3.0
+- **Client Projects**: Legacy views provided for gradual transition
+  - Views automatically filter `nexus_entities` by entity_type
+  - Views map old column names to new structure
+- **Source Configuration**: Update vars structure in `dbt_project.yml`
+- **Breaking Changes**: All queries using old table names must be updated
+
 ## [Unreleased]
 
 ### Added

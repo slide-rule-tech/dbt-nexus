@@ -2,11 +2,26 @@
 
 {# Collect relations to union based on sources with events #}
 {% set relations_to_union = [] %}
-{% for source in var('sources') %}
-    {% if source.events %}
-        {% do relations_to_union.append(ref(source.name ~ '_events')) %}
-    {% endif %}
-{% endfor %}
+
+{# Support both new and legacy config patterns #}
+{% set nexus_config = var('nexus', {}) %}
+{% set sources_config = nexus_config.get('sources', {}) %}
+
+{% if sources_config %}
+    {# New pattern: nexus.sources dictionary #}
+    {% for source_name, source_config in sources_config.items() %}
+        {% if source_config.get('enabled') and source_config.get('events') %}
+            {% do relations_to_union.append(ref(source_name ~ '_events')) %}
+        {% endif %}
+    {% endfor %}
+{% elif var('sources', none) %}
+    {# Legacy pattern: sources list #}
+    {% for source in var('sources') %}
+        {% if source.get('events') %}
+            {% do relations_to_union.append(ref(source.name ~ '_events')) %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
 
 {# Set column override based on database type #}
 {% if target.type == 'snowflake' %}

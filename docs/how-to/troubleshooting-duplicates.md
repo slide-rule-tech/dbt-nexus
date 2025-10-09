@@ -148,11 +148,13 @@ used as email), creating duplicate person_identifier_ids.
 **Example**:
 
 ```
-person_identifier_id: per_idfr_abc123
+entity_identifier_id: ent_idfr_abc123
+entity_type: person
 identifier_type: email
-identifier_value: "6307776986" (phone number)
+identifier_value: "6307776986" (phone number - wrong type!)
 
-person_identifier_id: per_idfr_abc123 (same ID!)
+entity_identifier_id: ent_idfr_abc123 (same ID!)
+entity_type: person
 identifier_type: phone
 identifier_value: "6307776986" (same value)
 ```
@@ -175,7 +177,8 @@ same ID.
 **Example**:
 
 ```
-person_identifier_id: per_idfr_abc123
+entity_identifier_id: ent_idfr_abc123
+entity_type: person
 role: organizer
 role: attendee
 role: creator

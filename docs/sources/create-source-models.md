@@ -12,21 +12,21 @@ guide walks through the complete process of generating these models.
 
 ## Overview
 
-The dbt-nexus identity resolution system requires **6 core model types** for
+The dbt-nexus identity resolution system requires **4 core model types** for
 each new source:
 
 1. **Events** - Core event data from the source
-2. **Person Identifiers** - Individual identifiers (emails, phones, user IDs)
-3. **Person Traits** - Characteristics and attributes of individuals
-4. **Group Identifiers** - Group-level identifiers (domains, addresses, contract
-   IDs)
-5. **Group Traits** - Characteristics and attributes of groups
-6. **Membership Identifiers** - Relationships between persons and groups
+2. **Entity Identifiers** - Unified identifiers for all entity types (persons,
+   groups, etc.)
+3. **Entity Traits** - Unified characteristics and attributes for all entity
+   types
+4. **Relationship Declarations** - Relationships between entities (e.g.,
+   person-to-group memberships)
 
-**Important**: You must create models for either **persons** (identifiers +
-traits) or **groups** (identifiers + traits), but not necessarily both. However,
-if you create both person and group models, you should also likely create
-membership identifiers to link them together.
+**Important**: Each source model combines multiple entity types (person, group,
+etc.) into unified tables with an `entity_type` field, rather than creating
+separate models per entity type. This reduces model count by ~50% and simplifies
+maintenance.
 
 ## Prerequisites
 
@@ -106,7 +106,7 @@ identity resolution.
 order by occurred_at desc
 ```
 
-## Step 3: Create Person Traits Model
+## Step 3: Create Entity Traits Model
 
 Person traits capture characteristics and attributes of individuals.
 
@@ -138,103 +138,55 @@ Person traits capture characteristics and attributes of individuals.
 order by occurred_at desc
 ```
 
-## Step 4: Create Group Identifiers Model
+## Step 4: Create Relationship Declarations Model
 
-Group identifiers capture group-level identifiers for householding and
-organizational grouping.
+Relationship declarations capture relationships between entities (e.g.,
+person-to-group memberships, person-to-task assignments, etc.).
 
 ```sql
-{{ config(tags=['identity-resolution','groups'], materialized='table') }}
-
-{{ nexus.unpivot_identifiers(
-    model_name='stg_your_source',
-    columns=['domain', 'address', 'company_id'],
-    event_id_field='event_id',
-    edge_id_field='event_id',
-    additional_columns=['occurred_at', "'your_source' as source"],
-    column_to_identifier_type={
-      'domain': 'domain',
-      'address': 'address',
-      'company_id': 'company_id'
-    },
-    role_column="'organization'",
-    entity_type='group'
+{{ config(
+    materialized='table',
+    tags=['nexus', 'relationship_declarations', 'your_source']
 ) }}
-
-order by occurred_at desc
-```
-
-## Step 5: Create Group Traits Model
-
-Group traits capture characteristics and attributes of groups.
-
-```sql
-{{ config(tags=['identity-resolution','groups'], materialized='table') }}
-
-{{ nexus.unpivot_traits(
-    model_name='stg_your_source',
-    columns=[
-        'company_name',
-        'domain',
-        'address',
-        'city',
-        'state',
-        'zip_code',
-        'industry'
-    ],
-    identifier_column='company_id',
-    identifier_type='company_id',
-    event_id_field='event_id',
-    additional_columns=['occurred_at', "'your_source' as source"],
-    column_to_trait_name={
-        'company_name': 'name',
-        'zip_code': 'postal_code'
-    },
-    entity_type='group'
-) }}
-
-order by occurred_at desc
-```
-
-## Step 6: Create Membership Identifiers Model
-
-Membership identifiers capture relationships between persons and groups.
-
-```sql
-{{ config(tags=['identity-resolution','memberships'], materialized='table') }}
 
 with source_data as (
-    select * from {{ ref('stg_your_source') }}
+    select * from {{ ref('your_source_order_events') }}
 ),
 
-membership_data as (
+customer_organization_relationships as (
     select
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'user_id']) }} as event_id,
-        {{ dbt_utils.generate_surrogate_key(['event_id', 'user_id']) }} as edge_id,
+        {{ nexus.create_nexus_id('relationship_declaration', ['event_id', 'customer_email', 'company_domain']) }} as relationship_declaration_id,
+        event_id,
         occurred_at,
-        'your_source' as source,
 
-        -- Person identifier
-        user_id as person_identifier,
-        'user_id' as person_identifier_type,
+        -- Entity A (person)
+        customer_email as entity_a_identifier,
+        'email' as entity_a_identifier_type,
+        'person' as entity_a_type,
+        'customer' as entity_a_role,
 
-        -- Group identifier
-        company_id as group_identifier,
-        'company_id' as group_identifier_type,
+        -- Entity B (group)
+        company_domain as entity_b_identifier,
+        'domain' as entity_b_identifier_type,
+        'group' as entity_b_type,
+        'organization' as entity_b_role,
 
-        -- Membership role
-        'employee' as role
+        -- Relationship metadata
+        'membership' as relationship_type,
+        'a_to_b' as relationship_direction,
+        true as is_active,
+        'your_source' as source
 
     from source_data
-    where user_id is not null
-    and company_id is not null
+    where customer_email is not null
+      and company_domain is not null
 )
 
-select * from membership_data
+select * from customer_organization_relationships
 order by occurred_at desc
 ```
 
-## Step 7: Configure dbt_project.yml
+## Step 5: Configure dbt_project.yml
 
 **Critical**: You must update your `dbt_project.yml` file to register your new
 source with the nexus system. Without this configuration, nexus will not
@@ -243,18 +195,22 @@ recognize or process your new source.
 ```yaml
 vars:
   nexus_max_recursion: 3
+  nexus_entity_types: ["person", "group"] # Declare which entity types you're using
+
   sources:
     - name: your_source_name
       events: true
-      persons: true # Set to true if you created person models
-      groups: true # Set to true if you created group models
+      entities: ["person", "group"] # List which entity types this source provides
+      relationships: true # Set to true if you created relationship_declarations model
 ```
 
 **Important**:
 
 - The `name` field must match the source name used in your models
-- Set `events`, `persons`, and `groups` to `true` based on which model types you
-  created
+- `nexus_entity_types` declares all entity types across all sources (used for
+  dynamic model generation)
+- `entities` lists which entity types this specific source provides
+- Set `relationships: true` if you created a relationship_declarations model
 - This configuration tells nexus which sources to include in the identity
   resolution pipeline
 
@@ -262,8 +218,9 @@ vars:
 
 ### Tags
 
-- Use `identity-resolution` tag for all identity resolution models
-- Add specific tags: `events`, `persons`, `groups`, `memberships`
+- Use `nexus` tag for all nexus models
+- Add specific tags: `events`, `entity_identifiers`, `entity_traits`,
+  `relationship_declarations`
 
 ### Materialization
 
@@ -272,8 +229,12 @@ vars:
 
 ### Naming Conventions
 
-- Use descriptive names: `{source}_{entity}_{type}.sql`
-- Examples: `enrollments_person_identifiers.sql`, `contracts_group_traits.sql`
+- Use descriptive names: `{source}_{model_type}.sql`
+- Required models:
+  - `{source}_events.sql`
+  - `{source}_entity_identifiers.sql`
+  - `{source}_entity_traits.sql`
+  - `{source}_relationship_declarations.sql`
 
 ## Testing Your Models
 
@@ -281,28 +242,33 @@ After creating your identity resolution models:
 
 1. **Compile and run** each model individually
 2. **Check data quality** - ensure no null identifiers where expected
-3. **Validate relationships** - verify membership identifiers link correctly
-4. **Test identity resolution** - run the full identity resolution pipeline
+3. **Validate entity_type field** - verify all identifiers/traits have
+   entity_type set
+4. **Validate relationships** - verify relationship declarations link correctly
+5. **Test identity resolution** - run the full identity resolution pipeline
 
 ## Common Patterns
 
 ### E-commerce Sources
 
-- **Person identifiers**: email, customer_id, user_id
-- **Group identifiers**: domain, shop_id
-- **Membership roles**: customer, admin, staff
+- **Person identifiers**: email, customer_id, user_id (entity_type='person')
+- **Group identifiers**: domain, shop_id (entity_type='group')
+- **Entity roles**: customer, admin, staff, organization
+- **Relationships**: customer→shop memberships
 
 ### CRM Sources
 
-- **Person identifiers**: email, phone, contact_id
-- **Group identifiers**: company_id, domain
-- **Membership roles**: contact, lead, customer
+- **Person identifiers**: email, phone, contact_id (entity_type='person')
+- **Group identifiers**: company_id, domain (entity_type='group')
+- **Entity roles**: contact, lead, customer, organization, account
+- **Relationships**: contact→account memberships
 
 ### Event Tracking Sources
 
-- **Person identifiers**: user_id, session_id, device_id
-- **Group identifiers**: domain, app_id
-- **Membership roles**: user, visitor, subscriber
+- **Person identifiers**: user_id, session_id, device_id (entity_type='person')
+- **Group identifiers**: domain, app_id (entity_type='group')
+- **Entity roles**: user, visitor, subscriber, organization
+- **Relationships**: user→organization memberships (if applicable)
 
 ## Troubleshooting
 

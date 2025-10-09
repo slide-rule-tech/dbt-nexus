@@ -1,5 +1,5 @@
 {{ config(
-    enabled=var('nexus', {}).get('gmail', {}).get('enabled', false),
+    enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
     materialized='table',
     tags=['event-processing', 'realtime']
 ) }}

@@ -13,3 +13,169 @@ sources:
           - name: synced_at
             description: "Timestamp when the record was synced"
             data_type: timestamp
+
+models:
+  # Union Layer - Events
+  - name: google_calendar_events
+    description:
+      "Union layer - All Google Calendar events in nexus-compatible format"
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description: "Unique nexus event identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_%'"
+              config:
+                severity: warn
+      - name: occurred_at
+        description: "Timestamp when the event occurred"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: event_type
+        description: "Type of event"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  # Union Layer - Entity Identifiers
+  - name: google_calendar_entity_identifiers
+    description:
+      "Union layer - All entity identifiers (person + group) from Google
+      Calendar"
+    tests:
+      - unique:
+          column_name: entity_identifier_id
+          config:
+            severity: error
+    columns:
+      - name: entity_identifier_id
+        description: "Unique nexus entity identifier ID"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'ent_idfr_%'"
+              config:
+                severity: warn
+      - name: entity_type
+        description: "Type of entity (person or group)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["person", "group"]
+              config:
+                severity: error
+      - name: identifier_type
+        description: "Type of identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: identifier_value
+        description: "Value of the identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  # Union Layer - Entity Traits
+  - name: google_calendar_entity_traits
+    description:
+      "Union layer - All entity traits (person + group) from Google Calendar"
+    tests:
+      - unique:
+          column_name: entity_trait_id
+          config:
+            severity: error
+    columns:
+      - name: entity_trait_id
+        description: "Unique nexus entity trait ID"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'ent_tr_%'"
+              config:
+                severity: warn
+      - name: entity_type
+        description: "Type of entity (person or group)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["person", "group"]
+              config:
+                severity: error
+      - name: trait_name
+        description: "Name of the trait"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: trait_value
+        description: "Value of the trait"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  # Union Layer - Relationship Declarations
+  - name: google_calendar_relationship_declarations
+    description:
+      "Union layer - All relationship declarations from Google Calendar"
+    tests:
+      - unique:
+          column_name: relationship_declaration_id
+          config:
+            severity: error
+    columns:
+      - name: relationship_declaration_id
+        description: "Unique nexus relationship declaration ID"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'rel_decl_%'"
+              config:
+                severity: warn
+      - name: entity_a_identifier
+        description: "Entity A identifier value"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: entity_a_type
+        description: "Entity A type"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: entity_b_identifier
+        description: "Entity B identifier value"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: entity_b_type
+        description: "Entity B type"
+        tests:
+          - not_null:
+              config:
+                severity: error
