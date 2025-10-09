@@ -6,7 +6,8 @@ with relationship_declarations as (
 
 -- Get all resolved entity identifiers across all entity types
 all_resolved_identifiers as (
-    {% set entity_types = var('nexus_entity_types', ['person', 'group']) %}
+    {# Support both new unified config and legacy variable #}
+    {% set entity_types = var('nexus', {}).get('entity_types') or var('nexus_entity_types', ['person', 'group']) %}
     {% for entity_type in entity_types %}
     select
         identifier_type,

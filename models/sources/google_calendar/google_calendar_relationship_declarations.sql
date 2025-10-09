@@ -1,5 +1,5 @@
 {{ config(
-    enabled=var('nexus', {}).get('google_calendar', {}).get('enabled', false),
+    enabled=var('nexus', {}).get('sources', {}).get('google_calendar', {}).get('enabled', false),
     materialized='table',
     tags=['nexus', 'relationship_declarations', 'google_calendar']
 ) }}

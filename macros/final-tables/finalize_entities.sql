@@ -6,7 +6,8 @@ with resolved_traits as (
 
 -- Get all distinct entity IDs from all entity types
 all_entities as (
-    {% set entity_types = var('nexus_entity_types', ['person', 'group']) %}
+    {# Support both new unified config and legacy variable #}
+    {% set entity_types = var('nexus', {}).get('entity_types') or var('nexus_entity_types', ['person', 'group']) %}
     {% for entity_type in entity_types %}
         select
             {{ entity_type }}_id as entity_id,

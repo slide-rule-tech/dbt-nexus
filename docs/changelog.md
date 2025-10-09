@@ -57,10 +57,15 @@ a **BREAKING CHANGE** that requires migration.
   - Four-layer structure implemented: Base → Normalized → Intermediate → Union
   - Person/group logic kept separate in intermediate layer for DevX
 - **Configuration Enhancements**:
-  - New `nexus_entity_types` variable to declare active entity types
-  - Sources config uses `entities: ["person", "group"]` and
-    `relationships: true`
-  - Simplified configuration with fewer model-specific settings
+  - **Unified Configuration Structure**: All nexus settings now under single
+    `nexus:` variable
+  - `nexus.max_recursion` replaces `nexus_max_recursion`
+  - `nexus.entity_types` replaces `nexus_entity_types`
+  - `nexus.sources` dictionary replaces both `sources` list and duplicate
+    `nexus.{source}.enabled` patterns
+  - Single source of truth for all source configuration (enabled status, events,
+    entities, relationships)
+  - Backward compatibility maintained - macros check both old and new patterns
 
 #### Changed 🔄
 
@@ -90,11 +95,26 @@ a **BREAKING CHANGE** that requires migration.
   - `process_entity_identifiers()` - No longer takes entity_type parameter
   - `process_entity_traits()` - No longer takes entity_type parameter
   - Filtering by entity_type happens within resolution macros
-- **BREAKING**: Configuration structure updated in `dbt_project.yml`:
-  - **Old**:
-    `sources: [{name: gmail, persons: true, groups: true, memberships: true}]`
-  - **New**:
-    `sources: [{name: gmail, events: true, entities: ["person", "group"], relationships: true}]`
+- **BREAKING**: Configuration structure completely redesigned in
+  `dbt_project.yml`:
+  - **Old**: Separate `nexus_max_recursion`, `nexus_entity_types`, and `sources`
+    list variables
+  - **New**: Unified `nexus` config with `max_recursion`, `entity_types`, and
+    `sources` dictionary
+  - Example:
+    ```yaml
+    nexus:
+      max_recursion: 3
+      entity_types: ["person", "group"]
+      sources:
+        gmail:
+          enabled: true
+          events: true
+          entities: ["person", "group"]
+          relationships: true
+    ```
+  - **Backward Compatibility**: Macros support both old and new patterns for
+    gradual migration
 - Identity resolution now filters by `entity_type` within unified
   `nexus_entity_identifiers_edges` table
   - Single edges table for all entity types (instead of separate person/group

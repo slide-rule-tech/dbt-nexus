@@ -193,6 +193,6 @@ Expected: Multiple distinct values collapsing into fewer unique entities
   identifier models for each source
 - Use development models to test identity resolution with specific records
 - Regularly check for duplicate emails/domains in the final entities table
-- Verify that `nexus_max_recursion` is set appropriately for your data
+- Verify that `nexus.max_recursion` is set appropriately for your data
   complexity (recommend: 3 for large datasets)
 - Ensure `entity_type` is included in edge uniqueness hash to prevent collisions

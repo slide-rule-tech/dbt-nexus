@@ -173,15 +173,18 @@ by implementing a standard interface:
 ```yaml
 # Source configuration
 vars:
-  sources:
-    - name: shopify_partner
-      events: true
-      groups: true
-      persons: false
-    - name: gmail
-      events: true
-      persons: true
-      groups: false
+  nexus:
+    sources:
+      shopify_partner:
+        enabled: true
+        events: true
+        entities: ["group"]
+        relationships: false
+      gmail:
+        enabled: true
+        events: true
+        entities: ["person"]
+        relationships: false
 ```
 
 ### Interface Requirements
@@ -269,7 +272,7 @@ WITH RECURSIVE identity_graph AS (
     ig.depth + 1
   FROM identity_graph ig
   JOIN edges e ON ig.identifier_b = e.identifier_a
-  WHERE ig.depth < {{ var('nexus_max_recursion', 5) }}
+  WHERE ig.depth < {{ var('nexus', {}).get('max_recursion', 5) }}
 )
 ```
 
@@ -349,9 +352,16 @@ The package uses dbt variables for flexible configuration:
 
 ```yaml
 vars:
-  nexus_max_recursion: 5 # Identity resolution depth limit
+  nexus:
+    max_recursion: 5 # Identity resolution depth limit
+    entity_types: ["person", "group"]
+    sources:
+      gmail:
+        enabled: true
+        events: true
+        entities: ["person", "group"]
+        relationships: true
   override_incremental: false # Force full refresh in development
-  sources: [...] # Source system definitions
 ```
 
 ### Schema Organization

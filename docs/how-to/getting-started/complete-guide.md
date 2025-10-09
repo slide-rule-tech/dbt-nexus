@@ -333,41 +333,43 @@ Add the following to your `dbt_project.yml`:
 
 ```yaml
 vars:
-  # Required: Define your data sources
-  sources:
-    - name: "shopify_partner"
-      events: true
-      persons: false
-      groups: true
-      memberships: false
-
-    - name: "gmail"
-      events: true
-      persons: true
-      groups: false
-      memberships: false
-
-    - name: "manual"
-      events: true
-      persons: true
-      groups: true
-      memberships: true
-
-  # Optional: Control recursion depth for identity resolution
-  nexus_max_recursion: 5
-
+  # Unified Nexus configuration
+  nexus:
+    max_recursion: 5 # Control recursion depth for identity resolution
+    entity_types: ["person", "group"]
+    
+    # Define your data sources
+    sources:
+      shopify_partner:
+        enabled: true
+        events: true
+        entities: ["group"]
+        relationships: false
+      
+      gmail:
+        enabled: true
+        events: true
+        entities: ["person"]
+        relationships: false
+      
+      manual:
+        enabled: true
+        events: true
+        entities: ["person", "group"]
+        relationships: true
+  
   # Optional: Override incremental behavior in development
   override_incremental: false # Set to true for full refresh in dev
 ```
 
 ### Source Configuration Details
 
-Each source in the `sources` list must specify which entity types it provides:
+Each source in the `nexus.sources` dictionary must specify:
 
+- **`enabled`**: Whether this source is active (true/false)
 - **`events`**: Whether this source provides event data
-- **`persons`**: Whether this source provides person identifiers/traits
-- **`groups`**: Whether this source provides group/organization data
-- **`memberships`**: Whether this source provides person-group relationships
+- **`entities`**: Which entity types this source provides (e.g., ["person", "group"])
+- **`relationships`**: Whether this source provides entity relationships (person-group, etc.)
 
 ### Model Materialization
 

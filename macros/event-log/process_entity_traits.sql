@@ -1,11 +1,26 @@
 {% macro process_entity_traits() %}
     {# Collect relations to union - now sources provide unified entity_traits #}
     {% set relations_to_union = [] %}
-    {% for source in var('sources') %}
-        {% if source.get('entities') %}
-            {% do relations_to_union.append(ref(source.name ~ '_entity_traits')) %}
-        {% endif %}
-    {% endfor %}
+    
+    {# Support both new unified config and legacy list config #}
+    {% set nexus_config = var('nexus', {}) %}
+    {% set sources_config = nexus_config.get('sources', {}) %}
+    
+    {# New unified config pattern (nexus.sources dict) #}
+    {% if sources_config %}
+        {% for source_name, source_config in sources_config.items() %}
+            {% if source_config.get('enabled') and source_config.get('entities') %}
+                {% do relations_to_union.append(ref(source_name ~ '_entity_traits')) %}
+            {% endif %}
+        {% endfor %}
+    {# Legacy config pattern (sources list) - backward compatibility #}
+    {% elif var('sources', none) %}
+        {% for source in var('sources') %}
+            {% if source.get('entities') %}
+                {% do relations_to_union.append(ref(source.name ~ '_entity_traits')) %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
 
     {% if relations_to_union %}
         with unioned as (

@@ -1,6 +1,6 @@
 
 {{ config(
-    enabled=var('nexus', {}).get('google_calendar', {}).get('enabled', false),
+    enabled=var('nexus', {}).get('sources', {}).get('google_calendar', {}).get('enabled', false),
     materialized='table',
     tags=['event-processing', 'realtime']
 ) }}

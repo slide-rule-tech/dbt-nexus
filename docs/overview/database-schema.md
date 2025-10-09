@@ -108,71 +108,54 @@ custom entity types)
 | `occurred_at`      | TIMESTAMP | When identifier was collected | ✅       | Business timestamp                 |
 | `_ingested_at`     | TIMESTAMP | When processed by dbt         | ✅       | System timestamp                   |
 
-#### Person Traits
+**Note**: The `nexus_entities` table is populated from the union of
+entity_type-specific columns. For persons, columns like `email`, `name`, `phone`
+are populated; for groups, columns like `domain`, `company_name` are populated.
+Other entity types follow their own schema.
 
-**Purpose**: Attributes and characteristics of persons
+#### Entity Traits (`nexus_entity_traits`)
 
-| Column         | Type      | Description               | Required | Notes                             |
-| -------------- | --------- | ------------------------- | -------- | --------------------------------- |
-| `id`           | STRING    | Unique trait record       | ✅       | Primary key                       |
-| `event_id`     | STRING    | Reference to source event | ✅       | Foreign key to events.id          |
-| `edge_id`      | STRING    | Groups related traits     | ✅       | Surrogate key for grouping        |
-| `trait_name`   | STRING    | Name of the trait         | ✅       | e.g., 'name', 'title', 'timezone' |
-| `trait_value`  | STRING    | Value of the trait        | ✅       | e.g., 'John Smith', 'Manager'     |
-| `source`       | STRING    | Source system             | ✅       | Source attribution                |
-| `occurred_at`  | TIMESTAMP | When trait was collected  | ✅       | Business timestamp                |
-| `_ingested_at` | TIMESTAMP | When processed by dbt     | ✅       | System timestamp                  |
+**Purpose**: Attributes and characteristics for all entity types
 
-#### Group Identifiers
+| Column             | Type      | Description                      | Required | Notes                                   |
+| ------------------ | --------- | -------------------------------- | -------- | --------------------------------------- |
+| `entity_trait_id`  | STRING    | Unique trait record              | ✅       | Primary key (ent*tr* prefix)            |
+| `event_id`         | STRING    | Reference to source event        | ✅       | Foreign key to events.event_id          |
+| `entity_type`      | STRING    | Type of entity                   | ✅       | 'person', 'group', etc.                 |
+| `identifier_type`  | STRING    | Type used to identify the entity | ✅       | e.g., 'email', 'domain'                 |
+| `identifier_value` | STRING    | Value used to identify entity    | ✅       | e.g., 'john@example.com', 'example.com' |
+| `trait_name`       | STRING    | Name of the trait                | ✅       | e.g., 'name', 'title', 'company_name'   |
+| `trait_value`      | STRING    | Value of the trait               | ✅       | e.g., 'John Smith', 'Acme Corp'         |
+| `role`             | STRING    | Entity's role in event           | ❌       | e.g., 'sender', 'organizer'             |
+| `source`           | STRING    | Source system                    | ✅       | Source attribution                      |
+| `occurred_at`      | TIMESTAMP | When trait was collected         | ✅       | Business timestamp                      |
+| `_ingested_at`     | TIMESTAMP | When processed by dbt            | ✅       | System timestamp                        |
 
-**Purpose**: Normalized identifiers for organizational entities
+#### Relationship Declarations (`nexus_relationship_declarations`)
 
-| Column             | Type      | Description                   | Required | Notes                          |
-| ------------------ | --------- | ----------------------------- | -------- | ------------------------------ |
-| `id`               | STRING    | Unique identifier record      | ✅       | Primary key                    |
-| `event_id`         | STRING    | Reference to source event     | ✅       | Foreign key to events.id       |
-| `edge_id`          | STRING    | Groups related identifiers    | ✅       | Surrogate key for grouping     |
-| `identifier_type`  | STRING    | Type of identifier            | ✅       | e.g., 'domain', 'company_id'   |
-| `identifier_value` | STRING    | Actual identifier value       | ✅       | e.g., 'example.com', 'COMP123' |
-| `source`           | STRING    | Source system                 | ✅       | Source attribution             |
-| `occurred_at`      | TIMESTAMP | When identifier was collected | ✅       | Business timestamp             |
-| `_ingested_at`     | TIMESTAMP | When processed by dbt         | ✅       | System timestamp               |
+**Purpose**: Declared relationships between any two entities
 
-#### Group Traits
-
-**Purpose**: Attributes and characteristics of groups/organizations
-
-| Column         | Type      | Description               | Required | Notes                            |
-| -------------- | --------- | ------------------------- | -------- | -------------------------------- |
-| `id`           | STRING    | Unique trait record       | ✅       | Primary key                      |
-| `event_id`     | STRING    | Reference to source event | ✅       | Foreign key to events.id         |
-| `edge_id`      | STRING    | Groups related traits     | ✅       | Surrogate key for grouping       |
-| `trait_name`   | STRING    | Name of the trait         | ✅       | e.g., 'company_name', 'industry' |
-| `trait_value`  | STRING    | Value of the trait        | ✅       | e.g., 'Acme Corp', 'Technology'  |
-| `source`       | STRING    | Source system             | ✅       | Source attribution               |
-| `occurred_at`  | TIMESTAMP | When trait was collected  | ✅       | Business timestamp               |
-| `_ingested_at` | TIMESTAMP | When processed by dbt     | ✅       | System timestamp                 |
-
-#### Membership Identifiers
-
-**Purpose**: Relationships between persons and groups
-
-| Column                   | Type      | Description                     | Required | Notes                            |
-| ------------------------ | --------- | ------------------------------- | -------- | -------------------------------- |
-| `id`                     | STRING    | Unique membership record        | ✅       | Primary key                      |
-| `event_id`               | STRING    | Reference to source event       | ✅       | Foreign key to events.id         |
-| `person_identifier`      | STRING    | Person identifier value         | ✅       | e.g., email address              |
-| `person_identifier_type` | STRING    | Person identifier type          | ✅       | e.g., 'email'                    |
-| `group_identifier`       | STRING    | Group identifier value          | ✅       | e.g., domain or company ID       |
-| `group_identifier_type`  | STRING    | Group identifier type           | ✅       | e.g., 'domain'                   |
-| `role`                   | STRING    | Person's role in the group      | ❌       | e.g., 'owner', 'admin', 'member' |
-| `source`                 | STRING    | Source system                   | ✅       | Source attribution               |
-| `occurred_at`            | TIMESTAMP | When membership was established | ✅       | Business timestamp               |
-| `_ingested_at`           | TIMESTAMP | When processed by dbt           | ✅       | System timestamp                 |
+| Column                        | Type      | Description                     | Required | Notes                               |
+| ----------------------------- | --------- | ------------------------------- | -------- | ----------------------------------- |
+| `relationship_declaration_id` | STRING    | Unique declaration record       | ✅       | Primary key (rel*decl* prefix)      |
+| `event_id`                    | STRING    | Reference to source event       | ✅       | Foreign key to events.event_id      |
+| `occurred_at`                 | TIMESTAMP | When relationship was declared  | ✅       | Business timestamp                  |
+| `entity_a_identifier`         | STRING    | Entity A identifier value       | ✅       | e.g., email address                 |
+| `entity_a_identifier_type`    | STRING    | Entity A identifier type        | ✅       | e.g., 'email'                       |
+| `entity_a_type`               | STRING    | Entity A type                   | ✅       | e.g., 'person'                      |
+| `entity_a_role`               | STRING    | Entity A's role in relationship | ❌       | e.g., 'member', 'owner'             |
+| `entity_b_identifier`         | STRING    | Entity B identifier value       | ✅       | e.g., domain                        |
+| `entity_b_identifier_type`    | STRING    | Entity B identifier type        | ✅       | e.g., 'domain'                      |
+| `entity_b_type`               | STRING    | Entity B type                   | ✅       | e.g., 'group'                       |
+| `entity_b_role`               | STRING    | Entity B's role in relationship | ❌       | e.g., 'organization'                |
+| `relationship_type`           | STRING    | Type of relationship            | ✅       | e.g., 'membership', 'ownership'     |
+| `relationship_direction`      | STRING    | Relationship directionality     | ✅       | 'a_to_b', 'b_to_a', 'bidirectional' |
+| `is_active`                   | BOOLEAN   | Whether relationship is active  | ✅       | true/false                          |
+| `source`                      | STRING    | Source system                   | ✅       | Source attribution                  |
 
 ### Resolved Entities
 
-#### Resolved Person Identifiers
+#### Resolved Person Identifiers (`nexus_resolved_person_identifiers`)
 
 **Purpose**: Deduplicated person identifiers after identity resolution
 
@@ -184,19 +167,7 @@ custom entity types)
 | `source`           | STRING    | Source of earliest occurrence | ✅       | Source attribution               |
 | `occurred_at`      | TIMESTAMP | When first collected          | ✅       | Earliest business timestamp      |
 
-#### Resolved Person Traits
-
-**Purpose**: Consolidated person attributes with latest values
-
-| Column        | Type      | Description                     | Required | Notes                         |
-| ------------- | --------- | ------------------------------- | -------- | ----------------------------- |
-| `person_id`   | STRING    | Resolved person identifier      | ✅       | Links to resolved identifiers |
-| `trait_name`  | STRING    | Name of the trait               | ✅       | e.g., 'name', 'title'         |
-| `trait_value` | STRING    | Most recent trait value         | ✅       | Latest value from any source  |
-| `source`      | STRING    | Source of latest value          | ✅       | Source attribution            |
-| `occurred_at` | TIMESTAMP | When latest value was collected | ✅       | Business timestamp            |
-
-#### Resolved Group Identifiers
+#### Resolved Group Identifiers (`nexus_resolved_group_identifiers`)
 
 **Purpose**: Deduplicated group identifiers after identity resolution
 
@@ -235,68 +206,49 @@ custom entity types)
 
 ### Final Production Tables
 
-#### Persons
+#### Entities (`nexus_entities`)
 
-**Purpose**: Production table with complete person profiles
+**Purpose**: Production table with complete entity profiles for all entity types
 
-| Column          | Type      | Description                   | Required | Notes                |
-| --------------- | --------- | ----------------------------- | -------- | -------------------- |
-| `person_id`     | STRING    | Unique person identifier      | ✅       | Primary key          |
-| `email`         | STRING    | Primary email address         | ❌       | Most recent email    |
-| `name`          | STRING    | Full name                     | ❌       | Most recent name     |
-| `phone`         | STRING    | Phone number                  | ❌       | Most recent phone    |
-| `title`         | STRING    | Job title                     | ❌       | Most recent title    |
-| `timezone`      | STRING    | Timezone                      | ❌       | Most recent timezone |
-| `_last_updated` | TIMESTAMP | When profile was last updated | ✅       | System timestamp     |
+| Column            | Type      | Description                     | Required | Notes                               |
+| ----------------- | --------- | ------------------------------- | -------- | ----------------------------------- |
+| `entity_id`       | STRING    | Unique entity identifier        | ✅       | Primary key (person_id or group_id) |
+| `entity_type`     | STRING    | Type of entity                  | ✅       | 'person', 'group', custom types     |
+| `email`           | STRING    | Primary email (persons)         | ❌       | Most recent, person entities only   |
+| `name`            | STRING    | Full name (persons/groups)      | ❌       | Most recent                         |
+| `phone`           | STRING    | Phone number (persons)          | ❌       | Most recent, person entities only   |
+| `title`           | STRING    | Job title (persons)             | ❌       | Most recent, person entities only   |
+| `domain`          | STRING    | Primary domain (groups)         | ❌       | Most recent, group entities only    |
+| `company_name`    | STRING    | Organization name (groups)      | ❌       | Most recent, group entities only    |
+| `industry`        | STRING    | Industry (groups)               | ❌       | Most recent, group entities only    |
+| `primary_source`  | STRING    | Source with earliest identifier | ✅       | Source attribution                  |
+| `last_updated_at` | TIMESTAMP | When entity was last updated    | ✅       | Most recent trait timestamp         |
 
-#### Groups
+**Note**: Columns are populated based on `entity_type`. Person entities have
+email/name/phone populated; group entities have domain/company_name populated.
 
-**Purpose**: Production table with complete group/organization profiles
+#### Relationships (`nexus_relationships`)
 
-| Column          | Type      | Description                   | Required | Notes                |
-| --------------- | --------- | ----------------------------- | -------- | -------------------- |
-| `group_id`      | STRING    | Unique group identifier       | ✅       | Primary key          |
-| `domain`        | STRING    | Primary domain                | ❌       | Most recent domain   |
-| `company_name`  | STRING    | Organization name             | ❌       | Most recent name     |
-| `industry`      | STRING    | Industry classification       | ❌       | Most recent industry |
-| `company_size`  | STRING    | Organization size             | ❌       | Most recent size     |
-| `shopify_id`    | STRING    | Shopify identifier            | ❌       | If applicable        |
-| `_last_updated` | TIMESTAMP | When profile was last updated | ✅       | System timestamp     |
+**Purpose**: Production table with resolved relationships between any two
+entities
 
-#### Memberships
+| Column              | Type      | Description                              | Required | Notes                             |
+| ------------------- | --------- | ---------------------------------------- | -------- | --------------------------------- |
+| `relationship_id`   | STRING    | Unique relationship identifier           | ✅       | Primary key (rel\_ prefix)        |
+| `entity_a_id`       | STRING    | Entity A identifier                      | ✅       | Foreign key to nexus_entities     |
+| `entity_b_id`       | STRING    | Entity B identifier                      | ✅       | Foreign key to nexus_entities     |
+| `relationship_type` | STRING    | Type of relationship                     | ✅       | e.g., 'membership', 'ownership'   |
+| `is_active`         | BOOLEAN   | Whether relationship is currently active | ✅       | true/false                        |
+| `established_at`    | TIMESTAMP | When relationship was first declared     | ✅       | Earliest declaration timestamp    |
+| `last_updated_at`   | TIMESTAMP | When relationship was last updated       | ✅       | Most recent declaration timestamp |
+| `primary_source`    | STRING    | Source of earliest declaration           | ✅       | Source attribution                |
 
-**Purpose**: Production table with person-group relationships
+**Backward Compatibility**: Legacy views available in client projects:
 
-| Column           | Type      | Description                            | Required | Notes                  |
-| ---------------- | --------- | -------------------------------------- | -------- | ---------------------- |
-| `id`             | STRING    | Unique membership identifier           | ✅       | Primary key            |
-| `person_id`      | STRING    | Person identifier                      | ✅       | Foreign key to persons |
-| `group_id`       | STRING    | Group identifier                       | ✅       | Foreign key to groups  |
-| `role`           | STRING    | Role in the organization               | ❌       | Current role           |
-| `source`         | STRING    | Source of relationship data            | ✅       | Source attribution     |
-| `established_at` | TIMESTAMP | When relationship was first identified | ✅       | Business timestamp     |
-| `_last_updated`  | TIMESTAMP | When relationship was last updated     | ✅       | System timestamp       |
-
-#### Person Participants
-
-**Purpose**: Links between persons and events with role context
-
-| Column                  | Type   | Description                          | Required | Notes                                                                       |
-| ----------------------- | ------ | ------------------------------------ | -------- | --------------------------------------------------------------------------- |
-| `person_participant_id` | STRING | Unique person-event participation ID | ✅       | Primary key                                                                 |
-| `event_id`              | STRING | Event identifier                     | ✅       | Foreign key to events                                                       |
-| `person_id`             | STRING | Person identifier                    | ✅       | Foreign key to persons                                                      |
-| `role`                  | STRING | Person's role in the event           | ❌       | e.g., 'sender', 'recipient', 'organizer', 'attendee', 'contact', 'assignee' |
-
-#### Group Participants
-
-**Purpose**: Links between groups and events
-
-| Column                 | Type   | Description                         | Required | Notes                 |
-| ---------------------- | ------ | ----------------------------------- | -------- | --------------------- |
-| `group_participant_id` | STRING | Unique group-event participation ID | ✅       | Primary key           |
-| `event_id`             | STRING | Event identifier                    | ✅       | Foreign key to events |
-| `group_id`             | STRING | Group identifier                    | ✅       | Foreign key to groups |
+- `persons` - Filters `nexus_entities WHERE entity_type = 'person'`
+- `groups` - Filters `nexus_entities WHERE entity_type = 'group'`
+- `memberships` - Filters
+  `nexus_relationships WHERE relationship_type = 'membership'`
 
 ## Relationships and Constraints
 
@@ -304,28 +256,23 @@ custom entity types)
 
 ```mermaid
 erDiagram
-    EVENTS ||--o{ PERSON_IDENTIFIERS : generates
-    EVENTS ||--o{ PERSON_TRAITS : generates
-    EVENTS ||--o{ GROUP_IDENTIFIERS : generates
-    EVENTS ||--o{ GROUP_TRAITS : generates
-    EVENTS ||--o{ MEMBERSHIP_IDENTIFIERS : generates
+    EVENTS ||--o{ ENTITY_IDENTIFIERS : generates
+    EVENTS ||--o{ ENTITY_TRAITS : generates
+    EVENTS ||--o{ RELATIONSHIP_DECLARATIONS : generates
 
-    PERSON_IDENTIFIERS ||--o{ RESOLVED_PERSON_IDENTIFIERS : resolves_to
-    PERSON_TRAITS ||--o{ RESOLVED_PERSON_TRAITS : resolves_to
-    GROUP_IDENTIFIERS ||--o{ RESOLVED_GROUP_IDENTIFIERS : resolves_to
-    GROUP_TRAITS ||--o{ RESOLVED_GROUP_TRAITS : resolves_to
-    MEMBERSHIP_IDENTIFIERS ||--o{ RESOLVED_MEMBERSHIP_IDENTIFIERS : resolves_to
+    ENTITY_IDENTIFIERS ||--o{ ENTITY_IDENTIFIERS_EDGES : creates
+    ENTITY_IDENTIFIERS_EDGES ||--o{ RESOLVED_PERSON_IDENTIFIERS : resolves_to
+    ENTITY_IDENTIFIERS_EDGES ||--o{ RESOLVED_GROUP_IDENTIFIERS : resolves_to
+    ENTITY_TRAITS ||--o{ RESOLVED_ENTITY_TRAITS : resolves_to
+    RELATIONSHIP_DECLARATIONS ||--o{ RESOLVED_RELATIONSHIP_DECLARATIONS : resolves_to
 
-    RESOLVED_PERSON_IDENTIFIERS ||--|| PERSONS : materializes_as
-    RESOLVED_GROUP_IDENTIFIERS ||--|| GROUPS : materializes_as
-    RESOLVED_MEMBERSHIP_IDENTIFIERS ||--|| MEMBERSHIPS : materializes_as
+    RESOLVED_PERSON_IDENTIFIERS ||--|| ENTITIES : materializes_as
+    RESOLVED_GROUP_IDENTIFIERS ||--|| ENTITIES : materializes_as
+    RESOLVED_ENTITY_TRAITS ||--|| ENTITIES : enriches
+    RESOLVED_RELATIONSHIP_DECLARATIONS ||--|| RELATIONSHIPS : materializes_as
 
-    PERSONS ||--o{ MEMBERSHIPS : belongs_to
-    GROUPS ||--o{ MEMBERSHIPS : contains
-    PERSONS ||--o{ PERSON_PARTICIPANTS : participates_in
-    GROUPS ||--o{ GROUP_PARTICIPANTS : participates_in
-    EVENTS ||--o{ PERSON_PARTICIPANTS : has_person_participants
-    EVENTS ||--o{ GROUP_PARTICIPANTS : has_group_participants
+    ENTITIES ||--o{ RELATIONSHIPS : entity_a
+    ENTITIES ||--o{ RELATIONSHIPS : entity_b
 ```
 
 ### Key Constraints
