@@ -236,6 +236,305 @@ vars:
       relationships: true # NEW: Replaces memberships
 ```
 
+## Unified Nexus Configuration Migration
+
+The v0.3.0 release introduces a unified configuration structure that
+consolidates all Nexus settings under a single `nexus:` namespace. This
+simplifies configuration management and provides better organization.
+
+### Migration from Legacy Configuration
+
+**Before (Legacy Configuration)**:
+
+```yaml
+vars:
+  # Scattered configuration across multiple namespaces
+  nexus_max_recursion: 3
+  nexus_entity_types: ["person", "group"]
+
+  sources:
+    - name: notion
+      events: true
+      entities: ["person", "group"]
+      relationships: true
+    - name: gmail
+      events: true
+      entities: ["person", "group"]
+      relationships: true
+    - name: segment
+      enabled: true
+      identifiers: ["email", "user_id"]
+      traits: ["name", "company"]
+```
+
+**After (Unified Configuration)**:
+
+```yaml
+vars:
+  # All Nexus configuration under single namespace
+  nexus:
+    max_recursion: 3
+    entity_types: ["person", "group"]
+
+    # All sources configured in one place
+    sources:
+      notion:
+        enabled: true
+        events: true
+        entities: ["person", "group"]
+        relationships: true
+      gmail:
+        enabled: true
+        events: true
+        entities: ["person", "group"]
+        relationships: true
+      segment:
+        enabled: true
+        events: true
+        entities: ["person"]
+        attribution: true # If using touchpoints
+      google_calendar:
+        enabled: false
+        events: true
+        entities: ["person", "group"]
+        relationships: true
+
+    # Backward compatibility for template source macros
+    segment: # Keep for unpivot macros
+      identifiers: ["email", "user_id"]
+      traits: ["name", "company"]
+    gmail: # Keep for unpivot macros
+      identifiers: ["email", "thread_id"]
+      traits: ["name", "subject"]
+```
+
+### Key Configuration Changes
+
+#### 1. **Consolidated Namespace**
+
+- **Before**: `nexus_max_recursion`, `nexus_entity_types`, separate `sources`
+  list
+- **After**: All under `nexus:` namespace with nested structure
+
+#### 2. **Unified Source Configuration**
+
+- **Before**: Sources as list with `name` field
+- **After**: Sources as dictionary with source names as keys
+
+#### 3. **Standardized Source Properties**
+
+All sources now support consistent configuration options:
+
+```yaml
+nexus:
+  sources:
+    source_name:
+      enabled: true/false # Master enable/disable switch
+      events: true/false # Enable event processing
+      entities: ["person", "group"] # Entity types this source provides
+      relationships: true/false # Enable relationship processing
+      attribution: true/false # Enable attribution/touchpoints (optional)
+```
+
+#### 4. **Backward Compatibility**
+
+Template source macros (unpivot_identifiers, unpivot_traits) continue to use the
+legacy configuration namespaces for backward compatibility:
+
+```yaml
+nexus:
+  sources:
+    segment:
+      enabled: true
+      events: true
+      entities: ["person"]
+  # Legacy namespace preserved for macros
+  segment:
+    identifiers: ["email", "user_id"]
+    traits: ["name", "company"]
+```
+
+### Migration Steps
+
+#### Step 1: Update Main Configuration Structure
+
+1. **Move global settings**:
+
+   ```yaml
+   # Before
+   nexus_max_recursion: 3
+   nexus_entity_types: ["person", "group"]
+
+   # After
+   nexus:
+     max_recursion: 3
+     entity_types: ["person", "group"]
+   ```
+
+2. **Convert sources list to dictionary**:
+
+   ```yaml
+   # Before
+   sources:
+     - name: notion
+       events: true
+       entities: ["person", "group"]
+       relationships: true
+
+   # After
+   nexus:
+     sources:
+       notion:
+         enabled: true
+         events: true
+         entities: ["person", "group"]
+         relationships: true
+   ```
+
+#### Step 2: Update Source-Specific Configuration
+
+For each source, ensure all configuration is under the unified structure:
+
+```yaml
+nexus:
+  sources:
+    notion:
+      enabled: true
+      events: true
+      entities: ["person", "group"]
+      relationships: true
+    gmail:
+      enabled: true
+      events: true
+      entities: ["person", "group"]
+      relationships: true
+    segment:
+      enabled: true
+      events: true
+      entities: ["person"]
+      attribution: true
+    google_calendar:
+      enabled: false # Can be disabled per source
+      events: true
+      entities: ["person", "group"]
+      relationships: true
+```
+
+#### Step 3: Preserve Backward Compatibility
+
+Keep legacy namespaces for template source macros:
+
+```yaml
+nexus:
+  sources:
+    # ... unified configuration
+  # Legacy namespaces for macro compatibility
+  segment:
+    identifiers: ["email", "user_id"]
+    traits: ["name", "company"]
+  gmail:
+    identifiers: ["email", "thread_id"]
+    traits: ["name", "subject"]
+```
+
+### Benefits of Unified Configuration
+
+#### 1. **Centralized Management**
+
+- All Nexus configuration in one place
+- Easier to understand and maintain
+- Clear separation from other dbt variables
+
+#### 2. **Consistent Structure**
+
+- All sources follow the same configuration pattern
+- Standardized enable/disable controls
+- Predictable configuration schema
+
+#### 3. **Better Organization**
+
+- Logical grouping of related settings
+- Clear hierarchy: global → sources → source-specific
+- Reduced configuration duplication
+
+#### 4. **Enhanced Flexibility**
+
+- Per-source enable/disable controls
+- Granular control over features (events, entities, relationships, attribution)
+- Easy to add new sources or modify existing ones
+
+### Validation
+
+After migration, verify your configuration:
+
+```bash
+# Test configuration parsing
+dbt parse
+
+# Test source model compilation
+dbt compile --select source:*
+
+# Test specific source models
+dbt compile --select package:nexus notion
+dbt compile --select package:nexus gmail
+dbt compile --select package:nexus segment
+```
+
+### Common Issues
+
+#### 1. **Missing `enabled` Field**
+
+```yaml
+# ❌ Missing enabled field
+nexus:
+  sources:
+    notion:
+      events: true
+      entities: ["person", "group"]
+
+# ✅ Include enabled field
+nexus:
+  sources:
+    notion:
+      enabled: true
+      events: true
+      entities: ["person", "group"]
+```
+
+#### 2. **Incorrect Source Structure**
+
+```yaml
+# ❌ Using list format
+nexus:
+  sources:
+    - name: notion
+      enabled: true
+
+# ✅ Using dictionary format
+nexus:
+  sources:
+    notion:
+      enabled: true
+```
+
+#### 3. **Missing Backward Compatibility**
+
+```yaml
+# ❌ Missing legacy namespace for macros
+nexus:
+  sources:
+    segment:
+      enabled: true
+
+# ✅ Include legacy namespace
+nexus:
+  sources:
+    segment:
+      enabled: true
+  segment:  # For macro compatibility
+    identifiers: ['email', 'user_id']
+```
+
 ## Query Migration Examples
 
 ### Querying Persons

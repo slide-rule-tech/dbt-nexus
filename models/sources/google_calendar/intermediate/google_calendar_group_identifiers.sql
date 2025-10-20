@@ -20,7 +20,7 @@ organizer_domains AS (
     WHERE organizer.domain IS NOT NULL
     AND organizer.domain != ''
     AND organizer.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list') -%}
+        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
         '{{ domain }}'
         {%- if not loop.last -%},{%- endif -%}
         {%- endfor -%}
@@ -38,7 +38,7 @@ creator_domains AS (
     WHERE creator.domain IS NOT NULL
     AND creator.domain != ''
     AND creator.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list') -%}
+        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
         '{{ domain }}'
         {%- if not loop.last -%},{%- endif -%}
         {%- endfor -%}
@@ -57,7 +57,7 @@ attendee_domains AS (
     WHERE attendee.domain IS NOT NULL
     AND attendee.domain != ''
     AND attendee.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list') -%}
+        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
         '{{ domain }}'
         {%- if not loop.last -%},{%- endif -%}
         {%- endfor -%}

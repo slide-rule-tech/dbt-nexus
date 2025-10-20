@@ -25,7 +25,7 @@ organizer_domain_traits AS (
     FROM google_calendar_event_events
     WHERE organizer.domain IS NOT NULL
     AND organizer.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list') -%}
+        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
         '{{ domain }}'
         {%- if not loop.last -%},{%- endif -%}
         {%- endfor -%}
@@ -48,7 +48,7 @@ creator_domain_traits AS (
     FROM google_calendar_event_events
     WHERE creator.domain IS NOT NULL
     AND creator.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list') -%}
+        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
         '{{ domain }}'
         {%- if not loop.last -%},{%- endif -%}
         {%- endfor -%}
@@ -72,7 +72,7 @@ attendee_domain_traits AS (
     UNNEST(attendees) as attendee
     WHERE attendee.domain IS NOT NULL
     AND attendee.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list') -%}
+        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
         '{{ domain }}'
         {%- if not loop.last -%},{%- endif -%}
         {%- endfor -%}
