@@ -3,7 +3,7 @@ version: 2
 sources:
   - name:
       "{{ var('nexus', {}).get('sources', {}).get('segment', {}).get('location',
-      {}).get('schema', 'segment_disabled') }}"
+      {}).get('schema', 'segment_disabled_' ~ project_name) }}"
     description: "Segment live data warehouse tables"
     database:
       "{{ var('nexus', {}).get('sources', {}).get('segment', {}).get('location',
