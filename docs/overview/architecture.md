@@ -111,9 +111,10 @@ The central entity that captures "what happened" across all sources:
 Individual entities with identifiers and traits:
 
 ```sql
--- Person structure
+-- Entity structure (v0.3.0)
 {
-  person_id: UUID,
+  entity_id: UUID,
+  entity_type: STRING,  -- 'person', 'group', or custom types
   identifiers: {
     email: STRING,
     phone: STRING,
@@ -153,11 +154,16 @@ Organizational entities (companies, accounts):
 Relationships between persons and groups:
 
 ```sql
--- Membership structure
+-- Relationship structure (v0.3.0)
 {
-  person_id: UUID,
-  group_id: UUID,
-  role: STRING,
+  relationship_id: UUID,
+  entity_a_id: UUID,
+  entity_a_type: STRING,  -- 'person', 'group', etc.
+  entity_b_id: UUID,
+  entity_b_type: STRING,  -- 'person', 'group', etc.
+  relationship_type: STRING,  -- 'membership', 'collaboration', etc.
+  entity_a_role: STRING,
+  entity_b_role: STRING,
   occurred_at: TIMESTAMP,
   source: STRING
 }
@@ -416,13 +422,19 @@ Custom transformations can be added through the macro system:
 
 ```yaml
 models:
-  - name: nexus_persons
+  - name: nexus_entities
     tests:
       - unique:
-          column_name: person_id
+          column_name: entity_id
       - not_null:
-          column_name: person_id
+          column_name: entity_id
+      - not_null:
+          column_name: entity_type
     columns:
+      - name: entity_type
+        tests:
+          - accepted_values:
+              values: ["person", "group"]
       - name: email
         tests:
           - not_null

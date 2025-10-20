@@ -143,9 +143,12 @@ erDiagram
         float significance
     }
 
-    nexus_person_participants {
-        string person_id FK
+    nexus_entity_participants {
+        string entity_participant_id PK
+        string entity_type
+        string entity_id FK
         string event_id FK
+        string role
     }
 
     %% Attribution Tables
@@ -171,14 +174,16 @@ erDiagram
         string touchpoint_batch_id FK
         string last_touchpoint_id FK
         string event_id FK
-        string person_id FK
+        string entity_id FK
+        string entity_type
         timestamp touchpoint_occurred_at
         timestamp event_occurred_at
     }
 
     nexus_touchpoint_path_batches {
         string touchpoint_batch_id PK
-        string person_id FK
+        string entity_id FK
+        string entity_type
         timestamp touchpoint_occurred_at
         timestamp last_event_occurred_at
         int events_in_batch
@@ -199,7 +204,8 @@ erDiagram
     nexus_attribution_model_results {
         string result_id PK
         string event_id FK
-        string person_id FK
+        string entity_id FK
+        string entity_type
         string model_name
         string utm_source
         string utm_medium
@@ -218,12 +224,88 @@ erDiagram
     nexus_events ||--o{ nexus_touchpoints : "has attribution info"
 
     nexus_touchpoints ||--o{ nexus_touchpoint_paths : "last touchpoint for event"
-    nexus_person_participants ||--|| nexus_touchpoint_paths : "person context"
+    nexus_entity_participants ||--|| nexus_touchpoint_paths : "entity context"
 
     nexus_touchpoint_paths }o--|| nexus_touchpoint_path_batches : "batched for efficiency"
 
     nexus_events ||--o{ nexus_attribution_model_results : "has attribution"
-    nexus_person_participants ||--|| nexus_attribution_model_results : "person context"
+    nexus_entity_participants ||--|| nexus_attribution_model_results : "entity context"
+```
+
+---
+
+## Multi-Entity Attribution Support
+
+Nexus v0.3.0 introduces **multi-entity attribution** that supports attribution
+for both persons and groups (or any custom entity types). This enables
+sophisticated attribution analysis across different entity types.
+
+### Entity-Centric Attribution
+
+**Key Features:**
+
+- **Unified Attribution Pipeline**: Single attribution infrastructure supports
+  all entity types
+- **Entity Type Filtering**: Can filter attribution results by `entity_type`
+  ('person', 'group', etc.)
+- **Separate Attribution Timelines**: Each entity type maintains independent
+  attribution paths
+- **Cross-Entity Attribution**: Can analyze attribution relationships between
+  different entity types
+
+**Example Queries:**
+
+```sql
+-- Attribution by entity type
+SELECT
+  entity_type,
+  attribution_model_name,
+  COUNT(*) as attribution_count
+FROM {{ ref('nexus_attribution_model_results') }}
+GROUP BY entity_type, attribution_model_name
+
+-- Group attribution analysis
+SELECT
+  entity_id,
+  attributed_event_id,
+  attribution_model_name,
+  source,
+  medium,
+  campaign
+FROM {{ ref('nexus_attribution_model_results') }}
+WHERE entity_type = 'group'
+  AND attribution_model_name = 'last_marketing_touch'
+
+-- Cross-entity attribution relationships
+SELECT
+  p.entity_id as person_id,
+  g.entity_id as group_id,
+  p.attribution_model_name,
+  p.source as person_source,
+  g.source as group_source
+FROM {{ ref('nexus_attribution_model_results') }} p
+JOIN {{ ref('nexus_attribution_model_results') }} g
+  ON p.attributed_event_id = g.attributed_event_id
+WHERE p.entity_type = 'person'
+  AND g.entity_type = 'group'
+```
+
+### Backward Compatibility
+
+For existing queries that expect person-only attribution, you can filter by
+entity type:
+
+```sql
+-- Legacy person-only attribution query
+SELECT * FROM {{ ref('nexus_attribution_model_results') }}
+WHERE entity_type = 'person'
+```
+
+Or use the compatibility views (if available):
+
+```sql
+-- Using compatibility view (if implemented)
+SELECT * FROM {{ ref('nexus_person_attribution_results') }}
 ```
 
 ---
@@ -541,7 +623,8 @@ Each client attribution model must follow a consistent schema:
 - `touchpoint_batch_id` - Batch identifier
 - `touchpoint_event_id` - Event ID associated with the touchpoint
 - `attributed_event_id` - Each event attributed by this model
-- `person_id` - Person identifier
+- `entity_id` - Entity identifier (person, group, etc.)
+- `entity_type` - Type of entity ('person', 'group', etc.)
 - `attributed_event_occurred_at` - When the attributed event occurred
 
 **Attribution-Specific Columns:**
@@ -572,21 +655,23 @@ Query attribution results across all models:
 -- Compare attribution models
 SELECT
   attribution_model_name,
+  entity_type,
   COUNT(*) as total_attributions,
-  COUNT(DISTINCT person_id) as unique_persons,
+  COUNT(DISTINCT entity_id) as unique_entities,
   COUNT(DISTINCT attributed_event_id) as unique_events
 FROM {{ ref('nexus_attribution_model_results') }}
-GROUP BY attribution_model_name
+GROUP BY attribution_model_name, entity_type
 ORDER BY total_attributions DESC
 
 -- Cross-model attribution analysis
 SELECT
-  person_id,
+  entity_id,
+  entity_type,
   attributed_event_id,
   STRING_AGG(attribution_model_name || ': ' || COALESCE(fbclid, gclid, source), ' | ') as attribution_summary
 FROM {{ ref('nexus_attribution_model_results') }}
-WHERE person_id = 'per_12345'
-GROUP BY person_id, attributed_event_id
+WHERE entity_id = 'ent_12345' AND entity_type = 'person'
+GROUP BY entity_id, entity_type, attributed_event_id
 ```
 
 ### Column Naming Strategy
@@ -608,15 +693,16 @@ column mapping.
 **Last FBCLID Attribution:**
 
 ```sql
--- Tracks the most recent Facebook click ID for each user journey
+-- Tracks the most recent Facebook click ID for each entity journey
 SELECT
-  {{ nexus.create_nexus_id('attribution_model_result', ['touchpoint_batch_id', 'event_id', 'person_id']) }} as attribution_model_result_id,
+  {{ nexus.create_nexus_id('attribution_model_result', ['touchpoint_batch_id', 'event_id', 'entity_id', 'entity_type']) }} as attribution_model_result_id,
   touchpoint_occurred_at,
   'last fbclid' as attribution_model_name,
   touchpoint_batch_id,
   touchpoint_event_id,
   attributed_event_id,
-  person_id,
+  entity_id,
+  entity_type,
   attributed_event_occurred_at,
   last_fbclid as fbclid  -- Renamed for consistency
 FROM last_fbclid_attribution
@@ -625,15 +711,16 @@ FROM last_fbclid_attribution
 **First Touch Attribution:**
 
 ```sql
--- Attributes all events to the first touchpoint for each person
+-- Attributes all events to the first touchpoint for each entity
 SELECT
-  {{ nexus.create_nexus_id('attribution_model_result', ['touchpoint_batch_id', 'event_id', 'person_id']) }} as attribution_model_result_id,
+  {{ nexus.create_nexus_id('attribution_model_result', ['touchpoint_batch_id', 'event_id', 'entity_id', 'entity_type']) }} as attribution_model_result_id,
   touchpoint_occurred_at,
   'first touch' as attribution_model_name,
   touchpoint_batch_id,
   touchpoint_event_id,
   attributed_event_id,
-  person_id,
+  entity_id,
+  entity_type,
   attributed_event_occurred_at,
   first_touch_source as source,
   first_touch_medium as medium,
