@@ -1,5 +1,5 @@
 {{ config(
-    enabled=var('nexus', {}).get('segment', {}).get('enabled', false)
+    enabled=var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false)
 ) }}
 
 {%- set columns = adapter.get_columns_in_relation(ref('base_segment_all_calls')) -%}

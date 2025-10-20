@@ -3,7 +3,7 @@
 -- Follows the attribution modeling schema from exploration.md
 
 {{ config(
-    enabled=var('nexus', {}).get('segment', {}).get('enabled', false),
+    enabled=var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false),
     tags=['attribution', 'touchpoints'], 
     materialized='table'
 ) }}

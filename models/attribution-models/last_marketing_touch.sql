@@ -22,7 +22,8 @@ with touchpoint_batches as (
 web_touchpoints as (
     select
         touchpoint_batch_id,
-        person_id,
+        entity_id,
+        entity_type,
         touchpoint_occurred_at,
         touchpoint_event_id,
         -- Attribution fields (already cleaned in source touchpoints)
@@ -41,7 +42,8 @@ touchpoint_paths as (
     select 
         touchpoint_batch_id,
         event_id,
-        person_id,
+        entity_id,
+        entity_type,
         event_occurred_at
     from {{ ref('nexus_touchpoint_paths') }}
 ),
@@ -49,13 +51,14 @@ touchpoint_paths as (
 -- Final output: attribution model results with metadata
 final_output as (
     select
-        {{ nexus.create_nexus_id('attribution_model_result', ['wt.touchpoint_batch_id', 'tp.event_id', 'wt.person_id']) }} as attribution_model_result_id,
+        {{ nexus.create_nexus_id('attribution_model_result', ['wt.touchpoint_batch_id', 'tp.event_id', 'wt.entity_id', 'wt.entity_type']) }} as attribution_model_result_id,
         wt.touchpoint_occurred_at,
         'last_marketing_touch' as attribution_model_name,
         wt.touchpoint_batch_id,
         wt.touchpoint_event_id,
         tp.event_id as attributed_event_id,
-        wt.person_id,
+        wt.entity_id,
+        wt.entity_type,
         tp.event_occurred_at as attributed_event_occurred_at,
         -- Marketing attribution fields from the last touchpoint
         wt.source,
@@ -66,9 +69,10 @@ final_output as (
     from web_touchpoints wt
     inner join touchpoint_paths tp
         on wt.touchpoint_batch_id = tp.touchpoint_batch_id
-        and wt.person_id = tp.person_id
+        and wt.entity_id = tp.entity_id
+        and wt.entity_type = tp.entity_type
 )
 
 select * from final_output
-order by person_id, touchpoint_occurred_at, attributed_event_id
+order by entity_id, entity_type, touchpoint_occurred_at, attributed_event_id
 

@@ -44,8 +44,9 @@ with source_data as (
 {% for col in trait_cols %}
   {% if not loop.first %}union all{% endif %}
   select
-    {{ nexus.create_nexus_id(entity_type ~ '_trait', ['event_id', 'identifier_column', "'" ~ col ~ "'", "'" ~ (identifier_type if identifier_type is not none else identifier_column) ~ "'"]) }} as {{ entity_type }}_trait_id,
+    {{ nexus.create_nexus_id('entity_trait', ['event_id', 'identifier_column', "'" ~ entity_type ~ "'", "'" ~ col ~ "'", "'" ~ (identifier_type if identifier_type is not none else identifier_column) ~ "'"]) }} as entity_trait_id,
     event_id,
+    '{{ entity_type }}' as entity_type,
     {% if identifier_type is not none %}
     '{{ identifier_type }}' as identifier_type,
     {% else %}

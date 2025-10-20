@@ -18,36 +18,38 @@ with touchpoint_batches as (
     select * from {{ ref('nexus_touchpoint_path_batches') }}
 ),
 
--- Create a complete timeline for each person with all batches
-person_timeline as (
+-- Create a complete timeline for each entity with all batches
+entity_timeline as (
     select
         touchpoint_batch_id,
-        person_id,
+        entity_id,
+        entity_type,
         touchpoint_occurred_at,
         touchpoint_event_id,
         fbclid,
         row_number() over (
-            partition by person_id 
+            partition by entity_id, entity_type 
             order by touchpoint_occurred_at
         ) as batch_sequence
     from touchpoint_batches
 ),
 
--- Use window function to carry forward the last fbclid for each person
+-- Use window function to carry forward the last fbclid for each entity
 last_fbclid_attribution as (
     select
         touchpoint_batch_id,
-        person_id,
+        entity_id,
+        entity_type,
         touchpoint_occurred_at,
         touchpoint_event_id,
         fbclid,
-        -- Carry forward the last non-null fbclid for this person
+        -- Carry forward the last non-null fbclid for this entity
         last_value(fbclid ignore nulls) over (
-            partition by person_id 
+            partition by entity_id, entity_type 
             order by touchpoint_occurred_at
             rows between unbounded preceding and current row
         ) as last_fbclid
-    from person_timeline
+    from entity_timeline
 ),
 
 -- Join with nexus_touchpoint_paths to get all event_ids for each batch
@@ -55,7 +57,8 @@ touchpoint_paths as (
     select 
         touchpoint_batch_id,
         event_id,
-        person_id,
+        entity_id,
+        entity_type,
         event_occurred_at
     from {{ ref('nexus_touchpoint_paths') }}
 ),
@@ -63,20 +66,22 @@ touchpoint_paths as (
 -- Final output: attribution model results with metadata
 final_output as (
     select
-        {{ nexus.create_nexus_id('attribution_model_result', ['lf.touchpoint_batch_id', 'tp.event_id', 'lf.person_id']) }} as attribution_model_result_id,
+        {{ nexus.create_nexus_id('attribution_model_result', ['lf.touchpoint_batch_id', 'tp.event_id', 'lf.entity_id', 'lf.entity_type']) }} as attribution_model_result_id,
         lf.touchpoint_occurred_at,
         'last_fbclid' as attribution_model_name,
         lf.touchpoint_batch_id,
         lf.touchpoint_event_id,
         tp.event_id as attributed_event_id,
-        lf.person_id,
+        lf.entity_id,
+        lf.entity_type,
         tp.event_occurred_at as attributed_event_occurred_at,
         lf.last_fbclid as fbclid
     from last_fbclid_attribution lf
     inner join touchpoint_paths tp
         on lf.touchpoint_batch_id = tp.touchpoint_batch_id
-        and lf.person_id = tp.person_id
+        and lf.entity_id = tp.entity_id
+        and lf.entity_type = tp.entity_type
 )
 
 select * from final_output
-order by person_id, touchpoint_occurred_at, attributed_event_id
+order by entity_id, entity_type, touchpoint_occurred_at, attributed_event_id

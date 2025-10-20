@@ -1,10 +1,10 @@
--- Person traits for Segment identify events
+-- Entity traits for Segment identify events
 -- Uses nexus.unpivot_traits to extract person traits
--- Follows nexus person traits schema pattern
+-- Follows nexus entity traits schema pattern
 
 {{ config(
-    enabled=var('nexus', {}).get('segment', {}).get('enabled', false),
-    tags=['identity-resolution', 'persons'], 
+    enabled=var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false),
+    tags=['identity-resolution', 'entities'], 
     materialized='table'
 ) }}
 
@@ -15,7 +15,6 @@
     identifier_type='segment_anonymous_id',
     event_id_field='event_id',
     additional_columns=['occurred_at', "'segment' as source"],
-
     entity_type='person'
 ) }}
 
