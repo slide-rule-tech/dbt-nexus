@@ -1,10 +1,10 @@
--- Person identifiers for Segment identify events
+-- Entity identifiers for Segment identify events
 -- Uses nexus.unpivot_identifiers to extract person identifiers
--- Follows nexus person identifiers schema pattern
+-- Follows nexus entity identifiers schema pattern
 
 {{ config(
-    enabled=var('nexus', {}).get('segment', {}).get('enabled', false),
-    tags=['identity-resolution', 'persons'], 
+    enabled=var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false),
+    tags=['identity-resolution', 'entities'], 
     materialized='table'
 ) }}
 

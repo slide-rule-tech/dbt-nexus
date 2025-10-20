@@ -147,26 +147,36 @@ models:
               config:
                 severity: error
 
-  - name: segment_person_identifiers
+  - name: segment_entity_identifiers
     description:
-      "Unified Segment person identifiers table containing all person
+      "Unified Segment entity identifiers table containing all person
       identifiers from tracks, pages, and identifies"
     tests:
       - unique:
-          column_name: person_identifier_id
+          column_name: entity_identifier_id
           config:
             severity: error
     columns:
-      - name: person_identifier_id
-        description: "Unique identifier for the person identifier record"
+      - name: entity_identifier_id
+        description: "Unique identifier for the entity identifier record"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_idfr_%'"
+              expression: "like 'ent_idfr_%'"
               config:
                 severity: warn
+      - name: entity_type
+        description: "Type of entity (person)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["person"]
+              config:
+                severity: error
       - name: event_id
         description: "Reference to the source event"
         tests:
@@ -184,17 +194,17 @@ models:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_edg_%'"
+              expression: "like 'ent_edg_%'"
               config:
                 severity: warn
       - name: identifier_type
-        description: "Type of person identifier"
+        description: "Type of entity identifier"
         tests:
           - not_null:
               config:
                 severity: error
       - name: identifier_value
-        description: "Value of the person identifier"
+        description: "Value of the entity identifier"
         tests:
           - not_null:
               config:
@@ -216,26 +226,36 @@ models:
               config:
                 severity: error
 
-  - name: segment_person_traits
+  - name: segment_entity_traits
     description:
-      "Unified Segment person traits table containing all person traits from
+      "Unified Segment entity traits table containing all person traits from
       tracks, pages, and identifies"
     tests:
       - unique:
-          column_name: person_trait_id
+          column_name: entity_trait_id
           config:
             severity: error
     columns:
-      - name: person_trait_id
-        description: "Unique identifier for the person trait record"
+      - name: entity_trait_id
+        description: "Unique identifier for the entity trait record"
         tests:
           - not_null:
               config:
                 severity: error
           - dbt_utils.expression_is_true:
-              expression: "like 'per_tr_%'"
+              expression: "like 'ent_tr_%'"
               config:
                 severity: warn
+      - name: entity_type
+        description: "Type of entity (person)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["person"]
+              config:
+                severity: error
       - name: event_id
         description: "Reference to the source event"
         tests:
@@ -247,25 +267,25 @@ models:
               config:
                 severity: warn
       - name: identifier_type
-        description: "Type of person identifier this trait belongs to"
+        description: "Type of entity identifier this trait belongs to"
         tests:
           - not_null:
               config:
                 severity: error
       - name: identifier_value
-        description: "Value of the person identifier this trait belongs to"
+        description: "Value of the entity identifier this trait belongs to"
         tests:
           - not_null:
               config:
                 severity: error
       - name: trait_name
-        description: "Name of the person trait"
+        description: "Name of the entity trait"
         tests:
           - not_null:
               config:
                 severity: error
       - name: trait_value
-        description: "Value of the person trait"
+        description: "Value of the entity trait"
         tests:
           - not_null:
               config:

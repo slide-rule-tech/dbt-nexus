@@ -1,16 +1,16 @@
 ---
 title: Segment Template Source
-tags: [template-sources, segment, configuration, attribution]
+tags: [template-sources, segment, configuration, attribution, v0.3.0]
 summary:
-  Ready-to-use Segment integration for events, person identifiers, person
-  traits, and attribution touchpoints
+  Ready-to-use Segment integration for events, entity identifiers, entity
+  traits, and attribution touchpoints with v0.3.0 entity-centric architecture
 ---
 
 # Segment Template Source
 
 The Segment template source provides a complete integration for Segment
-analytics data, enabling event tracking, person identification, and attribution
-analysis within the dbt-nexus framework.
+analytics data, enabling event tracking, entity identification, and attribution
+analysis within the dbt-nexus v0.3.0 entity-centric framework.
 
 ## Overview
 
@@ -23,10 +23,11 @@ This template source processes Segment data from three main event types:
 ## Features
 
 - ✅ **Event Processing**: Unified event tracking across all Segment event types
-- ✅ **Person Identification**: Multi-identifier person resolution
-- ✅ **Person Traits**: User attribute and trait management
+- ✅ **Entity Identification**: Multi-identifier entity resolution (person entities)
+- ✅ **Entity Traits**: User attribute and trait management
 - ✅ **Attribution Analysis**: UTM parameter and click ID tracking
 - ✅ **Touchpoint Modeling**: Attribution touchpoint identification
+- ✅ **v0.3.0 Compatible**: Entity-centric architecture with unified entity models
 
 ## Configuration
 
@@ -37,8 +38,15 @@ Enable the Segment template source in your `dbt_project.yml`:
 ```yaml
 vars:
   nexus:
-    segment:
-      enabled: true
+    sources:
+      segment:
+        enabled: true
+        events: true
+        entities: ["person"]
+        attribution: true  # If using touchpoints
+    segment:  # Keep for backward compatibility with unpivot macros
+      identifiers: ['email', 'user_id']  # Optional: specify custom identifiers
+      traits: ['name', 'company']        # Optional: specify custom traits
 ```
 
 ### Multiple Segment Sources
@@ -233,25 +241,27 @@ identifies).
 - `event_name`: Specific event name
 - `source`: Source system (segment)
 
-#### `segment_person_identifiers`
+#### `segment_entity_identifiers`
 
-Person identifiers from all Segment event types.
+Entity identifiers from all Segment event types (person entities only).
 
 **Key Fields:**
 
-- `person_identifier_id`: Unique identifier record ID
+- `entity_identifier_id`: Unique identifier record ID
+- `entity_type`: Entity type (always 'person' for Segment)
 - `event_id`: Reference to source event
 - `identifier_type`: Type of identifier (segment_anonymous_id, user_id, email)
 - `identifier_value`: Identifier value
 - `occurred_at`: Timestamp when captured
 
-#### `segment_person_traits`
+#### `segment_entity_traits`
 
-Person traits and attributes from Segment events.
+Entity traits and attributes from Segment events (person entities only).
 
 **Key Fields:**
 
-- `person_trait_id`: Unique trait record ID
+- `entity_trait_id`: Unique trait record ID
+- `entity_type`: Entity type (always 'person' for Segment)
 - `event_id`: Reference to source event
 - `trait_name`: Name of the trait
 - `trait_value`: Trait value
@@ -397,10 +407,11 @@ select
     pi.identifier_type,
     pi.identifier_value
 from {{ ref('segment_events') }} e
-join {{ ref('segment_person_identifiers') }} pi
+join {{ ref('segment_entity_identifiers') }} pi
     on e.event_id = pi.event_id
 where pi.identifier_type = 'user_id'
     and pi.identifier_value = 'user_123'
+    and pi.entity_type = 'person'
 order by e.occurred_at desc
 ```
 
@@ -425,7 +436,7 @@ dbt test --select package:nexus segment
 
 **Models Not Building**
 
-- Ensure `nexus.segment.enabled: true` in your project configuration
+- Ensure `nexus.sources.segment.enabled: true` in your project configuration
 - Verify Segment source tables exist and are accessible
 - Check that both `database` and `schema` are configured (no defaults for
   Segment)
@@ -483,12 +494,44 @@ from {{ ref('segment_touchpoints') }}
 group by channel, touchpoint_type
 ```
 
+## v0.3.0 Entity-Centric Migration
+
+The Segment template source has been updated for dbt-nexus v0.3.0 with entity-centric architecture:
+
+### Key Changes
+
+- **Model Names**: `segment_person_identifiers` → `segment_entity_identifiers`
+- **Model Names**: `segment_person_traits` → `segment_entity_traits`
+- **Field Names**: `person_identifier_id` → `entity_identifier_id`
+- **Field Names**: `person_trait_id` → `entity_trait_id`
+- **New Field**: `entity_type` (always 'person' for Segment)
+- **Configuration**: `nexus.segment.enabled` → `nexus.sources.segment.enabled`
+
+### Migration Steps
+
+1. **Update Configuration**: Change to new `nexus.sources.segment` structure
+2. **Update References**: Update any custom models referencing old model names
+3. **Add Entity Type Filtering**: Add `entity_type = 'person'` to queries if needed
+4. **Test Migration**: Run `dbt run --select segment_entity_identifiers segment_entity_traits`
+
+### Backward Compatibility
+
+The `nexus.segment` configuration namespace is preserved for the unpivot macros, so existing identifier and trait configurations continue to work.
+
+### Architecture Notes
+
+Unlike other template sources (Gmail, Google Calendar), Segment uses a simplified architecture:
+- **No intermediate/union layers**: Direct entity models without four-layer structure
+- **Person-only entities**: `entity_type='person'` is hardcoded (no groups)
+- **No relationships**: Segment doesn't track entity-to-entity relationships
+- **Simplified structure**: Maintains Segment's flat, straightforward approach
+
 ## Migration from Legacy Sources
 
 If migrating from a legacy Segment source implementation:
 
 1. **Backup Current Implementation**: Save existing models and tests
-2. **Enable Template Source**: Set `nexus.segment.enabled: true`
+2. **Enable Template Source**: Set `nexus.sources.segment.enabled: true`
 3. **Test Migration**: Run `dbt run --select package:nexus segment`
 4. **Update References**: Update any custom models referencing old source models
 5. **Remove Legacy Files**: Delete old Segment source files
