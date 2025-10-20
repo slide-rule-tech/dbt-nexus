@@ -18,16 +18,13 @@ batches as (
 batches_with_attribution as (
     select 
         b.touchpoint_batch_id,
-        b.touchpoint_id,
         b.entity_id,
         b.entity_type,
         b.touchpoint_occurred_at,
         b.last_event_occurred_at,
         b.events_in_batch,
-        t.touchpoint_event_id,
-        t.occurred_at,
-        t.touchpoint_type,
-        t.attribution_deduplication_key
+        -- Attribution columns from nexus_touchpoints
+        t.*
     from batches b
     inner join {{ ref('nexus_touchpoints') }} t on b.touchpoint_id = t.touchpoint_id
 )

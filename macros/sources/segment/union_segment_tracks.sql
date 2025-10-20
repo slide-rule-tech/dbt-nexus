@@ -1,5 +1,5 @@
 {%- macro union_segment_tracks() -%}
-    {% if var('nexus', {}).get('segment', {}).get('enabled', false) and var('segment_sources', []) | length > 0 %}
+    {% if var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false) and var('segment_sources', []) | length > 0 %}
         {% set segment_tracks = [] %}
         {% set segment_sources = var("segment_sources") %}
         {% for segment_source in segment_sources %}

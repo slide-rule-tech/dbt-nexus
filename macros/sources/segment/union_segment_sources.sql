@@ -1,8 +1,8 @@
 {%- macro union_segment_sources(table_name) -%}
-    {% if var('nexus', {}).get('segment', {}).get('enabled', false) and var('segment_sources', []) | length > 0 %}
+    {% if var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false) and var('segment_sources', []) | length > 0 %}
         {% set segment_call_sources = [] %}
         {% for segment_source in var("segment_sources") %}
-            {% set actual_table_name = var('nexus', {}).get('segment', {}).get('location', {}).get('tables', {}).get(table_name, table_name.upper()) %}
+            {% set actual_table_name = var('nexus', {}).get('sources', {}).get('segment', {}).get('location', {}).get('tables', {}).get(table_name, table_name.upper()) %}
             {% do segment_call_sources.append(source(segment_source.name, actual_table_name)) %}
         {% endfor %}
 
