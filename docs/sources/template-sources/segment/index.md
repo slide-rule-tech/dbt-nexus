@@ -23,11 +23,13 @@ This template source processes Segment data from three main event types:
 ## Features
 
 - ✅ **Event Processing**: Unified event tracking across all Segment event types
-- ✅ **Entity Identification**: Multi-identifier entity resolution (person entities)
+- ✅ **Entity Identification**: Multi-identifier entity resolution (person
+  entities)
 - ✅ **Entity Traits**: User attribute and trait management
 - ✅ **Attribution Analysis**: UTM parameter and click ID tracking
 - ✅ **Touchpoint Modeling**: Attribution touchpoint identification
-- ✅ **v0.3.0 Compatible**: Entity-centric architecture with unified entity models
+- ✅ **v0.3.0 Compatible**: Entity-centric architecture with unified entity
+  models
 
 ## Configuration
 
@@ -43,10 +45,10 @@ vars:
         enabled: true
         events: true
         entities: ["person"]
-        attribution: true  # If using touchpoints
-    segment:  # Keep for backward compatibility with unpivot macros
-      identifiers: ['email', 'user_id']  # Optional: specify custom identifiers
-      traits: ['name', 'company']        # Optional: specify custom traits
+        attribution: true # If using touchpoints
+    segment: # Keep for backward compatibility with unpivot macros
+      identifiers: ["email", "user_id"] # Optional: specify custom identifiers
+      traits: ["name", "company"] # Optional: specify custom traits
 ```
 
 ### Multiple Segment Sources
@@ -496,7 +498,8 @@ group by channel, touchpoint_type
 
 ## v0.3.0 Entity-Centric Migration
 
-The Segment template source has been updated for dbt-nexus v0.3.0 with entity-centric architecture:
+The Segment template source has been updated for dbt-nexus v0.3.0 with
+entity-centric architecture:
 
 ### Key Changes
 
@@ -511,17 +514,23 @@ The Segment template source has been updated for dbt-nexus v0.3.0 with entity-ce
 
 1. **Update Configuration**: Change to new `nexus.sources.segment` structure
 2. **Update References**: Update any custom models referencing old model names
-3. **Add Entity Type Filtering**: Add `entity_type = 'person'` to queries if needed
-4. **Test Migration**: Run `dbt run --select segment_entity_identifiers segment_entity_traits`
+3. **Add Entity Type Filtering**: Add `entity_type = 'person'` to queries if
+   needed
+4. **Test Migration**: Run
+   `dbt run --select segment_entity_identifiers segment_entity_traits`
 
 ### Backward Compatibility
 
-The `nexus.segment` configuration namespace is preserved for the unpivot macros, so existing identifier and trait configurations continue to work.
+The `nexus.segment` configuration namespace is preserved for the unpivot macros,
+so existing identifier and trait configurations continue to work.
 
 ### Architecture Notes
 
-Unlike other template sources (Gmail, Google Calendar), Segment uses a simplified architecture:
-- **No intermediate/union layers**: Direct entity models without four-layer structure
+Unlike other template sources (Gmail, Google Calendar), Segment uses a
+simplified architecture:
+
+- **No intermediate/union layers**: Direct entity models without four-layer
+  structure
 - **Person-only entities**: `entity_type='person'` is hardcoded (no groups)
 - **No relationships**: Segment doesn't track entity-to-entity relationships
 - **Simplified structure**: Maintains Segment's flat, straightforward approach
