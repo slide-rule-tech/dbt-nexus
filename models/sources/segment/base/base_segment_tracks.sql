@@ -1,5 +1,5 @@
 {{ config(
-    enabled=var('nexus', {}).get('segment', {}).get('enabled', false)
+    enabled=var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false)
 ) }}
 
 {{ nexus.join_and_rename_or_drop(

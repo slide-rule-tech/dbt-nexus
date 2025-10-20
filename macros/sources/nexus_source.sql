@@ -1,5 +1,5 @@
 {% macro nexus_source(source_name, table_name=none) %}
-  {%- set source_config = var('nexus', {}).get(source_name, {}) -%}
+  {%- set source_config = var('nexus', {}).get('sources', {}).get(source_name, {}) -%}
   {%- set location = source_config.get('location', {}) -%}
   
   {%- set schema_name = location.get('schema', source_name) -%}

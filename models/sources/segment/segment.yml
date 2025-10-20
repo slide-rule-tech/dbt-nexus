@@ -2,16 +2,16 @@ version: 2
 
 sources:
   - name:
-      "{{ var('nexus', {}).get('segment', {}).get('location', {}).get('schema',
-      'segment_disabled') }}"
+      "{{ var('nexus', {}).get('sources', {}).get('segment', {}).get('location',
+      {}).get('schema', 'segment_disabled') }}"
     description: "Segment live data warehouse tables"
     database:
-      "{{ var('nexus', {}).get('segment', {}).get('location',
+      "{{ var('nexus', {}).get('sources', {}).get('segment', {}).get('location',
       {}).get('database', '') }}"
     tables:
       - name:
-          "{{ var('nexus', {}).get('segment', {}).get('location',
-          {}).get('tables', {}).get('tracks', 'TRACKS') }}"
+          "{{ var('nexus', {}).get('sources', {}).get('segment',
+          {}).get('location', {}).get('tables', {}).get('tracks', 'TRACKS') }}"
         description: "Segment track events"
         columns:
           - name: event_id
@@ -31,8 +31,8 @@ sources:
           - name: received_at
             description: "When event was received"
       - name:
-          "{{ var('nexus', {}).get('segment', {}).get('location',
-          {}).get('tables', {}).get('pages', 'PAGES') }}"
+          "{{ var('nexus', {}).get('sources', {}).get('segment',
+          {}).get('location', {}).get('tables', {}).get('pages', 'PAGES') }}"
         description: "Segment page events"
         columns:
           - name: event_id
@@ -52,8 +52,9 @@ sources:
           - name: received_at
             description: "When event was received"
       - name:
-          "{{ var('nexus', {}).get('segment', {}).get('location',
-          {}).get('tables', {}).get('identifies', 'IDENTIFIES') }}"
+          "{{ var('nexus', {}).get('sources', {}).get('segment',
+          {}).get('location', {}).get('tables', {}).get('identifies',
+          'IDENTIFIES') }}"
         description: "Segment identify events"
         columns:
           - name: event_id
@@ -71,9 +72,9 @@ sources:
           - name: received_at
             description: "When event was received"
       - name:
-          "{{ var('nexus', {}).get('segment', {}).get('location',
-          {}).get('tables', {}).get('appointment_form_submitted',
-          'APPOINTMENT_FORM_SUBMITTED') }}"
+          "{{ var('nexus', {}).get('sources', {}).get('segment',
+          {}).get('location', {}).get('tables',
+          {}).get('appointment_form_submitted', 'APPOINTMENT_FORM_SUBMITTED') }}"
         description: "Appointment form submission events"
         columns:
           - name: event_id
