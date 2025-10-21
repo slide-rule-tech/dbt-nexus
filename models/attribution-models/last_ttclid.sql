@@ -1,17 +1,17 @@
 {{ config(
-    enabled=var('nexus', {}).get('attribution_models', {}).get('last_fbclid', {}).get('enabled', false),
+    enabled=var('nexus', {}).get('attribution_models', {}).get('last_ttclid', {}).get('enabled', false),
     materialized='table', 
-    tags=['attribution', 'fbclid', 'template-attribution-model']
+    tags=['attribution', 'ttclid', 'template-attribution-model']
 ) }}
 
 {#
-This model finds the last fbclid for each batch by looking back through 
+This model finds the last ttclid for each batch by looking back through 
 the person's touchpoint history. For each batch, it identifies the most 
-recent previous batch (for the same person) that contains an fbclid value.
+recent previous batch (for the same person) that contains a ttclid value.
 
-The approach uses a window function to find the most recent previous batch with fbclid
-for each person, then assigns that fbclid to all subsequent batches until 
-a new fbclid is encountered.
+The approach uses a window function to find the most recent previous batch with ttclid
+for each person, then assigns that ttclid to all subsequent batches until 
+a new ttclid is encountered.
 #}
 
 with touchpoint_batches as (
@@ -26,7 +26,7 @@ entity_timeline as (
         entity_type,
         touchpoint_occurred_at,
         touchpoint_event_id,
-        fbclid,
+        ttclid,
         row_number() over (
             partition by entity_id, entity_type 
             order by touchpoint_occurred_at
@@ -34,21 +34,21 @@ entity_timeline as (
     from touchpoint_batches
 ),
 
--- Use window function to carry forward the last fbclid for each entity
-last_fbclid_attribution as (
+-- Use window function to carry forward the last ttclid for each entity
+last_ttclid_attribution as (
     select
         touchpoint_batch_id,
         entity_id,
         entity_type,
         touchpoint_occurred_at,
         touchpoint_event_id,
-        fbclid,
-        -- Carry forward the last non-null fbclid for this entity
-        last_value(fbclid ignore nulls) over (
+        ttclid,
+        -- Carry forward the last non-null ttclid for this entity
+        last_value(ttclid ignore nulls) over (
             partition by entity_id, entity_type 
             order by touchpoint_occurred_at
             rows between unbounded preceding and current row
-        ) as last_fbclid
+        ) as last_ttclid
     from entity_timeline
 ),
 
@@ -66,23 +66,23 @@ touchpoint_paths as (
 -- Final output: attribution model results with metadata
 final_output as (
     select
-        {{ nexus.create_nexus_id('attribution_model_result', ['lf.touchpoint_batch_id', 'tp.event_id', 'lf.entity_id', 'lf.entity_type']) }} as attribution_model_result_id,
-        lf.touchpoint_occurred_at,
-        'last_fbclid' as attribution_model_name,
-        lf.touchpoint_batch_id,
-        lf.touchpoint_event_id,
+        {{ nexus.create_nexus_id('attribution_model_result', ['lt.touchpoint_batch_id', 'tp.event_id', 'lt.entity_id', 'lt.entity_type']) }} as attribution_model_result_id,
+        lt.touchpoint_occurred_at,
+        'last_ttclid' as attribution_model_name,
+        lt.touchpoint_batch_id,
+        lt.touchpoint_event_id,
         tp.event_id as attributed_event_id,
-        lf.entity_id,
-        lf.entity_type,
+        lt.entity_id,
+        lt.entity_type,
         tp.event_occurred_at as attributed_event_occurred_at,
-        lf.last_fbclid as fbclid
-    from last_fbclid_attribution lf
+        lt.last_ttclid as ttclid
+    from last_ttclid_attribution lt
     inner join touchpoint_paths tp
-        on lf.touchpoint_batch_id = tp.touchpoint_batch_id
-        and lf.entity_id = tp.entity_id
-        and lf.entity_type = tp.entity_type
+        on lt.touchpoint_batch_id = tp.touchpoint_batch_id
+        and lt.entity_id = tp.entity_id
+        and lt.entity_type = tp.entity_type
 )
 
 select * from final_output
-where fbclid is not null
+where ttclid is not null
 order by entity_id, entity_type, touchpoint_occurred_at, attributed_event_id
