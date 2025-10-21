@@ -71,6 +71,18 @@ touchpoint_events as (
             else null
         end as gclid,
         
+        case 
+            when context_page_search like '%ttclid=%' then 
+                regexp_substr(context_page_search, 'ttclid=([^&]+)', 1, 1, 'e')
+            else null
+        end as ttclid,
+        
+        case 
+            when context_page_search like '%li_fat_id=%' then 
+                regexp_substr(context_page_search, 'li_fat_id=([^&]+)', 1, 1, 'e')
+            else null
+        end as li_fat_id,
+        
 
     from segment_events
     
@@ -84,6 +96,8 @@ touchpoint_events as (
         -- Click IDs present
         or context_page_search like '%fbclid=%'
         or context_page_search like '%gclid=%'
+        or context_page_search like '%ttclid=%'
+        or context_page_search like '%li_fat_id=%'
         
         -- Referrer present (for referral attribution) - exclude internal referrers
         or (context_page_referrer is not null 
@@ -121,9 +135,11 @@ final as (
         -- Click tracking IDs
         fbclid,
         gclid,
+        ttclid,
+        li_fat_id,
         
 
-        {{ nexus.create_nexus_id('attribution_deduplication_key', ['source', 'medium', 'campaign', 'content', 'term', 'referrer',  'fbclid', 'gclid']) }} as attribution_deduplication_key,
+        {{ nexus.create_nexus_id('attribution_deduplication_key', ['source', 'medium', 'campaign', 'content', 'term', 'referrer',  'fbclid', 'gclid', 'ttclid', 'li_fat_id']) }} as attribution_deduplication_key,
         
     
     from touchpoint_events
