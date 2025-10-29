@@ -28,6 +28,8 @@ with recursive recursive_components as (
     join {{ ref(edges_table) }} e
       on rc.identifier_type  = e.identifier_type_a
      and rc.identifier_value = e.identifier_value_a
+     and e.entity_type_a = '{{ entity_type }}'
+     and e.entity_type_b = '{{ entity_type }}'
     -- Use string operations to check for cycles
     where not contains(rc.path, e.identifier_type_b || ':' || e.identifier_value_b)
     and rc.recursion_level < {{ max_recursion }}

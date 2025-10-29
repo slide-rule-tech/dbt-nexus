@@ -31,6 +31,8 @@ with recursive recursive_components as (
     join {{ ref(edges_table) }} e
       on rc.identifier_type  = e.identifier_type_a
      and rc.identifier_value = e.identifier_value_a
+     and e.entity_type_a = '{{ entity_type }}'
+     and e.entity_type_b = '{{ entity_type }}'
     where not exists (
       select 1
       from unnest(rc.path) p
