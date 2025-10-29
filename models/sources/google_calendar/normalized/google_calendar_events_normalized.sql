@@ -6,9 +6,11 @@
 
 -- Normalized layer: Clean, deduplicated events with explicit columns
 -- Extracts data from new STANDARD_TABLE_SCHEMA with _raw_record
+-- Uses iCalUID for cross-account deduplication (like Message-ID for Gmail)
 WITH source_data AS (
     SELECT
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
+        JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
         _ingested_at,
         _connection_id,
         _stream_id,
@@ -16,12 +18,25 @@ WITH source_data AS (
         _sync_token,
         _raw_record
     FROM {{ ref('google_calendar_events_base') }}
+    WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+      AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
 ),
 
 extracted AS (
     SELECT
         -- Event identifiers
         calendar_event_id,
+        ical_uid,
+        
+        -- Determine instanceStart for recurring events
+        -- Priority: originalStartTime.dateTime > start.dateTime > start.date
+        CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 
+            COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            )
+        ) AS TIMESTAMP) as instance_start,
         
         -- Event details
         JSON_EXTRACT_SCALAR(_raw_record, '$.summary') as summary,
@@ -49,6 +64,16 @@ extracted AS (
             WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.start.date') IS NOT NULL THEN true
             ELSE false
         END as is_all_day,
+        
+        -- Check if it's a recurring event
+        -- Event is recurring if:
+        -- 1. recurringEventId exists (it's an instance of a recurring event), OR
+        -- 2. recurrence array exists (it's the master recurring event)
+        CASE 
+            WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') IS NOT NULL THEN true
+            WHEN JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence') IS NOT NULL AND ARRAY_LENGTH(JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence')) > 0 THEN true
+            ELSE false
+        END as is_recurring,
         
         -- Determine if meeting has external attendees (for event classification)
         (
@@ -80,11 +105,28 @@ extracted AS (
         _sync_token,
         'google_calendar' as source
     FROM source_data
-    WHERE calendar_event_id IS NOT NULL
+),
+
+-- Create composite key for deduplication
+-- For recurring events: ical_uid + instance_start
+-- For single events: ical_uid (or ical_uid + start_time + end_time for extra safety)
+with_composite_key AS (
+    SELECT
+        *,
+        -- Use iCalUID as primary key for single events
+        -- Use iCalUID + instanceStart for recurring events
+        CASE 
+            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS STRING))
+            ELSE ical_uid
+        END as event_key
+    FROM extracted
 )
 
 SELECT 
+    event_key as event_id,
+    ical_uid,
     calendar_event_id,
+    instance_start,
     summary,
     description,
     location,
@@ -92,6 +134,7 @@ SELECT
     start_time,
     end_time,
     is_all_day,
+    is_recurring,
     has_external_attendees,
     _ingested_at,
     raw_record,
@@ -100,8 +143,8 @@ SELECT
     _sync_timestamp,
     _sync_token,
     source
-FROM extracted
--- Deduplication: keep latest event per calendar_event_id
-QUALIFY row_number() OVER (PARTITION BY calendar_event_id ORDER BY start_time DESC) = 1
+FROM with_composite_key
+-- Deduplication: keep latest event per event_key (iCalUID for single, iCalUID + instanceStart for recurring)
+QUALIFY row_number() OVER (PARTITION BY event_key ORDER BY _ingested_at DESC) = 1
 ORDER BY start_time DESC
 

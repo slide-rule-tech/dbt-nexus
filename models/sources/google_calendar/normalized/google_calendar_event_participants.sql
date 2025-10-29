@@ -6,9 +6,19 @@
 
 -- Normalized participants: Extract, parse, and normalize all participants (organizer, creator, attendees) from Google Calendar events
 -- Creates one row per participant per event, with role indicating "organizer", "creator", or "attendee"
+-- Uses iCalUID + instanceStart for cross-account deduplication (like Message-ID for Gmail)
 WITH source_data AS (
     SELECT
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
+        JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
+        -- Determine instanceStart for recurring events
+        CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 
+            COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            )
+        ) AS TIMESTAMP) as instance_start,
         -- Parse start_time for event timing
         CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 
             COALESCE(
@@ -16,16 +26,39 @@ WITH source_data AS (
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
             )
         ) AS TIMESTAMP) as start_time,
+        -- Check if it's a recurring event
+        CASE 
+            WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') IS NOT NULL THEN true
+            WHEN JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence') IS NOT NULL AND ARRAY_LENGTH(JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence')) > 0 THEN true
+            ELSE false
+        END as is_recurring,
         _ingested_at,
         _raw_record
     FROM {{ ref('google_calendar_events_base') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+      AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
+),
+
+-- Create composite key matching events table
+with_event_key AS (
+    SELECT
+        *,
+        -- Use iCalUID as primary key for single events
+        -- Use iCalUID + instanceStart for recurring events
+        CASE 
+            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS STRING))
+            ELSE ical_uid
+        END as event_id
+    FROM source_data
 ),
 
 -- Extract and normalize organizer
 organizer_raw AS (
     SELECT
+        event_id,
+        ical_uid,
         calendar_event_id,
+        instance_start,
         start_time,
         _ingested_at,
         JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') as participant_raw,
@@ -37,14 +70,17 @@ organizer_raw AS (
         'organizer' as role,
         JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.displayName') as display_name,
         CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.self') AS BOOL) as is_self
-    FROM source_data
+    FROM with_event_key
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') != ''
 ),
 
 organizer_normalized AS (
     SELECT
+        event_id,
+        ical_uid,
         calendar_event_id,
+        instance_start,
         start_time,
         _ingested_at,
         participant_raw,
@@ -54,9 +90,9 @@ organizer_normalized AS (
         role,
         display_name,
         is_self,
-        NULL as response_status,
-        NULL as is_optional,
-        NULL as is_organizer
+        CAST(NULL AS STRING) as response_status,
+        CAST(NULL AS BOOL) as is_optional,
+        CAST(NULL AS BOOL) as is_organizer
     FROM organizer_raw
     WHERE {{ nexus.validate_and_normalize_email('parsed_email') }} IS NOT NULL
 ),
@@ -64,7 +100,10 @@ organizer_normalized AS (
 -- Extract and normalize creator
 creator_raw AS (
     SELECT
+        event_id,
+        ical_uid,
         calendar_event_id,
+        instance_start,
         start_time,
         _ingested_at,
         JSON_EXTRACT_SCALAR(_raw_record, '$.creator.email') as participant_raw,
@@ -75,18 +114,21 @@ creator_raw AS (
         ) as participant_name,
         'creator' as role,
         JSON_EXTRACT_SCALAR(_raw_record, '$.creator.displayName') as display_name,
-        NULL as is_self,
-        NULL as response_status,
-        NULL as is_optional,
-        NULL as is_organizer
-    FROM source_data
+        CAST(NULL AS BOOL) as is_self,
+        CAST(NULL AS STRING) as response_status,
+        CAST(NULL AS BOOL) as is_optional,
+        CAST(NULL AS BOOL) as is_organizer
+    FROM with_event_key
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.creator.email') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.creator.email') != ''
 ),
 
 creator_normalized AS (
     SELECT
+        event_id,
+        ical_uid,
         calendar_event_id,
+        instance_start,
         start_time,
         _ingested_at,
         participant_raw,
@@ -106,7 +148,10 @@ creator_normalized AS (
 -- Extract and normalize attendees
 attendees_raw AS (
     SELECT
+        s.event_id,
+        s.ical_uid,
         s.calendar_event_id,
+        s.instance_start,
         s.start_time,
         s._ingested_at,
         JSON_EXTRACT_SCALAR(attendee, '$.email') as participant_raw,
@@ -121,7 +166,7 @@ attendees_raw AS (
         JSON_EXTRACT_SCALAR(attendee, '$.responseStatus') as response_status,
         CAST(JSON_EXTRACT_SCALAR(attendee, '$.optional') AS BOOL) as is_optional,
         CAST(JSON_EXTRACT_SCALAR(attendee, '$.organizer') AS BOOL) as is_organizer
-    FROM source_data s,
+    FROM with_event_key s,
     UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.attendees')) as attendee
     WHERE JSON_EXTRACT_SCALAR(attendee, '$.email') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(attendee, '$.email') != ''
@@ -129,7 +174,10 @@ attendees_raw AS (
 
 attendees_normalized AS (
     SELECT
+        event_id,
+        ical_uid,
         calendar_event_id,
+        instance_start,
         start_time,
         _ingested_at,
         participant_raw,
@@ -156,7 +204,10 @@ participants_combined AS (
 )
 
 SELECT 
+    event_id,
+    ical_uid,
     calendar_event_id,
+    instance_start,
     participant_raw,
     TRIM(
         REGEXP_REPLACE(
@@ -171,7 +222,7 @@ SELECT
     start_time,
     _ingested_at
 FROM participants_combined
-ORDER BY calendar_event_id, 
+ORDER BY event_id, 
     CASE role 
         WHEN 'organizer' THEN 1
         WHEN 'creator' THEN 2

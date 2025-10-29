@@ -11,8 +11,8 @@ WITH participants AS (
 
 participants_with_event_id AS (
     SELECT 
-        {{ nexus.create_nexus_id('event', ['calendar_event_id', 'start_time']) }} as event_id,
-        calendar_event_id,
+        {{ nexus.create_nexus_id('event', ['event_id']) }} as nexus_event_id,
+        event_id,
         email,
         start_time,
         _ingested_at,
@@ -23,9 +23,9 @@ participants_with_event_id AS (
 
 identifiers AS (
     SELECT 
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'email', "'person'", 'role']) }} as entity_identifier_id,
-        event_id,
-        event_id as edge_id,
+        {{ nexus.create_nexus_id('entity_identifier', ['nexus_event_id', 'email', "'person'", 'role']) }} as entity_identifier_id,
+        nexus_event_id as event_id,
+        nexus_event_id as edge_id,
         'person' as entity_type,
         'email' as identifier_type,
         email as identifier_value,

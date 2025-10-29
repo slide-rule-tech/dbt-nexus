@@ -9,15 +9,27 @@ WITH participants AS (
     SELECT * FROM {{ ref('google_calendar_event_participants') }}
 ),
 
+participants_with_nexus_event_id AS (
+    SELECT
+        {{ nexus.create_nexus_id('event', ['event_id']) }} as nexus_event_id,
+        event_id,
+        start_time,
+        email,
+        domain,
+        role
+    FROM participants
+),
+
 -- Extract participants with valid email and domain (filter generic domains)
 participants_with_domains AS (
     SELECT
-        {{ nexus.create_nexus_id('event', ['calendar_event_id', 'start_time']) }} as event_id,
+        nexus_event_id,
+        event_id,
         start_time,
         email as entity_a_identifier,
         domain as entity_b_identifier,
         role
-    FROM participants
+    FROM participants_with_nexus_event_id
     WHERE email IS NOT NULL
       AND domain IS NOT NULL
       AND {{ filter_non_generic_domains('domain') }}
@@ -27,7 +39,7 @@ participants_with_domains AS (
 -- Create relationships
 relationships AS (
     SELECT DISTINCT
-        event_id,
+        nexus_event_id as event_id,
         start_time as occurred_at,
         entity_a_identifier,
         'email' as entity_a_identifier_type,
