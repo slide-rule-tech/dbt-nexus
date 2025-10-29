@@ -12,13 +12,11 @@ sources:
           "{{ var('nexus', {}).get('google_calendar', {}).get('location',
           {}).get('table', 'google_calendar_events') }}"
         description: "Raw Google Calendar events from Nango sync"
-        columns:
-          - name: record
-            description: "JSON record from Google Calendar API"
-            data_type: json
-          - name: synced_at
-            description: "Timestamp when the record was synced"
-            data_type: timestamp
+      - name: calendars
+        identifier:
+          "{{ var('nexus', {}).get('google_calendar', {}).get('location',
+          {}).get('table', 'google_calendar_calendars') }}"
+        description: "Raw Google Calendar calendars from Nango sync"
 
 models:
   # Union Layer - Events
