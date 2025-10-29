@@ -9,22 +9,36 @@
 -- Uses iCalUID for cross-account deduplication (like Message-ID for Gmail)
 WITH source_data AS (
     SELECT
-        JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
-        JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
-        _ingested_at,
-        _connection_id,
-        _stream_id,
-        _sync_timestamp,
-        _sync_token,
-        _raw_record
-    FROM {{ ref('google_calendar_events_base') }}
-    WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
-      AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
+        e._raw_record,
+        JSON_EXTRACT_SCALAR(e._raw_record, '$.id') as calendar_event_id,
+        JSON_EXTRACT_SCALAR(e._raw_record, '$.iCalUID') as ical_uid,
+        JSON_EXTRACT_SCALAR(e._raw_record, '$.organizer.email') as organizer_email,
+        e._ingested_at,
+        e._connection_id,
+        e._stream_id,
+        e._sync_timestamp,
+        e._sync_token,
+        -- Get calendar_id by joining to calendars table
+        -- Try matching on _stream_id first, then organizer.email
+        COALESCE(
+            cal_stream.calendar_id,
+            cal_organizer.calendar_id,
+            e._stream_id  -- Fallback to stream_id if join doesn't match
+        ) as calendar_id
+    FROM {{ ref('google_calendar_events_base') }} e
+    LEFT JOIN {{ ref('google_calendar_calendars') }} cal_stream
+        ON e._stream_id = cal_stream.calendar_id
+    LEFT JOIN {{ ref('google_calendar_calendars') }} cal_organizer
+        ON JSON_EXTRACT_SCALAR(e._raw_record, '$.organizer.email') = cal_organizer.calendar_id
+        AND cal_stream.calendar_id IS NULL  -- Only use if stream match didn't work
+    WHERE JSON_EXTRACT_SCALAR(e._raw_record, '$.id') IS NOT NULL
+      AND JSON_EXTRACT_SCALAR(e._raw_record, '$.iCalUID') IS NOT NULL
 ),
 
 extracted AS (
     SELECT
         -- Event identifiers
+        calendar_id,
         calendar_event_id,
         ical_uid,
         
@@ -124,6 +138,7 @@ with_composite_key AS (
 
 SELECT 
     event_key as event_id,
+    calendar_id,
     ical_uid,
     calendar_event_id,
     instance_start,

@@ -23,6 +23,7 @@ SELECT
     source,
     _ingested_at,
     event_id as calendar_event_key,
+    calendar_id,
     ical_uid,
     calendar_event_id,
     instance_start,
