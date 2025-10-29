@@ -1,13 +1,36 @@
 version: 2
 
 sources:
-  - name:
+  - name: gmail
+    schema:
       "{{ var('nexus', {}).get('gmail', {}).get('location', {}).get('schema',
       'gmail') }}"
     tables:
-      - name:
+      - name: messages
+        identifier:
           "{{ var('nexus', {}).get('gmail', {}).get('location', {}).get('table',
-          'messages') }}"
+          'gmail_messages') }}"
+        description:
+          "Raw Gmail messages from Convex ingestion with STANDARD_TABLE_SCHEMA"
+        columns:
+          - name: _ingested_at
+            description: "Timestamp when record was ingested"
+            data_type: timestamp
+          - name: _connection_id
+            description: "Nango connection ID"
+            data_type: string
+          - name: _stream_id
+            description: "Stream identifier (e.g., 'default')"
+            data_type: string
+          - name: _raw_record
+            description: "Raw JSON record containing Gmail message data"
+            data_type: json
+          - name: _sync_timestamp
+            description: "Timestamp-based cursor for incremental sync"
+            data_type: timestamp
+          - name: _sync_token
+            description: "Token-based cursor (history ID) for incremental sync"
+            data_type: string
 
 models:
   # Union Layer Tests - Events

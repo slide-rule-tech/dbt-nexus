@@ -4,64 +4,39 @@
     tags=['nexus', 'google_calendar', 'intermediate', 'person_identifiers']
 ) }}
 
--- Extract person identifiers from Google Calendar events
-WITH google_calendar_event_events AS (
-    SELECT * FROM {{ ref('google_calendar_event_events') }}
+-- Extract person identifiers from google calendar event participants
+WITH participants AS (
+    SELECT * FROM {{ ref('google_calendar_event_participants') }}
 ),
 
-organizer_identifiers AS (
+participants_with_event_id AS (
     SELECT 
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'organizer.email', "'person'", "'organizer'"]) }} as entity_identifier_id,
-        event_id,
-        event_id as edge_id,
-        'person' as entity_type,
-        'email' as identifier_type,
-        organizer.email as identifier_value,
-        'organizer' as role,
-        'google_calendar' as source,
-        occurred_at,
-        _ingested_at
-    FROM google_calendar_event_events
-    WHERE organizer.email IS NOT NULL
-    AND organizer.email != ''
+        {{ nexus.create_nexus_id('event', ['calendar_event_id', 'start_time']) }} as event_id,
+        calendar_event_id,
+        email,
+        start_time,
+        _ingested_at,
+        role
+    FROM participants
+    WHERE email IS NOT NULL
 ),
 
-creator_identifiers AS (
+identifiers AS (
     SELECT 
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'creator.email', "'person'", "'creator'"]) }} as entity_identifier_id,
+        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'email', "'person'", 'role']) }} as entity_identifier_id,
         event_id,
         event_id as edge_id,
         'person' as entity_type,
         'email' as identifier_type,
-        creator.email as identifier_value,
-        'creator' as role,
+        email as identifier_value,
         'google_calendar' as source,
-        occurred_at,
-        _ingested_at
-    FROM google_calendar_event_events
-    WHERE creator.email IS NOT NULL
-    AND creator.email != ''
+        start_time as occurred_at,
+        _ingested_at,
+        role
+    FROM participants_with_event_id
 ),
 
-attendee_identifiers AS (
-    SELECT
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'attendee.email', "'person'", "'attendee'"]) }} as entity_identifier_id,
-        event_id,
-        event_id as edge_id,
-        'person' as entity_type,
-        'email' as identifier_type,
-        attendee.email as identifier_value,
-        'attendee' as role,
-        'google_calendar' as source,
-        occurred_at,
-        _ingested_at
-    FROM google_calendar_event_events,
-    UNNEST(attendees) as attendee
-    WHERE attendee.email IS NOT NULL
-    AND attendee.email != ''
-),
-
--- Deduplicate in case attendees array has duplicates
+-- Deduplicate in case same person appears multiple times in same event
 deduplicated AS (
     SELECT DISTINCT
         entity_identifier_id,
@@ -70,20 +45,13 @@ deduplicated AS (
         entity_type,
         identifier_type,
         identifier_value,
-        role,
         source,
         occurred_at,
-        _ingested_at
-    FROM (
-        SELECT * FROM organizer_identifiers
-        UNION ALL
-        SELECT * FROM creator_identifiers
-        UNION ALL
-        SELECT * FROM attendee_identifiers
-    )
+        _ingested_at,
+        role
+    FROM identifiers
 )
 
 SELECT * FROM deduplicated
 WHERE identifier_value IS NOT NULL
 ORDER BY occurred_at DESC
-

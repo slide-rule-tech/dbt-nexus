@@ -5,9 +5,9 @@
 ) }}
 
 -- Extract message events from normalized gmail messages
-select
-    event_id,
-    occurred_at,
+SELECT
+    {{ nexus.create_nexus_id('event', ['message_id']) }} as event_id,
+    sent_at as occurred_at,
     'message_sent' as event_name,
     'email' as event_type,
     subject as event_description,
@@ -16,10 +16,7 @@ select
     -- Additional context
     message_id,
     thread_id,
-    sender,
-    recipients,
-    synced_at as _ingested_at
-from {{ ref('gmail_messages') }}
-where occurred_at is not null
-order by occurred_at desc
-
+    _ingested_at
+FROM {{ ref('gmail_messages') }}
+WHERE sent_at IS NOT NULL
+ORDER BY sent_at DESC

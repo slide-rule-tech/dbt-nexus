@@ -4,46 +4,37 @@
     tags=['gmail', 'intermediate', 'person_identifiers']
 ) }}
 
--- Extract person identifiers from gmail messages
-with gmail_messages as (
-    select * from {{ ref('gmail_messages') }}
+-- Extract person identifiers from gmail message participants
+WITH participants AS (
+    SELECT * FROM {{ ref('gmail_message_participants') }}
 ),
 
-sender_identifiers as (
-    select 
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'sender.email', "'person'", "'sender'"]) }} as entity_identifier_id,
+participants_with_event_id AS (
+    SELECT 
+        {{ nexus.create_nexus_id('event', ['message_id']) }} as event_id,
+        message_id,
+        email,
+        sent_at,
+        _ingested_at,
+        role
+    FROM participants
+    WHERE email IS NOT NULL
+),
+
+identifiers AS (
+    SELECT 
+        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'email', "'person'", 'role']) }} as entity_identifier_id,
         event_id,
         event_id as edge_id,
         'person' as entity_type,
         'email' as identifier_type,
-        sender.email as identifier_value,
+        email as identifier_value,
         'gmail' as source,
-        occurred_at,
-        synced_at as _ingested_at,
-        'sender' as role
-    from gmail_messages
-    where sender.email is not null
-),
-
-recipient_identifiers as (
-    select 
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'recipient.email', "'person'", "'recipient'"]) }} as entity_identifier_id,
-        event_id,
-        event_id as edge_id,
-        'person' as entity_type,
-        'email' as identifier_type,
-        recipient.email as identifier_value,
-        'gmail' as source,
-        occurred_at,
-        synced_at as _ingested_at,
-        'recipient' as role
-    from gmail_messages,
-    unnest(recipients) as recipient
-    where recipient.email is not null
+        sent_at as occurred_at,
+        _ingested_at,
+        role
+    FROM participants_with_event_id
 )
 
-select * from sender_identifiers
-union all
-select * from recipient_identifiers
-order by occurred_at desc
-
+SELECT * FROM identifiers
+ORDER BY occurred_at DESC

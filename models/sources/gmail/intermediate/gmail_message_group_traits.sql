@@ -4,47 +4,27 @@
     tags=['gmail', 'intermediate', 'group_traits']
 ) }}
 
--- Extract group (domain) traits from gmail messages
-with gmail_messages as (
-    select * from {{ ref('gmail_messages') }}
+-- Extract group (domain) traits from gmail message participants
+WITH participants AS (
+    SELECT * FROM {{ ref('gmail_message_participants') }}
 ),
 
--- Extract domains from sender emails
-sender_domains as (
-    select 
-        event_id,
-        occurred_at,
-        synced_at,
-        sender.domain as domain
-    from gmail_messages
-    where sender.domain is not null
-      and not sender.generic_domain
-),
-
--- Extract domains from recipient emails
-recipient_domains as (
-    select 
-        event_id,
-        occurred_at,
-        synced_at,
-        recipient.domain as domain
-    from gmail_messages,
-    unnest(recipients) as recipient
-    where recipient.domain is not null
-      and not recipient.generic_domain
-),
-
--- Union all domains (use DISTINCT to avoid duplicate domain per event)
-all_domains as (
-    select * from sender_domains
-    union distinct
-    select * from recipient_domains
+-- Filter out generic domains
+domains_filtered AS (
+    SELECT DISTINCT
+        {{ nexus.create_nexus_id('event', ['message_id']) }} as event_id,
+        sent_at,
+        _ingested_at,
+        domain
+    FROM participants
+    WHERE {{ filter_non_generic_domains('domain') }}
+      AND domain NOT LIKE '%>%'
 ),
 
 -- Create domain traits
-domain_traits as (
+domain_traits AS (
     -- Domain as a trait (for searchability)
-    select
+    SELECT
         {{ nexus.create_nexus_id('entity_trait', ['event_id', 'domain', "'group'", "'domain'"]) }} as entity_trait_id,
         event_id,
         'group' as entity_type,
@@ -53,12 +33,11 @@ domain_traits as (
         'domain' as trait_name,
         domain as trait_value,
         'gmail' as source,
-        occurred_at,
-        synced_at as _ingested_at
-    from all_domains
-    where domain is not null
+        sent_at as occurred_at,
+        _ingested_at
+    FROM domains_filtered
+    WHERE domain IS NOT NULL
 )
 
-select * from domain_traits
-order by occurred_at desc
-
+SELECT * FROM domain_traits
+ORDER BY occurred_at DESC

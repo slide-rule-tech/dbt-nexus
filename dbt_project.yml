@@ -44,67 +44,37 @@ vars:
   nexus:
     gmail:
       enabled: false
-      location:
-        schema: gmail
-        table: messages
-      capabilities:
-        events: true
-        persons: true
-        groups: true
-        memberships: true
 
     google_calendar:
       enabled: false
-      location:
-        schema: google_calendar
-        table: calendar_events
-      capabilities:
-        events: true
-        persons: true
-        groups: true
-        memberships: true
 
     stripe:
       enabled: false
-      location:
-        schema: stripe
-        tables:
-          invoices: stripe_invoices
-          payments: stripe_payments
-          customers: stripe_customers
-          subscriptions: stripe_subscriptions
-      capabilities:
-        events: true
-        persons: true
-        groups: true
-        memberships: true
+      tables:
+        - name: stripe_invoices
+          description: "Stripe invoices"
+        - name: stripe_payments
+          description: "Stripe payments"
+        - name: stripe_customers
+          description: "Stripe customers"
+        - name: stripe_subscriptions
+          description: "Stripe subscriptions"
 
     shopify:
       enabled: false
-      location:
-        schema: shopify_partner
-        table: app_events
-      capabilities:
-        events: true
-        persons: false
-        groups: true
-        memberships: false
+      tables:
+        - name: shopify_app_events
+          description: "Shopify app events"
 
     segment:
       enabled: false
-      location:
-        schema: segment_disabled
-        database: ""
-        tables:
-          tracks: TRACKS
-          pages: PAGES
-          identifies: IDENTIFIES
-      capabilities:
-        events: true
-        persons: true
-        groups: false
-        memberships: false
-        attribution: true
+      tables:
+        - name: segment_tracks
+          description: "Segment tracks"
+        - name: segment_pages
+          description: "Segment pages"
+        - name: segment_identifies
+          description: "Segment identifies"
       # Configurable identifiers and traits for identify events
       # Note: segment_anonymous_id is always included as it's a core Segment field
       identifiers:
