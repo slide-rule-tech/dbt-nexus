@@ -3,8 +3,14 @@ version: 2
 sources:
   - name: google_calendar
     description: "Google Calendar events synced via Nango integration"
+    schema:
+      "{{ var('nexus', {}).get('google_calendar', {}).get('location',
+      {}).get('schema', 'google_calendar') }}"
     tables:
       - name: calendar_events
+        identifier:
+          "{{ var('nexus', {}).get('google_calendar', {}).get('location',
+          {}).get('table', 'google_calendar_events') }}"
         description: "Raw Google Calendar events from Nango sync"
         columns:
           - name: record

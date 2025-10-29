@@ -4,105 +4,51 @@
     tags=['nexus', 'google_calendar', 'intermediate', 'group_traits']
 ) }}
 
--- Extract group (domain) traits from Google Calendar events
-WITH google_calendar_event_events AS (
-    SELECT * FROM {{ ref('google_calendar_event_events') }}
+-- Extract group (domain) traits from google calendar event participants
+WITH participants AS (
+    SELECT * FROM {{ ref('google_calendar_event_participants') }}
 ),
 
-organizer_domain_traits AS (
+participants_with_nexus_event_id AS (
     SELECT
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'organizer.domain', "'group'", "'domain_name'", "'organizer_domain'"]) }} as entity_trait_id,
+        {{ nexus.create_nexus_id('event', ['event_id']) }} as nexus_event_id,
         event_id,
-        'group' as entity_type,
-        'domain' as identifier_type,
-        organizer.domain as identifier_value,
-        'name' as trait_name,
-        organizer.domain as trait_value,
-        'organizer_domain' as role,
-        'google_calendar' as source,
-        occurred_at,
-        _ingested_at
-    FROM google_calendar_event_events
-    WHERE organizer.domain IS NOT NULL
-    AND organizer.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
-        '{{ domain }}'
-        {%- if not loop.last -%},{%- endif -%}
-        {%- endfor -%}
-    )
+        start_time,
+        _ingested_at,
+        domain
+    FROM participants
 ),
 
-creator_domain_traits AS (
-    SELECT
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'creator.domain', "'group'", "'domain_name'", "'creator_domain'"]) }} as entity_trait_id,
-        event_id,
-        'group' as entity_type,
-        'domain' as identifier_type,
-        creator.domain as identifier_value,
-        'name' as trait_name,
-        creator.domain as trait_value,
-        'creator_domain' as role,
-        'google_calendar' as source,
-        occurred_at,
-        _ingested_at
-    FROM google_calendar_event_events
-    WHERE creator.domain IS NOT NULL
-    AND creator.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
-        '{{ domain }}'
-        {%- if not loop.last -%},{%- endif -%}
-        {%- endfor -%}
-    )
-),
-
-attendee_domain_traits AS (
-    SELECT
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'attendee.domain', "'group'", "'domain_name'", "'attendee_domain'"]) }} as entity_trait_id,
-        event_id,
-        'group' as entity_type,
-        'domain' as identifier_type,
-        attendee.domain as identifier_value,
-        'name' as trait_name,
-        attendee.domain as trait_value,
-        'attendee_domain' as role,
-        'google_calendar' as source,
-        occurred_at,
-        _ingested_at
-    FROM google_calendar_event_events,
-    UNNEST(attendees) as attendee
-    WHERE attendee.domain IS NOT NULL
-    AND attendee.domain NOT IN (
-        {%- for domain in var('email_domain_groups_exclude_list', []) -%}
-        '{{ domain }}'
-        {%- if not loop.last -%},{%- endif -%}
-        {%- endfor -%}
-    )
-),
-
--- Deduplicate in case attendees array has duplicates
-deduplicated AS (
+-- Filter out generic domains
+domains_filtered AS (
     SELECT DISTINCT
-        entity_trait_id,
+        nexus_event_id,
         event_id,
-        entity_type,
-        identifier_type,
-        identifier_value,
-        trait_name,
-        trait_value,
-        role,
-        source,
-        occurred_at,
+        start_time,
+        _ingested_at,
+        domain
+    FROM participants_with_nexus_event_id
+    WHERE {{ filter_non_generic_domains('domain') }}
+      AND domain NOT LIKE '%>%'
+),
+
+-- Create domain traits
+domain_traits AS (
+    -- Domain as a trait (for searchability)
+    SELECT
+        {{ nexus.create_nexus_id('entity_trait', ['nexus_event_id', 'domain', "'group'", "'domain'"]) }} as entity_trait_id,
+        nexus_event_id as event_id,
+        'group' as entity_type,
+        'domain' as identifier_type,
+        domain as identifier_value,
+        'domain' as trait_name,
+        domain as trait_value,
+        'google_calendar' as source,
+        start_time as occurred_at,
         _ingested_at
-    FROM (
-        SELECT * FROM organizer_domain_traits
-        UNION ALL
-        SELECT * FROM creator_domain_traits
-        UNION ALL
-        SELECT * FROM attendee_domain_traits
-    )
+    FROM domains_filtered
+    WHERE domain IS NOT NULL
 )
 
-SELECT * FROM deduplicated
-WHERE trait_value IS NOT NULL
+SELECT * FROM domain_traits
 ORDER BY occurred_at DESC
-

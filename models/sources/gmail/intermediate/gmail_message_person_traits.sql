@@ -4,83 +4,56 @@
     tags=['gmail', 'intermediate', 'person_traits']
 ) }}
 
--- Extract person traits from gmail messages
-with gmail_messages as (
-    select * from {{ ref('gmail_messages') }}
+-- Extract person traits from gmail message participants
+WITH participants AS (
+    SELECT * FROM {{ ref('gmail_message_participants') }}
 ),
 
-sender_traits as (
-    -- Sender name trait
-    select
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'sender.email', "'person'", "'name'", "'sender'"]) }} as entity_trait_id,
-        event_id,
-        'person' as entity_type,
-        'email' as identifier_type,
-        sender.email as identifier_value,
-        'name' as trait_name,
-        sender.name as trait_value,
-        'gmail' as source,
-        occurred_at,
-        synced_at as _ingested_at
-    from gmail_messages
-    where sender.name is not null
-
-    union all
-
-    -- Sender email trait
-    select
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'sender.email', "'person'", "'email'", "'sender'"]) }} as entity_trait_id,
-        event_id,
-        'person' as entity_type,
-        'email' as identifier_type,
-        sender.email as identifier_value,
-        'email' as trait_name,
-        sender.email as trait_value,
-        'gmail' as source,
-        occurred_at,
-        synced_at as _ingested_at
-    from gmail_messages
-    where sender.email is not null
+participants_with_event_id AS (
+    SELECT 
+        {{ nexus.create_nexus_id('event', ['message_id']) }} as event_id,
+        message_id,
+        email,
+        name,
+        sent_at,
+        _ingested_at,
+        role
+    FROM participants
 ),
 
-recipient_traits as (
-    -- Recipient name trait
-    select
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'recipient.email', "'person'", "'name'", "'recipient'"]) }} as entity_trait_id,
+name_traits AS (
+    -- Person name trait
+    SELECT
+        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'name'", 'role']) }} as entity_trait_id,
         event_id,
         'person' as entity_type,
         'email' as identifier_type,
-        recipient.email as identifier_value,
+        email as identifier_value,
         'name' as trait_name,
-        recipient.name as trait_value,
+        name as trait_value,
         'gmail' as source,
-        occurred_at,
-        synced_at as _ingested_at
-    from gmail_messages,
-    unnest(recipients) as recipient
-    where recipient.name is not null
+        sent_at as occurred_at,
+        _ingested_at
+    FROM participants_with_event_id
+    WHERE name IS NOT NULL
 
-    union all
+    UNION ALL
 
-    -- Recipient email trait
-    select
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'recipient.email', "'person'", "'email'", "'recipient'"]) }} as entity_trait_id,
+    -- Person email trait
+    SELECT
+        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'email'", 'role']) }} as entity_trait_id,
         event_id,
         'person' as entity_type,
         'email' as identifier_type,
-        recipient.email as identifier_value,
+        email as identifier_value,
         'email' as trait_name,
-        recipient.email as trait_value,
+        email as trait_value,
         'gmail' as source,
-        occurred_at,
-        synced_at as _ingested_at
-    from gmail_messages,
-    unnest(recipients) as recipient
-    where recipient.email is not null
+        sent_at as occurred_at,
+        _ingested_at
+    FROM participants_with_event_id
+    WHERE email IS NOT NULL
 )
 
-select * from sender_traits
-union all
-select * from recipient_traits
-order by occurred_at desc
-
+SELECT * FROM name_traits
+ORDER BY occurred_at DESC

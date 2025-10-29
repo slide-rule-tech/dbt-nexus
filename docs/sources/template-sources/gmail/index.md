@@ -24,6 +24,10 @@ framework using the v0.3.0 entity-centric architecture:
 - **🔗 Relationships**: Links people to their organizations via email domains
   (membership type)
 - **🏷️ Entity Traits**: Captures names and email addresses for all entities
+- **🔄 Cross-Account Deduplication**: Uses `Message-ID` header to deduplicate
+  emails across multiple Gmail accounts
+- **📨 Participant Roles**: Distinguishes between `sender`, `recipient`, `cced`,
+  and `bcced` participants
 
 ## Quick Start
 
@@ -111,62 +115,193 @@ vars:
 
 ### Source Table Schema
 
-Your Gmail source table must have this structure:
+Your Gmail source table must use the **STANDARD_TABLE_SCHEMA** structure:
 
 ```sql
 CREATE TABLE `project.schema.table` (
-  record JSON,           -- Gmail message as JSON
-  synced_at TIMESTAMP    -- When the record was synced
+  _raw_record JSON NOT NULL,           -- Gmail message as JSON
+  _ingested_at TIMESTAMP NOT NULL,      -- When the record was ingested
+  _connection_id STRING NOT NULL,       -- Nango connection ID
+  _stream_id STRING NOT NULL,           -- Stream identifier (e.g., 'default')
+  _sync_timestamp TIMESTAMP,           -- Timestamp-based cursor for incremental sync
+  _sync_token STRING                    -- Token-based cursor (history ID)
 );
 ```
 
 ### Gmail Message JSON Structure
 
-The `record` column should contain Gmail API message format:
+The `_raw_record` column should contain Gmail API message format:
 
 ```json
 {
   "id": "message_id_123",
   "threadId": "thread_id_456",
-  "date": "2024-01-15T10:30:00Z",
-  "sender": "John Doe <john@company.com>",
-  "recipients": "jane@client.com, bob@partner.com",
-  "subject": "Meeting Follow-up",
-  "body": "Thanks for the great meeting..."
+  "internalDate": "1609459200000",
+  "headers": [
+    {
+      "name": "Message-ID",
+      "value": "<message-id-abc123@mail.gmail.com>"
+    },
+    {
+      "name": "Subject",
+      "value": "Meeting Follow-up"
+    },
+    {
+      "name": "From",
+      "value": "John Doe <john@company.com>"
+    },
+    {
+      "name": "To",
+      "value": "jane@client.com, bob@partner.com"
+    },
+    {
+      "name": "Cc",
+      "value": "team@company.com"
+    },
+    {
+      "name": "Bcc",
+      "value": "archive@company.com"
+    }
+  ],
+  "body_text": "Thanks for the great meeting..."
 }
 ```
 
+**Key Fields:**
+
+- `id`: Gmail-specific message ID (unique within a single account)
+- `threadId`: Thread identifier
+- `internalDate`: Unix timestamp in milliseconds
+- `headers`: Array of header objects (must include `Message-ID` for
+  deduplication)
+- `body_text`: Plain text body content
+
 ## Generated Models
 
-Gmail uses the **four-layer source architecture** for optimal DevX and
-performance:
+Gmail uses the **four-layer source architecture** with split normalized models
+for optimal performance:
 
 ### Layer 1: Base - `gmail_messages_base.sql`
 
-Transforms raw Gmail JSON into structured data.
+Simple passthrough with zero transformation overhead:
 
 **Key Features:**
 
-- Parses email addresses using `parse_gmail_email()` macro
-- Extracts names using `extract_gmail_name()` macro
-- Identifies internal vs external participants
-- Filters generic email domains
-- Creates sender/recipients STRUCTs
+- Direct `SELECT *` from source table
+- No JSON parsing or transformations
+- Minimal overhead for maximum performance
 
-### Layer 2: Normalized - `gmail_messages.sql`
+### Layer 2: Normalized - Split Structure
 
-Clean, deduplicated messages ready for processing.
+#### `gmail_messages.sql` - Message-Level Data
+
+Clean, deduplicated email messages.
+
+**Key Features:**
+
+- **Cross-Account Deduplication**: Uses `Message-ID` header as primary
+  identifier
+- **Header Extraction**: Extracts `Message-ID` and `Subject` from headers array
+- **Timestamp Conversion**: Converts `internalDate` (milliseconds) to `sent_at`
+  timestamp
+- **Thread Support**: Preserves `threadId` for conversation threading
+- **Body Content**: Extracts `body_text` and `attachments` array
+
+**Contains:**
+
+```sql
+message_id               -- Primary key from Message-ID header
+thread_id                -- Thread identifier
+gmail_message_id         -- Gmail-specific ID (from $.id)
+message_id_header        -- Message-ID header value
+sent_at                  -- Parsed timestamp from internalDate
+subject                  -- Email subject
+body                     -- Email body text
+attachments_array        -- Array of attachment objects
+_ingested_at             -- Ingestion timestamp
+raw_record               -- Full JSON record
+_connection_id           -- Nango connection ID
+_stream_id               -- Stream identifier
+_sync_timestamp          -- Sync timestamp
+_sync_token              -- Sync token (history ID)
+source                   -- "gmail"
+```
+
+**Deduplication Logic:**
+
+- Uses `Message-ID` header value as primary `message_id`
+- Deduplicates across accounts:
+  `QUALIFY row_number() OVER (PARTITION BY message_id ORDER BY sent_at DESC) = 1`
+- Only processes messages with valid `Message-ID` header
+
+**Why Message-ID instead of Gmail ID?**
+
+Gmail message IDs (`$.id`) are unique within a single account, but the same
+email appears with different IDs across different accounts. `Message-ID` is a
+standard email header that's stable across accounts, making it perfect for
+cross-account deduplication.
+
+#### `gmail_message_participants.sql` - Participant-Level Data
+
+One row per participant per message, normalized and validated.
+
+**Key Features:**
+
+- Extracts all participants from headers: `From`, `To`, `Cc`, `Bcc`
+- Uses Gmail email parsing macros for consistency
+- Normalizes email addresses using `validate_and_normalize_email()`
+- Extracts domains for group entity creation
+- Preserves participant roles: `sender`, `recipient`, `cced`, `bcced`
+
+**Contains:**
+
+```sql
+message_id               -- Message-ID header (matches gmail_messages)
+name                     -- Participant name (extracted or from header)
+email                    -- Normalized email address
+domain                   -- Extracted domain
+role                     -- "sender", "recipient", "cced", or "bcced"
+sent_at                  -- Message send time
+_ingested_at             -- Ingestion timestamp
+```
+
+**Role Types:**
+
+- `sender`: Person who sent the email (from `From` header)
+- `recipient`: Person in `To` field
+- `cced`: Person in `Cc` field
+- `bcced`: Person in `Bcc` field
+
+**Participant Extraction Pattern:**
+
+1. Extract `From` header → single sender
+2. Split `To` header by comma → multiple recipients
+3. Split `Cc` header by comma → multiple CC recipients
+4. Split `Bcc` header by comma → multiple BCC recipients
+5. Parse each email using `parse_gmail_email()` macro
+6. Extract name using `extract_gmail_name()` macro
+7. Validate and normalize using `validate_and_normalize_email()` macro
 
 ### Layer 3: Intermediate - 6 Models
 
 Separate person/group logic for better debugging and transparency:
 
-- `gmail_message_events.sql` - Message events with metadata
+- `gmail_message_events.sql` - Message events with metadata (reads from
+  `gmail_messages`)
 - `gmail_message_person_identifiers.sql` - Sender/recipient email identifiers
-- `gmail_message_group_identifiers.sql` - Domain identifiers (filtered)
-- `gmail_message_person_traits.sql` - Names and emails
-- `gmail_message_group_traits.sql` - Domain names
+  (reads from `gmail_message_participants`)
+- `gmail_message_group_identifiers.sql` - Domain identifiers filtered (reads
+  from `gmail_message_participants`)
+- `gmail_message_person_traits.sql` - Names and emails (reads from
+  `gmail_message_participants`)
+- `gmail_message_group_traits.sql` - Domain names (reads from
+  `gmail_message_participants`)
 - `gmail_message_relationship_declarations.sql` - Person→domain memberships
+  (reads from `gmail_message_participants`)
+
+**Key Pattern:** All intermediate models read directly from normalized tables
+without joins. Person/group models read from `gmail_message_participants`, event
+model reads from `gmail_messages`.
 
 ### Layer 4: Union - 4 Models (Nexus Integration)
 
@@ -179,10 +314,13 @@ Creates nexus-compatible events:
 ```sql
 event_id               -- Unique event identifier (evt_ prefix)
 event_name             -- "message_sent"
-occurred_at            -- Email send time
+occurred_at            -- Email send time (sent_at)
 event_description      -- Email subject
 event_type             -- "email"
 source                 -- "gmail"
+_ingested_at           -- Ingestion timestamp
+message_id             -- Message-ID header
+thread_id              -- Thread identifier
 ```
 
 #### `gmail_entity_identifiers`
@@ -196,15 +334,16 @@ edge_id                -- Groups related identifiers
 entity_type            -- "person" or "group"
 identifier_type        -- "email" or "domain"
 identifier_value       -- Email address or domain
-role                   -- "sender", "recipient", "sender_domain", "recipient_domain"
+role                   -- Participation role (see below)
 occurred_at            -- Email timestamp
 source                 -- "gmail"
+_ingested_at           -- Ingestion timestamp
 ```
 
 **Role Types:**
 
-- Person roles: `sender`, `recipient`
-- Group roles: `sender_domain`, `recipient_domain`
+- Person roles: `sender`, `recipient`, `cced`, `bcced`
+- Group roles: `sender`, `recipient`, `cced`, `bcced` (for domain tracking)
 
 #### `gmail_entity_traits`
 
@@ -216,11 +355,11 @@ event_id               -- Reference to email event
 entity_type            -- "person" or "group"
 identifier_type        -- "email" or "domain"
 identifier_value       -- Email address or domain
-trait_name             -- "name", "email", or "name" (for domains)
+trait_name             -- "name", "email" (for persons) or "domain_name" (for domains)
 trait_value            -- The trait value
-role                   -- Role in the email
 occurred_at            -- Email timestamp
 source                 -- "gmail"
+_ingested_at           -- Ingestion timestamp
 ```
 
 #### `gmail_relationship_declarations`
@@ -234,7 +373,7 @@ occurred_at                  -- Email timestamp
 entity_a_identifier          -- Person email address
 entity_a_identifier_type     -- "email"
 entity_a_type                -- "person"
-entity_a_role                -- "member"
+entity_a_role                -- "sender", "recipient", "cced", or "bcced"
 entity_b_identifier          -- Email domain
 entity_b_identifier_type     -- "domain"
 entity_b_type                -- "group"
@@ -251,6 +390,52 @@ source                       -- "gmail"
 - aol.com, icloud.com, me.com, live.com, msn.com
 - googlemail.com, ymail.com, rocketmail.com, protonmail.com
 - mail.com, zoho.com
+
+## Cross-Account Deduplication
+
+Gmail uses the `Message-ID` header for cross-account deduplication:
+
+### Message-ID Header
+
+- **Primary Key**: `Message-ID` header value from email headers
+- **Deduplication**: Messages with the same `Message-ID` across different Gmail
+  accounts are treated as the same email
+- **Use Case**: Same email appearing in sender's and all recipients' inboxes
+
+### Deduplication Logic
+
+```sql
+-- Extract Message-ID header
+message_id_header = (
+  SELECT JSON_EXTRACT_SCALAR(header, '$.value')
+  FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+  WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'message-id'
+  LIMIT 1
+)
+
+-- Use Message-ID as primary identifier
+-- Deduplicate keeping latest by sent_at
+QUALIFY row_number() OVER (
+  PARTITION BY message_id
+  ORDER BY sent_at DESC
+) = 1
+```
+
+This ensures the same email (identified by `Message-ID`) appearing in multiple
+Gmail accounts is only counted once, while preserving all participant
+information from each account's perspective.
+
+### Why Not Gmail Message ID?
+
+Gmail message IDs (`$.id`) are account-specific. The same email has different
+IDs when it appears in:
+
+- Sender's Sent folder
+- Recipient's Inbox
+- CC recipient's Inbox
+
+`Message-ID` is standardized by RFC 2822 and is consistent across all accounts,
+making it the perfect deduplication key.
 
 ## Integration Examples
 
@@ -270,7 +455,8 @@ SELECT
     e.event_description as subject,
     sender.email as from_email,
     sender.name as from_name,
-    customer.email as customer_email
+    customer.email as customer_email,
+    ei.role as customer_role
 FROM {{ ref('nexus_events') }} e
 JOIN {{ ref('nexus_entity_identifiers') }} ei ON e.event_id = ei.event_id
 JOIN customer ON ei.identifier_value = customer.email
@@ -294,6 +480,8 @@ SELECT
     g.name as domain,
     COUNT(DISTINCT e.event_id) as email_count,
     COUNT(DISTINCT p.entity_id) as unique_people,
+    COUNT(DISTINCT CASE WHEN ei.role = 'sender' THEN p.entity_id END) as senders,
+    COUNT(DISTINCT CASE WHEN ei.role = 'recipient' THEN p.entity_id END) as recipients,
     MIN(e.occurred_at) as first_contact,
     MAX(e.occurred_at) as last_contact
 FROM {{ ref('nexus_events') }} e
@@ -308,9 +496,46 @@ JOIN {{ ref('nexus_relationships') }} r
 JOIN {{ ref('nexus_entities') }} p
     ON r.entity_a_id = p.entity_id
     AND p.entity_type = 'person'
+JOIN {{ ref('nexus_entity_identifiers') }} ei
+    ON ei.event_id = e.event_id
+    AND ei.identifier_value = p.email
 WHERE e.source = 'gmail'
 GROUP BY g.entity_id, g.name
 ORDER BY email_count DESC;
+```
+
+### Participant Role Analysis
+
+```sql
+-- Analyze email participation patterns by role
+SELECT
+    role,
+    COUNT(DISTINCT message_id) as message_count,
+    COUNT(DISTINCT email) as unique_participants,
+    COUNT(*) as total_participations
+FROM {{ ref('gmail_message_participants') }}
+WHERE sent_at >= CURRENT_DATE - INTERVAL 30 DAY
+GROUP BY role
+ORDER BY total_participations DESC;
+```
+
+### Thread Conversation Analysis
+
+```sql
+-- Analyze email threads with participant counts
+SELECT
+    thread_id,
+    COUNT(DISTINCT message_id) as message_count,
+    COUNT(DISTINCT email) as unique_participants,
+    ARRAY_AGG(DISTINCT subject ORDER BY sent_at LIMIT 1)[OFFSET(0)] as thread_subject,
+    MIN(sent_at) as thread_start,
+    MAX(sent_at) as thread_end
+FROM {{ ref('gmail_message_participants') }} p
+JOIN {{ ref('gmail_messages') }} m ON p.message_id = m.message_id
+WHERE sent_at >= CURRENT_DATE - INTERVAL 90 DAY
+GROUP BY thread_id
+HAVING message_count > 1
+ORDER BY thread_start DESC;
 ```
 
 ## Performance Considerations
@@ -326,18 +551,21 @@ models:
     sources:
       gmail:
         +materialized: incremental
-        +unique_key: event_id
-        +cluster_by: ["occurred_at"]
+        +unique_key: message_id
+        +cluster_by: ["sent_at"]
 ```
 
-### Filtering
+### Partitioning (BigQuery)
 
-Use real-time event filtering for specific messages:
+Optimize time-based queries:
 
 ```yaml
-# dbt_project.yml
-vars:
-  realtime_event_id: ["msg_123", "msg_456"] # Process specific messages
+models:
+  nexus:
+    sources:
+      gmail:
+        +partition_by:
+          { "field": "sent_at", "data_type": "timestamp", "granularity": "day" }
 ```
 
 ## Troubleshooting
@@ -347,68 +575,159 @@ vars:
 **1. No Gmail events appearing**
 
 - Check `nexus.gmail.enabled: true` is set
-- Verify source table exists and has data
-- Ensure `internal_domains` is configured
+- Verify source table exists with STANDARD_TABLE_SCHEMA structure
+- Ensure `Message-ID` header is present in raw JSON records
+- Verify source data has the expected JSON structure
 
 **2. Missing email participants**
 
-- Check that sender/recipient emails are not null in source data
+- Check that `From`, `To`, `Cc`, `Bcc` headers are not null/empty in source data
 - Verify email parsing macros are working correctly
+- Ensure participant normalization is enabled
 
 **3. Generic domains appearing as groups**
 
 - Review the generic domain filter list
 - Add additional generic domains if needed
+- Verify `filter_non_generic_domains()` macro is working
+
+**4. Duplicate emails across accounts**
+
+- Verify `Message-ID` header is being extracted correctly
+- Check that deduplication QUALIFY clause is working
+- Ensure all messages have valid `Message-ID` headers
 
 ### Debugging Queries
 
 ```sql
 -- Check raw source data
-SELECT * FROM {{ nexus_source('gmail', 'messages') }} LIMIT 5;
+SELECT
+    _raw_record,
+    _ingested_at,
+    _connection_id,
+    _stream_id
+FROM {{ source('gmail', 'messages') }}
+LIMIT 5;
 
 -- Verify base model processing
-SELECT * FROM {{ ref('gmail_messages_base') }} LIMIT 5;
-
--- Check email parsing
-SELECT
-    sender_raw,
-    sender.email as parsed_email,
-    sender.name as parsed_name
-FROM {{ ref('gmail_messages_base') }}
+SELECT * FROM {{ ref('gmail_messages_base') }}
 LIMIT 10;
+
+-- Check normalized messages with deduplication
+SELECT
+    message_id,
+    gmail_message_id,
+    subject,
+    sent_at,
+    thread_id
+FROM {{ ref('gmail_messages') }}
+ORDER BY sent_at DESC
+LIMIT 10;
+
+-- Verify participants extraction
+SELECT
+    message_id,
+    email,
+    role,
+    domain
+FROM {{ ref('gmail_message_participants') }}
+LIMIT 20;
+
+-- Check Message-ID extraction
+SELECT
+    message_id,
+    gmail_message_id,
+    message_id_header,
+    COUNT(*) as count
+FROM {{ ref('gmail_messages') }}
+GROUP BY message_id, gmail_message_id, message_id_header
+HAVING count > 1;
 ```
 
-## Migration from Custom Gmail Models
+## Advanced Configuration
 
-### 1. **Compare Data Structure**
+### Custom Email Filtering
 
-Ensure your Gmail data matches the expected JSON format
+Filter specific messages or domains:
 
-### 2. **Configure Template Source**
+```sql
+-- Filter to external emails only
+SELECT * FROM {{ ref('gmail_messages') }} m
+WHERE EXISTS (
+    SELECT 1 FROM {{ ref('gmail_message_participants') }} p
+    WHERE p.message_id = m.message_id
+      AND p.domain NOT IN ('yourcompany.com')
+);
+```
 
-Point the template source to your existing data
+### Header Extraction
 
-### 3. **Test Processing**
+Add custom header extraction:
 
-Run the template source and verify output quality
+```sql
+-- Extract custom headers in normalized model
+(SELECT JSON_EXTRACT_SCALAR(header, '$.value')
+ FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+ WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'custom-header'
+ LIMIT 1) as custom_header_value
+```
 
-### 4. **Update Dependencies**
+## Migration Guide
 
-Update any models that referenced your custom Gmail models
+### From Custom Gmail Models
 
-### 5. **Remove Custom Models**
+If you have existing custom Gmail models:
 
-Delete your custom Gmail source models
+1. **Backup Current Models**: Save your existing logic
+2. **Compare Schemas**: Ensure data compatibility with STANDARD_TABLE_SCHEMA
+3. **Verify Message-ID**: Ensure your source data includes `Message-ID` in
+   headers
+4. **Enable Template Source**: Configure to point to your data
+5. **Test Output**: Verify data quality, deduplication, and completeness
+6. **Update References**: Change refs to use template models
+7. **Remove Custom Models**: Clean up old source models
 
-## Next Steps
+### Schema Compatibility
 
-- **[Google Calendar Template Source](../google_calendar/)** - Add calendar data
-- **[Custom Source Creation](../../how-to/custom-sources.md)** - Build your own
-  sources
-- **[Advanced Configuration](../../reference/configuration.md)** - Fine-tune
-  settings
-- **[Performance Optimization](../../explanations/performance.md)** - Scale to
-  production
+Ensure your Gmail data includes:
+
+- Message `id` and `threadId`
+- `internalDate` for timestamp
+- `headers` array with at least `Message-ID`, `From`, `To` headers
+- `body_text` for email content
+- Optional: `Cc`, `Bcc` headers for participant extraction
+
+### STANDARD_TABLE_SCHEMA Migration
+
+If migrating from old schema with `record` and `synced_at`:
+
+```sql
+-- Example migration query
+CREATE OR REPLACE TABLE `new_table` AS
+SELECT
+    old_record as _raw_record,
+    synced_at as _ingested_at,
+    'connection_123' as _connection_id,
+    'default' as _stream_id,
+    synced_at as _sync_timestamp,
+    NULL as _sync_token
+FROM `old_table`;
+```
+
+### Handling Missing Message-ID
+
+If some messages lack `Message-ID` headers:
+
+```sql
+-- Option 1: Use Gmail ID as fallback
+COALESCE(
+    message_id_header,
+    CONCAT('gmail_', gmail_message_id)
+) as message_id
+
+-- Option 2: Filter out messages without Message-ID
+WHERE message_id_header IS NOT NULL
+```
 
 ---
 
