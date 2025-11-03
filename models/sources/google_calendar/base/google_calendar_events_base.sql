@@ -6,4 +6,4 @@
 
 -- Base layer: Raw table with zero transformation overhead
 SELECT * 
-FROM {{ source('google_calendar', 'calendar_events') }}
+FROM {{ source('google_calendar', 'events') }}
