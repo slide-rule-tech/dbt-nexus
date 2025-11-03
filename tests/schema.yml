@@ -7,3 +7,11 @@ tests:
       fields"
     config:
       severity: error
+
+  - name: test_edge_quality_thresholds
+    description:
+      "Ensures no identifier has more connections than the error threshold. This
+      prevents problematic edges that can cause massive over-merging and
+      performance issues in identity resolution."
+    config:
+      severity: error

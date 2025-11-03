@@ -38,49 +38,15 @@ seeds:
       +schema: demo_raw
 
 vars:
-  nexus_max_recursion: 5
-
   # Nexus source configuration
   nexus:
-    gmail:
-      enabled: false
-
-    google_calendar:
-      enabled: false
-
-    stripe:
-      enabled: false
-      tables:
-        - name: stripe_invoices
-          description: "Stripe invoices"
-        - name: stripe_payments
-          description: "Stripe payments"
-        - name: stripe_customers
-          description: "Stripe customers"
-        - name: stripe_subscriptions
-          description: "Stripe subscriptions"
-
-    shopify:
-      enabled: false
-      tables:
-        - name: shopify_app_events
-          description: "Shopify app events"
-
-    segment:
-      enabled: false
-      tables:
-        - name: segment_tracks
-          description: "Segment tracks"
-        - name: segment_pages
-          description: "Segment pages"
-        - name: segment_identifies
-          description: "Segment identifies"
-      # Configurable identifiers and traits for identify events
-      # Note: segment_anonymous_id is always included as it's a core Segment field
-      identifiers:
-        - email
-      traits:
-        - email
+    max_recursion: 5
+    edge_quality:
+      critical_threshold: 50
+      critical_autofilter: false
+      error_threshold: 20
+      error_autofilter: false
+      warning_threshold: 10
 
   # Attribution models configuration
   attribution_models:
