@@ -4,18 +4,23 @@ sources:
   - name: google_calendar
     description: "Google Calendar events synced via Nango integration"
     schema:
-      "{{ var('nexus', {}).get('google_calendar', {}).get('location',
+      "{{ var('nexus', {}).get('sources', {}).get('google_calendar',
       {}).get('schema', 'google_calendar') }}"
+    database:
+      "{{ var('nexus', {}).get('sources', {}).get('google_calendar',
+      {}).get('database', '') }}"
     tables:
-      - name: calendar_events
+      - name: events
         identifier:
-          "{{ var('nexus', {}).get('google_calendar', {}).get('location',
-          {}).get('table', 'google_calendar_events') }}"
-        description: "Raw Google Calendar events from Nango sync"
+          "{{ var('nexus', {}).get('sources', {}).get('google_calendar',
+          {}).get('tables', {}).get('events', {}).get('identifier',
+          'google_calendar_calendars') }}"
+        description: "Raw Google Calendar calendars from Nango sync"
       - name: calendars
         identifier:
-          "{{ var('nexus', {}).get('google_calendar', {}).get('location',
-          {}).get('table', 'google_calendar_calendars') }}"
+          "{{ var('nexus', {}).get('sources', {}).get('google_calendar',
+          {}).get('tables', {}).get('calendars', {}).get('identifier',
+          'google_calendar_calendars') }}"
         description: "Raw Google Calendar calendars from Nango sync"
 
 models:

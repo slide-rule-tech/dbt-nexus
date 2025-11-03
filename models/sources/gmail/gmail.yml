@@ -3,13 +3,16 @@ version: 2
 sources:
   - name: gmail
     schema:
-      "{{ var('nexus', {}).get('gmail', {}).get('location', {}).get('schema',
+      "{{ var('nexus', {}).get('sources', {}).get('gmail', {}).get('schema',
       'gmail') }}"
+    database:
+      "{{ var('nexus', {}).get('sources', {}).get('gmail', {}).get('database',
+      '') }}"
     tables:
       - name: messages
         identifier:
-          "{{ var('nexus', {}).get('gmail', {}).get('location', {}).get('table',
-          'gmail_messages') }}"
+          "{{ var('nexus', {}).get('sources', {}).get('gmail', {}).get('tables',
+          {}).get('messages', {}).get('identifier', 'gmail_messages') }}"
         description:
           "Raw Gmail messages from Convex ingestion with STANDARD_TABLE_SCHEMA"
         columns:
