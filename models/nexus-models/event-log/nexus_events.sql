@@ -36,7 +36,8 @@
         'SIGNIFICANCE': dbt.type_float(),
         'SOURCE': dbt.type_string(),
         'SOURCE_TABLE': dbt.type_string(),
-        'SYNCED_AT': dbt.type_timestamp()
+        '_INGESTED_AT': dbt.type_timestamp(),
+        '_PROCESSED_AT': dbt.type_timestamp()
     } %}
 {% else %}
     {% set column_overrides = {
@@ -50,7 +51,8 @@
         'significance': dbt.type_float(),
         'source': dbt.type_string(),
         'source_table': dbt.type_string(),
-        'synced_at': dbt.type_timestamp()
+        '_ingested_at': dbt.type_timestamp(),
+        '_processed_at': dbt.type_timestamp()
     } %}
 {% endif %}
 
@@ -66,7 +68,8 @@
     {'name': 'significance', 'type': 'float'},
     {'name': 'source', 'type': 'string'},
     {'name': 'source_table', 'type': 'string'},
-    {'name': 'synced_at', 'type': 'timestamp'}
+    {'name': '_ingested_at', 'type': 'timestamp'},
+    {'name': '_processed_at', 'type': 'timestamp'}
 ] %}
 
 {# Get all columns from all relations to check what exists #}
@@ -112,19 +115,23 @@ WITH unioned AS (
 
 SELECT
     {# Select available columns and add NULLs for missing ones #}
+    {% set processed_columns = [] %}
     {% for desired_col in desired_columns -%}
-        {% if desired_col.name.lower() in all_columns %}
-            {{ desired_col.name.lower() }}
-        {% else %}
-            {% if desired_col.type == 'float' %}
-                CAST(NULL AS {{ dbt.type_float() }}) AS {{ desired_col.name.lower() }}
-            {% elif desired_col.type == 'timestamp' %}
-                CAST(NULL AS {{ dbt.type_timestamp() }}) AS {{ desired_col.name.lower() }}
+        {% if desired_col.name != '_processed_at' %}
+            {% if desired_col.name.lower() in all_columns %}
+                {% do processed_columns.append(desired_col.name.lower()) %}
             {% else %}
-                CAST(NULL AS {{ dbt.type_string() }}) AS {{ desired_col.name.lower() }}
+                {% if desired_col.type == 'float' %}
+                    {% do processed_columns.append('CAST(NULL AS ' ~ dbt.type_float() ~ ') AS ' ~ desired_col.name.lower()) %}
+                {% elif desired_col.type == 'timestamp' %}
+                    {% do processed_columns.append('CAST(NULL AS ' ~ dbt.type_timestamp() ~ ') AS ' ~ desired_col.name.lower()) %}
+                {% else %}
+                    {% do processed_columns.append('CAST(NULL AS ' ~ dbt.type_string() ~ ') AS ' ~ desired_col.name.lower()) %}
+                {% endif %}
             {% endif %}
         {% endif %}
-        {%- if not loop.last %},{% endif %}
     {% endfor %}
+    {{ processed_columns | join(',\n    ') }},
+    current_timestamp() as _processed_at
 FROM unioned 
 ORDER BY occurred_at DESC

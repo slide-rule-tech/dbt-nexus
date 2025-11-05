@@ -308,6 +308,121 @@ Common patterns and examples for using Nexus MCP tools with the unified entity a
 }
 ```
 
+### Filtering by Timestamp Fields
+
+#### Events Recently Processed
+```json
+{
+  "tool": "nexus_search_events",
+  "arguments": {
+    "filters": [
+      {
+        "column": "_processed_at",
+        "operator": ">",
+        "value": "2024-01-15T00:00:00Z"
+      }
+    ],
+    "orderBy": [
+      {
+        "column": "_processed_at",
+        "direction": "DESC"
+      }
+    ]
+  }
+}
+```
+
+#### Entities Recently Updated
+```json
+{
+  "tool": "nexus_list_entities",
+  "arguments": {
+    "entity_type": "person",
+    "filters": [
+      {
+        "column": "_updated_at",
+        "operator": ">",
+        "value": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "orderBy": [
+      {
+        "column": "_updated_at",
+        "direction": "DESC"
+      }
+    ]
+  }
+}
+```
+
+#### Entities Created Recently
+```json
+{
+  "tool": "nexus_list_entities",
+  "arguments": {
+    "entity_type": "person",
+    "filters": [
+      {
+        "column": "_created_at",
+        "operator": ">",
+        "value": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "orderBy": [
+      {
+        "column": "_created_at",
+        "direction": "DESC"
+      }
+    ]
+  }
+}
+```
+
+#### Entities with Recent Interactions
+```json
+{
+  "tool": "nexus_list_entities",
+  "arguments": {
+    "entity_type": "person",
+    "filters": [
+      {
+        "column": "last_interaction_at",
+        "operator": ">",
+        "value": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "orderBy": [
+      {
+        "column": "last_interaction_at",
+        "direction": "DESC"
+      }
+    ]
+  }
+}
+```
+
+#### Relationships Recently Updated
+```json
+{
+  "tool": "nexus_list_memberships",
+  "arguments": {
+    "filters": [
+      {
+        "column": "_updated_at",
+        "operator": ">",
+        "value": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "orderBy": [
+      {
+        "column": "_updated_at",
+        "direction": "DESC"
+      }
+    ]
+  }
+}
+```
+
 ## Pagination
 
 ### Paginated List

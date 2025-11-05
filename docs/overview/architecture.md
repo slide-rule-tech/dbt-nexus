@@ -36,7 +36,7 @@ graph TD
 - **Purpose**: Direct ingestion from source systems with minimal transformation
 - **Characteristics**:
   - Preserves original data structure
-  - Applies incremental filtering based on `synced_at`
+  - Applies incremental filtering based on `_ingested_at`
   - Adds `_ingested_at` tracking
   - Isolates downstream models from source changes
 
