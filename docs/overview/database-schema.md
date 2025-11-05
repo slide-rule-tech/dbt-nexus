@@ -67,7 +67,8 @@ The diagram is organized into color-coded sections:
 | `source`            | STRING    | Source system name            | ✅       | e.g., 'gmail', 'shopify_partner'       |
 | `value`             | NUMERIC   | Numeric value (if applicable) | ❌       | e.g., transaction amount               |
 | `value_unit`        | STRING    | Unit of the value field       | ❌       | e.g., 'USD', 'count'                   |
-| `_ingested_at`      | TIMESTAMP | When dbt processed the record | ✅       | System timestamp                       |
+| `_ingested_at`      | TIMESTAMP | When data was synced to warehouse | ✅       | From source models                     |
+| `_processed_at`     | TIMESTAMP | When dbt last built the model | ✅       | Runtime timestamp                      |
 
 #### Column Naming Strategy
 
@@ -222,7 +223,12 @@ Other entity types follow their own schema.
 | `company_name`    | STRING    | Organization name (groups)      | ❌       | Most recent, group entities only    |
 | `industry`        | STRING    | Industry (groups)               | ❌       | Most recent, group entities only    |
 | `primary_source`  | STRING    | Source with earliest identifier | ✅       | Source attribution                  |
-| `last_updated_at` | TIMESTAMP | When entity was last updated    | ✅       | Most recent trait timestamp         |
+| `_processed_at`   | TIMESTAMP | When dbt last built the model   | ✅       | Runtime timestamp                   |
+| `_updated_at`     | TIMESTAMP | When entity data last changed   | ✅       | Max of trait occurred_at            |
+| `_created_at`     | TIMESTAMP | When entity was first created  | ✅       | Min of identifier occurred_at       |
+| `_last_merged_at` | TIMESTAMP | When identifiers were last merged | ✅       | Max of edge timestamps              |
+| `last_interaction_at` | TIMESTAMP | Most recent event timestamp | ✅       | Max of event occurred_at            |
+| `first_interaction_at` | TIMESTAMP | First event timestamp | ✅       | Min of event occurred_at            |
 
 **Note**: Columns are populated based on `entity_type`. Person entities have
 email/name/phone populated; group entities have domain/company_name populated.
@@ -242,6 +248,9 @@ entities
 | `established_at`    | TIMESTAMP | When relationship was first declared     | ✅       | Earliest declaration timestamp    |
 | `last_updated_at`   | TIMESTAMP | When relationship was last updated       | ✅       | Most recent declaration timestamp |
 | `primary_source`    | STRING    | Source of earliest declaration           | ✅       | Source attribution                |
+| `_processed_at`    | TIMESTAMP | When dbt last built the model           | ✅       | Runtime timestamp                |
+| `_updated_at`      | TIMESTAMP | When relationship data last changed     | ✅       | Max of declaration occurred_at    |
+| `_created_at`      | TIMESTAMP | When relationship was first created      | ✅       | Min of declaration occurred_at    |
 
 **Backward Compatibility**: Legacy views available in client projects:
 
@@ -301,7 +310,7 @@ erDiagram
 
 ### Source Data Ingestion
 
-1. Raw data arrives via ETL processes with `synced_at` timestamps
+1. Raw data arrives via ETL processes with `_ingested_at` timestamps
 2. Source adapters normalize to standard interfaces
 3. Incremental processing based on `_ingested_at` watermarks
 

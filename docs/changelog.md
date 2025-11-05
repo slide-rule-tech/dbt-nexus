@@ -10,6 +10,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added ✨
+
+- **Consistent Timestamp Fields**: Added standardized timestamp fields across core nexus models:
+  - **Events** (`nexus_events`):
+    - `_ingested_at` - When data was synced to the data warehouse (renamed from `synced_at`)
+    - `_processed_at` - When dbt last built/ran the model
+  - **Entities** (`nexus_entities`):
+    - `_processed_at` - When dbt last built/ran the model
+    - `_updated_at` - When entity data last changed (max of trait occurred_at)
+    - `_created_at` - When entity was first created (min of identifier occurred_at)
+    - `_last_merged_at` - When entity identifiers were last merged (max of edge timestamps)
+    - `last_interaction_at` - Most recent event timestamp (no underscore prefix)
+    - `first_interaction_at` - First event timestamp (no underscore prefix)
+  - **Relationships** (`nexus_relationships`):
+    - `_processed_at` - When dbt last built/ran the model
+    - `_updated_at` - When relationship data last changed (max of declaration occurred_at)
+    - `_created_at` - When relationship was first created (min of declaration occurred_at)
+- **Schema Tests**: Added `not_null` tests with `severity: warn` for all timestamp fields to track data quality
+
+### Changed 🔄
+
+- **BREAKING**: `nexus_events.synced_at` renamed to `nexus_events._ingested_at` for consistency
+  - Removed backward compatibility with `synced_at` - source models must now use `_ingested_at`
+- **Entity Timestamps**: Updated `nexus_entities` to calculate `_last_merged_at` directly from `nexus_entity_identifiers` using `event_id` instead of joining with `nexus_entity_identifiers_edges` table
+
 ## [0.3.0] - 2025-10-09
 
 ### Major Architectural Refactor: Entity-Centric Model 🎯

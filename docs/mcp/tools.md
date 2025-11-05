@@ -75,6 +75,14 @@ List entities with optional filtering. Works for both person and group entities.
 - Array of entities with `membership_count` or `person_count` (when entity_type
   is specified and no filters)
 
+**Available Timestamp Fields for Filtering:**
+- `_processed_at` - When dbt last built the model
+- `_updated_at` - When entity data last changed
+- `_created_at` - When entity was first created
+- `_last_merged_at` - When entity identifiers were last merged (may be null)
+- `last_interaction_at` - Most recent event timestamp (may be null)
+- `first_interaction_at` - First event timestamp (may be null)
+
 **Example:**
 
 ```json
@@ -218,6 +226,11 @@ Search events with flexible text search and filtering.
 
 - Array of matching events
 
+**Available Timestamp Fields for Filtering:**
+- `occurred_at` - When the event occurred (business timestamp)
+- `_ingested_at` - When data was synced to warehouse
+- `_processed_at` - When dbt last built the model
+
 **Example:**
 
 ```json
@@ -278,6 +291,13 @@ List all memberships (relationships) with optional filtering.
 **Returns:**
 
 - Array of membership relationships
+
+**Available Timestamp Fields for Filtering:**
+- `established_at` - When relationship was first declared
+- `last_updated_at` - When relationship was last updated
+- `_processed_at` - When dbt last built the model
+- `_updated_at` - When relationship data last changed
+- `_created_at` - When relationship was first created
 
 **Example:**
 

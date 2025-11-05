@@ -21,13 +21,14 @@ This is a common mistake that will cause schema validation errors.
 
 ## Optional Fields
 
-| Field               | Type      | Description        | Example               |
-| ------------------- | --------- | ------------------ | --------------------- |
-| `event_description` | STRING    | Human description  | `Appointment booked`  |
-| `value`             | NUMERIC   | Numeric value      | `150.00`              |
-| `value_unit`        | STRING    | Value unit         | `USD`                 |
-| `significance`      | NUMERIC   | Event significance | `3`                   |
-| `_ingested_at`      | TIMESTAMP | Processing time    | `2024-01-15 14:35:00` |
+| Field               | Type      | Description              | Example               |
+| ------------------- | --------- | ------------------------ | --------------------- |
+| `event_description` | STRING    | Human description        | `Appointment booked`  |
+| `value`             | NUMERIC   | Numeric value            | `150.00`              |
+| `value_unit`        | STRING    | Value unit               | `USD`                 |
+| `significance`      | NUMERIC   | Event significance       | `3`                   |
+| `_ingested_at`      | TIMESTAMP | When synced to warehouse | `2024-01-15 14:35:00` |
+| `_processed_at`     | TIMESTAMP | When dbt built the model | `2024-01-15 14:35:00` |
 
 ## Source-Specific Fields
 
@@ -60,7 +61,8 @@ select
     null as value,
     null as value_unit,
     null as significance,
-    current_timestamp() as _ingested_at,
+    ingestion_field as _ingested_at,
+    current_timestamp() as _processed_at,
 
     -- Source-specific fields (for reference)
     source_id,
