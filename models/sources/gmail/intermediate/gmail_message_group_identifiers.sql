@@ -27,7 +27,7 @@ domain_identifiers AS (
     SELECT
         {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'domain', "'group'", 'role', 'sent_at']) }} as entity_identifier_id,
         event_id,
-        event_id as edge_id,
+        {{ nexus.create_nexus_id('edge', ['event_id', 'domain', "'group'", 'role']) }} as edge_id,
         'group' as entity_type,
         'domain' as identifier_type,
         domain as identifier_value,
@@ -44,7 +44,7 @@ redirected_domains AS (
     SELECT
         {{ nexus.create_nexus_id('entity_identifier', ['event_id', nexus.redirected_domain('domain'), "'group'", 'role', 'sent_at']) }} as entity_identifier_id,
         event_id,
-        event_id as edge_id,
+        {{ nexus.create_nexus_id('edge', ['event_id', nexus.redirected_domain('domain'), "'group'", 'role']) }} as edge_id,
         'group' as entity_type,
         'domain' as identifier_type,
         {{ nexus.redirected_domain('domain') }} as identifier_value,

@@ -25,7 +25,7 @@ identifiers AS (
     SELECT 
         {{ nexus.create_nexus_id('entity_identifier', ['nexus_event_id', 'email', "'person'", 'role']) }} as entity_identifier_id,
         nexus_event_id as event_id,
-        nexus_event_id as edge_id,
+        {{ nexus.create_nexus_id('edge', ['nexus_event_id', 'email', "'person'", 'role']) }} as edge_id,
         'person' as entity_type,
         'email' as identifier_type,
         email as identifier_value,

@@ -79,7 +79,13 @@ edge_distribution as (
         e.identifier_type_a,
         e.identifier_value_a,
         count(distinct e.identifier_value_b) as unique_connections,
+        {% if target.type == 'bigquery' %}
+        string_agg(distinct e.identifier_type_b, ', ' order by e.identifier_type_b) as connected_types
+        {% elif target.type == 'snowflake' %}
         listagg(distinct e.identifier_type_b, ', ') within group (order by e.identifier_type_b) as connected_types
+        {% else %}
+        string_agg(distinct e.identifier_type_b, ', ' order by e.identifier_type_b) as connected_types
+        {% endif %}
     from all_edges e
     group by e.entity_type_a, e.identifier_type_a, e.identifier_value_a
 ),
@@ -101,8 +107,16 @@ source_breakdown as (
         entity_type_a,
         identifier_type_a,
         identifier_value_a,
-        listagg(source || ' (' || edge_count_from_source || ')', ', ') 
-            within group (order by edge_count_from_source desc) as source_distribution
+        {% if target.type == 'bigquery' %}
+        string_agg(source || ' (' || edge_count_from_source || ')', ', ' 
+            order by edge_count_from_source desc) as source_distribution
+        {% elif target.type == 'snowflake' %}
+        listagg(source || ' (' || edge_count_from_source || ')', ', ') within group 
+            (order by edge_count_from_source desc) as source_distribution
+        {% else %}
+        string_agg(source || ' (' || edge_count_from_source || ')', ', ' 
+            order by edge_count_from_source desc) as source_distribution
+        {% endif %}
     from source_attribution
     group by entity_type_a, identifier_type_a, identifier_value_a
 )
