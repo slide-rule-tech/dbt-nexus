@@ -12,7 +12,7 @@ WITH source_data AS (
         TIMESTAMP_MILLIS(CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.internalDate') AS INT64)) as sent_at,
         _ingested_at,
         _raw_record
-    FROM {{ ref('gmail_messages_base') }}
+    FROM {{ ref('gmail_messages_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
 ),
 
@@ -208,24 +208,45 @@ participants_combined AS (
         normalized_email,
         role
     FROM bcc_recipients_normalized
+),
+
+-- Deduplicate participants: same message_id (header), email, and role can appear multiple times
+-- due to the same logical message appearing with different Gmail IDs or different sent_at values.
+-- Keep the row with the most recent _ingested_at.
+participants_deduped AS (
+    SELECT 
+        message_id,
+        participant_raw,
+        TRIM(
+            REGEXP_REPLACE(
+                REGEXP_REPLACE(participant_name, r'^[\'"]+', ''),
+                r'[\'"]+$', 
+                ''
+            )
+        ) as name,
+        normalized_email as email,
+        SPLIT(normalized_email, '@')[SAFE_OFFSET(1)] as domain,
+        role,
+        sent_at,
+        _ingested_at,
+        ROW_NUMBER() OVER (
+            PARTITION BY message_id, normalized_email, role 
+            ORDER BY _ingested_at DESC, sent_at DESC
+        ) as rn
+    FROM participants_combined
 )
 
 SELECT 
     message_id,
     participant_raw,
-    TRIM(
-        REGEXP_REPLACE(
-            REGEXP_REPLACE(participant_name, r'^[\'"]+', ''),
-            r'[\'"]+$', 
-            ''
-        )
-    ) as name,
-    normalized_email as email,
-    SPLIT(normalized_email, '@')[SAFE_OFFSET(1)] as domain,
+    name,
+    email,
+    domain,
     role,
     sent_at,
     _ingested_at
-FROM participants_combined
+FROM participants_deduped
+WHERE rn = 1
 ORDER BY message_id, 
     CASE role 
         WHEN 'sender' THEN 1
@@ -233,4 +254,4 @@ ORDER BY message_id,
         WHEN 'cced' THEN 3
         WHEN 'bcced' THEN 4
     END,
-    normalized_email
+    email

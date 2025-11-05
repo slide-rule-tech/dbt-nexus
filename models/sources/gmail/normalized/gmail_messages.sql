@@ -15,7 +15,7 @@ WITH source_data AS (
         _sync_timestamp,
         _sync_token,
         _raw_record
-    FROM {{ ref('gmail_messages_base') }}
+    FROM {{ ref('gmail_messages_base_dedupped') }}
 ),
 
 -- Extract headers for message-level data only
