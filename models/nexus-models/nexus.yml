@@ -27,6 +27,18 @@ models:
           - not_null:
               config:
                 severity: error
+      - name: _ingested_at
+        description: "When the data was synced to the data warehouse"
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: _processed_at
+        description: "When the data was last run or built by dbt"
+        tests:
+          - not_null:
+              config:
+                severity: warn
 
   - name: nexus_entity_identifiers
     description:
@@ -245,6 +257,42 @@ models:
         description: "Domain (for groups)"
       - name: notion_id
         description: "Notion page ID"
+      - name: _processed_at
+        description: "When the data was last run or built by dbt"
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: _updated_at
+        description: "When the data was last updated (max of trait occurred_at)"
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: _created_at
+        description: "When the entity was first created (min of identifier occurred_at)"
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: _last_merged_at
+        description: "When entity identifiers were last merged (max of edge timestamps)"
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: last_interaction_at
+        description: "Most recent event timestamp for this entity"
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: first_interaction_at
+        description: "First event timestamp for this entity"
+        tests:
+          - not_null:
+              config:
+                severity: warn
 
   - name: nexus_relationships
     description:
@@ -289,6 +337,24 @@ models:
         description: "When the relationship was last updated"
       - name: primary_source
         description: "Primary source system for this relationship"
+      - name: _processed_at
+        description: "When the data was last run or built by dbt"
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: _updated_at
+        description: "When the relationship was last updated (max of declaration occurred_at)"
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: _created_at
+        description: "When the relationship was first created (min of declaration occurred_at)"
+        tests:
+          - not_null:
+              config:
+                severity: warn
 
   # State Models
   - name: nexus_states
