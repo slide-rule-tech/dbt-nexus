@@ -29,6 +29,8 @@
     per_edg
   {%- elif type == 'group_edge' -%}
     grp_edg
+  {%- elif type == 'entity_edge' -%}
+    ent_edg
   {%- elif type == 'person_participant' -%}
     per_prt
   {%- elif type == 'group_participant' -%}
@@ -90,6 +92,8 @@
     {%- set p = 'per_edg' -%}
   {%- elif type == 'group_edge' -%}
     {%- set p = 'grp_edg' -%}
+  {%- elif type == 'entity_edge' -%}
+    {%- set p = 'ent_edg' -%}
   {%- elif type == 'person_participant' -%}
     {%- set p = 'per_prt' -%}
   {%- elif type == 'group_participant' -%}
