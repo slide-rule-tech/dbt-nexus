@@ -313,6 +313,84 @@ async function createServer() {
           required: ["entity_id"],
         },
       },
+      {
+        name: "nexus_find_edges_by_identifier",
+        description:
+          "Find edges by identifier value (email, phone, etc.) without requiring entity_id. Returns all edges where the identifier appears, with associated event information.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            identifier_value: {
+              type: "string",
+              description: "Identifier value to search for (email, phone, etc.)",
+            },
+            identifier_type: {
+              type: "string",
+              description: "Optional identifier type filter (email, phone, etc.)",
+            },
+            entity_type: {
+              type: "string",
+              enum: ["person", "group"],
+              description: "Optional entity type filter",
+            },
+            filters: { type: "array" },
+            orderBy: { type: "array" },
+            limit: { type: "number" },
+          },
+          required: ["identifier_value"],
+        },
+      },
+      {
+        name: "nexus_search_edges",
+        description:
+          "Search/filter edges with flexible filtering by source, identifier type, entity type, etc.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            filters: {
+              type: "array",
+              description: "Optional filters for edge properties",
+            },
+            orderBy: { type: "array" },
+            limit: { type: "number" },
+            offset: { type: "number" },
+          },
+        },
+      },
+      {
+        name: "nexus_find_edges_with_quality_issues",
+        description:
+          "Find edges with quality issues (high connection counts, problematic identifiers). Returns identifiers with connection counts exceeding the threshold.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            min_connections: {
+              type: "number",
+              description: "Minimum connection count threshold (default: 20)",
+              default: 20,
+            },
+            limit: {
+              type: "number",
+              description: "Maximum results (default: 500)",
+              default: 500,
+            },
+            identifier_type: {
+              type: "string",
+              description: "Optional identifier type filter",
+            },
+            entity_type: {
+              type: "string",
+              enum: ["person", "group"],
+              description: "Optional entity type filter",
+            },
+            source: {
+              type: "string",
+              description: "Optional source filter",
+            },
+            orderBy: { type: "array" },
+          },
+        },
+      },
     ],
   }));
 
@@ -420,6 +498,40 @@ async function createServer() {
             args.entity_type as "person" | "group" | undefined,
             args.orderBy as OrderBy[] | undefined,
             args.limit as number | undefined
+          );
+          break;
+
+        case "nexus_find_edges_by_identifier":
+          result = await tools.findEdgesByIdentifier(
+            toolContext,
+            args.identifier_value as string,
+            args.identifier_type as string | undefined,
+            args.entity_type as "person" | "group" | undefined,
+            args.filters as Filter[] | undefined,
+            args.orderBy as OrderBy[] | undefined,
+            args.limit as number | undefined
+          );
+          break;
+
+        case "nexus_search_edges":
+          result = await tools.searchEdges(
+            toolContext,
+            args.filters as Filter[] | undefined,
+            args.orderBy as OrderBy[] | undefined,
+            args.limit as number | undefined,
+            args.offset as number | undefined
+          );
+          break;
+
+        case "nexus_find_edges_with_quality_issues":
+          result = await tools.findEdgesWithQualityIssues(
+            toolContext,
+            (args.min_connections as number) || 20,
+            args.identifier_type as string | undefined,
+            args.entity_type as "person" | "group" | undefined,
+            args.source as string | undefined,
+            args.orderBy as OrderBy[] | undefined,
+            (args.limit as number) || 500
           );
           break;
 
