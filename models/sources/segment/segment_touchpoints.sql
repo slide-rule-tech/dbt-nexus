@@ -41,18 +41,7 @@ touchpoint_events as (
             else 'direct'
         end as channel,
         
-        -- Touchpoint type
-        case 
-            when context_campaign_source is not null then 'campaign'
-            when context_page_search like '%fbclid%' then 'facebook_click'
-            when context_page_referrer is not null 
-                 {% for exclusion in var('referral_exclusions') -%}
-                 and context_page_referrer not like '{{ exclusion }}'
-                 {% endfor -%}
-                 then 'referral'
-            else 'direct'
-        end as touchpoint_type,
-        
+      
         -- Landing page information
         context_page_path as landing_page,
         context_page_referrer as referrer,
@@ -125,7 +114,6 @@ final as (
         
         -- Channel and type classification
         channel,
-        touchpoint_type,
         
         -- Landing page details
         landing_page,
@@ -140,6 +128,7 @@ final as (
         
 
         {{ nexus.create_nexus_id('attribution_deduplication_key', ['source', 'medium', 'campaign', 'content', 'term', 'referrer',  'fbclid', 'gclid', 'ttclid', 'li_fat_id']) }} as attribution_deduplication_key,
+        'web' as touchpoint_type,
         
     
     from touchpoint_events
