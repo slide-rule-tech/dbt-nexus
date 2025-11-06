@@ -138,8 +138,8 @@ class SnowflakeClient implements WarehouseClient {
     };
 
     // Determine authentication method
-    const useKeyPairAuth =
-      target.authenticator === "SNOWFLAKE_JWT" && target.private_key_path;
+    // Use key-pair auth if private_key_path is provided (authenticator field is optional)
+    const useKeyPairAuth = !!target.private_key_path;
 
     if (!useKeyPairAuth && !target.password) {
       throw new Error(
