@@ -8,5 +8,5 @@
     ref2=ref('base_segment_selected_tracks'),
     id1='id',
     id2='id',
-    prefix2=''
+    prefix2='selected_'
 ) }}

@@ -118,6 +118,61 @@ Common patterns and examples for using Nexus MCP tools with the unified entity a
 }
 ```
 
+### Find Edges by Identifier
+```json
+{
+  "tool": "nexus_find_edges_by_identifier",
+  "arguments": {
+    "identifier_value": "user@example.com",
+    "identifier_type": "email",
+    "entity_type": "person",
+    "limit": 50
+  }
+}
+```
+
+### Search Edges
+```json
+{
+  "tool": "nexus_search_edges",
+  "arguments": {
+    "filters": [
+      {
+        "column": "source",
+        "operator": "=",
+        "value": "go high level"
+      },
+      {
+        "column": "identifier_type_a",
+        "operator": "=",
+        "value": "email"
+      }
+    ],
+    "orderBy": [
+      {
+        "column": "edge_id",
+        "direction": "ASC"
+      }
+    ],
+    "limit": 100
+  }
+}
+```
+
+### Find Edges with Quality Issues
+```json
+{
+  "tool": "nexus_find_edges_with_quality_issues",
+  "arguments": {
+    "min_connections": 20,
+    "identifier_type": "email",
+    "entity_type": "person",
+    "source": "go high level",
+    "limit": 50
+  }
+}
+```
+
 ## Searching Events
 
 ### Text Search

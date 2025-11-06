@@ -849,6 +849,240 @@ export async function getEdgesForEntity(
 }
 
 /**
+ * Find edges by identifier value (email, phone, etc.)
+ * Returns all edges where the identifier appears, with associated event information
+ */
+export async function findEdgesByIdentifier(
+  context: ToolContext,
+  identifierValue: string,
+  identifierType?: string,
+  entityType?: "person" | "group",
+  filters?: Filter[],
+  orderBy?: OrderBy[],
+  limit?: number
+): Promise<QueryResult> {
+  const { client, models } = context;
+  const adapterType = client.getAdapterType();
+  const startTime = Date.now();
+
+  const edgesTable = getQualifiedTableName(
+    models.entityIdentifiersEdges,
+    adapterType
+  );
+  const identifiersTable = getQualifiedTableName(
+    models.entityIdentifiers,
+    adapterType
+  );
+  const eventsTable = getQualifiedTableName(models.events, adapterType);
+
+  // Build SQL to find edges by identifier value
+  // Match identifier_value in either identifier_value_a or identifier_value_b
+  let sql = `
+    SELECT DISTINCT
+      e.edge_id,
+      e.entity_type_a,
+      e.identifier_type_a,
+      e.identifier_value_a,
+      e.entity_type_b,
+      e.identifier_type_b,
+      e.identifier_value_b,
+      e.source as edge_source,
+      ei.event_id,
+      ev.event_name,
+      ev.event_description,
+      ev.source as event_source,
+      ev.occurred_at as event_occurred_at
+    FROM ${edgesTable} e
+    LEFT JOIN ${identifiersTable} ei ON (
+      (ei.identifier_type = e.identifier_type_a AND ei.identifier_value = e.identifier_value_a)
+      OR
+      (ei.identifier_type = e.identifier_type_b AND ei.identifier_value = e.identifier_value_b)
+    )
+    AND ei.edge_id = e.edge_id
+    LEFT JOIN ${eventsTable} ev ON ei.event_id = ev.event_id
+    WHERE (
+      (e.identifier_value_a = '${escapeSQLString(identifierValue)}'
+        ${identifierType ? `AND e.identifier_type_a = '${escapeSQLString(identifierType)}'` : ""}
+        ${entityType ? `AND e.entity_type_a = '${entityType}'` : ""})
+      OR
+      (e.identifier_value_b = '${escapeSQLString(identifierValue)}'
+        ${identifierType ? `AND e.identifier_type_b = '${escapeSQLString(identifierType)}'` : ""}
+        ${entityType ? `AND e.entity_type_b = '${entityType}'` : ""})
+    )
+  `;
+
+  // Add additional filters
+  if (filters && filters.length > 0) {
+    const conditions = filters.map((filter) => buildWhereCondition(filter));
+    sql += ` AND ${conditions.join(" AND ")}`;
+  }
+
+  // Add ORDER BY
+  if (orderBy && orderBy.length > 0) {
+    const clauses = orderBy.map(
+      (order) => `${order.column} ${order.direction}`
+    );
+    sql += ` ORDER BY ${clauses.join(", ")}`;
+  } else {
+    sql += ` ORDER BY ev.occurred_at DESC`;
+  }
+
+  // Add LIMIT
+  if (limit !== undefined) {
+    sql += ` LIMIT ${limit}`;
+  }
+
+  console.error("🔍 Finding edges by identifier:", {
+    identifierValue,
+    identifierType,
+    entityType,
+    limit,
+  });
+  console.error("📝 SQL:", sql.substring(0, 200) + "...");
+
+  const result = await client.executeQuery(sql);
+  const executionTime = Date.now() - startTime;
+
+  console.error("✅ Edges found:", {
+    rowCount: result.rowCount,
+    executionTime: `${executionTime}ms`,
+  });
+
+  return result;
+}
+
+/**
+ * Search/filter edges with flexible filtering
+ * Supports filtering by source, identifier type, entity type, etc.
+ */
+export async function searchEdges(
+  context: ToolContext,
+  filters?: Filter[],
+  orderBy?: OrderBy[],
+  limit?: number,
+  offset?: number
+): Promise<QueryResult> {
+  const { client, models } = context;
+  const adapterType = client.getAdapterType();
+
+  const edgesTable = getQualifiedTableName(
+    models.entityIdentifiersEdges,
+    adapterType
+  );
+
+  // Use buildDynamicSQL for flexible filtering
+  const sql = buildDynamicSQL({
+    table: edgesTable,
+    filters,
+    orderBy: orderBy || [{ column: "edge_id", direction: "ASC" }],
+    limit,
+    offset,
+  });
+
+  console.error("🔍 Searching edges:", {
+    filterCount: filters?.length || 0,
+    limit,
+    offset,
+  });
+
+  return await client.executeQuery(sql);
+}
+
+/**
+ * Find edges with quality issues (high connection counts)
+ * Returns identifiers with connection counts exceeding the threshold
+ */
+export async function findEdgesWithQualityIssues(
+  context: ToolContext,
+  minConnections: number = 20,
+  identifierType?: string,
+  entityType?: "person" | "group",
+  source?: string,
+  orderBy?: OrderBy[],
+  limit: number = 500
+): Promise<QueryResult> {
+  const { client, models } = context;
+  const adapterType = client.getAdapterType();
+  const startTime = Date.now();
+
+  const edgesTable = getQualifiedTableName(
+    models.entityIdentifiersEdges,
+    adapterType
+  );
+
+  // Build WHERE conditions for filters
+  let whereConditions: string[] = [];
+  if (identifierType) {
+    whereConditions.push(
+      `identifier_type_a = '${escapeSQLString(identifierType)}'`
+    );
+  }
+  if (entityType) {
+    whereConditions.push(`entity_type_a = '${entityType}'`);
+  }
+  if (source) {
+    whereConditions.push(`source = '${escapeSQLString(source)}'`);
+  }
+  const whereClause =
+    whereConditions.length > 0
+      ? `WHERE ${whereConditions.join(" AND ")}`
+      : "";
+
+  // Build SQL to find identifiers with high connection counts
+  let sql = `
+    WITH edge_distribution AS (
+      SELECT
+        entity_type_a,
+        identifier_type_a,
+        identifier_value_a,
+        COUNT(DISTINCT identifier_value_b) as unique_connections
+      FROM ${edgesTable}
+      ${whereClause}
+      GROUP BY entity_type_a, identifier_type_a, identifier_value_a
+    )
+    SELECT
+      entity_type_a,
+      identifier_type_a,
+      identifier_value_a,
+      unique_connections
+    FROM edge_distribution
+    WHERE unique_connections > ${minConnections}
+  `;
+
+  // Add ORDER BY
+  if (orderBy && orderBy.length > 0) {
+    const clauses = orderBy.map(
+      (order) => `${order.column} ${order.direction}`
+    );
+    sql += ` ORDER BY ${clauses.join(", ")}`;
+  } else {
+    sql += ` ORDER BY unique_connections DESC`;
+  }
+
+  // Add LIMIT (default 500 if not specified)
+  sql += ` LIMIT ${limit}`;
+
+  console.error("🔍 Finding edges with quality issues:", {
+    minConnections,
+    identifierType,
+    entityType,
+    source,
+    limit,
+  });
+  console.error("📝 SQL:", sql.substring(0, 200) + "...");
+
+  const result = await client.executeQuery(sql);
+  const executionTime = Date.now() - startTime;
+
+  console.error("✅ Quality issues found:", {
+    rowCount: result.rowCount,
+    executionTime: `${executionTime}ms`,
+  });
+
+  return result;
+}
+
+/**
  * Escape SQL string to prevent injection
  */
 function escapeSQLString(str: string): string {

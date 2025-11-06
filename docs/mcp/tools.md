@@ -209,6 +209,119 @@ where the entity's identifiers appear, with associated event information.
 }
 ```
 
+### nexus_find_edges_by_identifier
+
+Find edges by identifier value (email, phone, etc.) without requiring
+entity_id. Returns all edges where the identifier appears, with associated
+event information.
+
+**Parameters:**
+
+- `identifier_value` (string, required): Identifier value to search for
+  (email, phone, etc.)
+- `identifier_type` (string, optional): Filter by identifier type (email,
+  phone, etc.)
+- `entity_type` (string, optional): Filter by entity type ("person" or
+  "group")
+- `filters` (array, optional): Additional filters
+- `orderBy` (array, optional): Sorting specification
+- `limit` (number, optional): Maximum results
+
+**Returns:**
+
+- Array of edges with associated event information
+
+**Example:**
+
+```json
+{
+  "identifier_value": "user@example.com",
+  "identifier_type": "email",
+  "entity_type": "person",
+  "limit": 50
+}
+```
+
+### nexus_search_edges
+
+Search/filter edges with flexible filtering by source, identifier type, entity
+type, etc.
+
+**Parameters:**
+
+- `filters` (array, optional): Filters for edge properties
+- `orderBy` (array, optional): Sorting specification
+- `limit` (number, optional): Maximum results
+- `offset` (number, optional): Pagination offset
+
+**Returns:**
+
+- Array of edges matching the filters
+
+**Available Filter Columns:**
+
+- `source` - Edge source
+- `entity_type_a` - Entity type for identifier A
+- `entity_type_b` - Entity type for identifier B
+- `identifier_type_a` - Identifier type for identifier A
+- `identifier_type_b` - Identifier type for identifier B
+- `identifier_value_a` - Identifier value for identifier A
+- `identifier_value_b` - Identifier value for identifier B
+
+**Example:**
+
+```json
+{
+  "filters": [
+    {
+      "column": "source",
+      "operator": "=",
+      "value": "go high level"
+    },
+    {
+      "column": "identifier_type_a",
+      "operator": "=",
+      "value": "email"
+    }
+  ],
+  "limit": 100
+}
+```
+
+### nexus_find_edges_with_quality_issues
+
+Find edges with quality issues (high connection counts, problematic
+identifiers). Returns identifiers with connection counts exceeding the
+threshold.
+
+**Parameters:**
+
+- `min_connections` (number, optional): Minimum connection count threshold
+  (default: 20)
+- `identifier_type` (string, optional): Filter by identifier type
+- `entity_type` (string, optional): Filter by entity type ("person" or
+  "group")
+- `source` (string, optional): Filter by source
+- `orderBy` (array, optional): Sorting specification (default:
+  `unique_connections DESC`)
+- `limit` (number, optional): Maximum results
+
+**Returns:**
+
+- Array of identifiers with connection counts exceeding the threshold
+
+**Example:**
+
+```json
+{
+  "min_connections": 20,
+  "identifier_type": "email",
+  "entity_type": "person",
+  "source": "go high level",
+  "limit": 50
+}
+```
+
 ## Event Tools
 
 ### nexus_search_events

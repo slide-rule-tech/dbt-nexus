@@ -138,8 +138,8 @@ class SnowflakeClient implements WarehouseClient {
     };
 
     // Determine authentication method
-    const useKeyPairAuth =
-      target.authenticator === "SNOWFLAKE_JWT" && target.private_key_path;
+    // Use key-pair auth if private_key_path is provided (authenticator field is optional)
+    const useKeyPairAuth = !!target.private_key_path;
 
     if (!useKeyPairAuth && !target.password) {
       throw new Error(
@@ -177,9 +177,12 @@ class SnowflakeClient implements WarehouseClient {
 
     // Dynamically require snowflake-sdk
     const snowflake = await import("snowflake-sdk");
+    
+    // Handle both default and named exports
+    const snowflakeSdk = (snowflake as any).default || snowflake;
 
     return new Promise<QueryResult>((resolve, reject) => {
-      const connection = snowflake.createConnection(this.config);
+      const connection = snowflakeSdk.createConnection(this.config);
 
       connection.connect((err: any, _conn: any) => {
         if (err) {
@@ -278,34 +281,42 @@ class SnowflakeClient implements WarehouseClient {
 
   /**
    * Transform BigQuery-style SQL (backticks) to Snowflake format
+   * Handles fully qualified names like `database`.`schema`.`table`
    */
   private transformSQLForSnowflake(query: string): string {
-    const backtickPattern = /`([^`]+)`/g;
+    // Match entire qualified names like `db`.`schema`.`table` as one unit
+    // This pattern matches: `identifier` or `identifier`.`identifier` or `identifier`.`identifier`.`identifier` etc.
+    const qualifiedNamePattern = /(`[^`]+`(?:\s*\.\s*`[^`]+`)*)/g;
 
     let transformedQuery = query;
 
     transformedQuery = transformedQuery.replace(
-      backtickPattern,
-      (match, content) => {
-        const parts = content.trim().split(/\s+/);
-        const identifier = parts[0];
-        const identifierParts = identifier.split(".");
+      qualifiedNamePattern,
+      (match) => {
+        // Remove all backticks and split by dots
+        const cleaned = match.replace(/`/g, "").trim();
+        const parts = cleaned.split(/\s*\.\s*/).filter((p: string) => p.length > 0);
+        const identifierParts = parts;
 
-        if (identifierParts.length === 2) {
-          const tableName = identifierParts[1].toUpperCase();
-          const qualifiedName = `"${this.database.toUpperCase()}"."${this.schema.toUpperCase()}"."${tableName}"`;
-
-          if (parts.length > 1) {
-            return `${qualifiedName} ${parts.slice(1).join(" ")}`;
-          }
+        // If already fully qualified (3+ parts: database.schema.table), use as-is
+        if (identifierParts.length >= 3) {
+          const qualifiedName = identifierParts
+            .map((part: string) => `"${part.toUpperCase()}"`)
+            .join(".");
           return qualifiedName;
-        } else if (identifierParts.length === 1) {
-          const tableName = identifierParts[0].toUpperCase();
-          const qualifiedName = `"${this.database.toUpperCase()}"."${this.schema.toUpperCase()}"."${tableName}"`;
+        }
+        // If 2 parts (schema.table), add database
+        else if (identifierParts.length === 2) {
+          const qualifiedName = `"${this.database.toUpperCase()}"."${identifierParts[0].toUpperCase()}"."${identifierParts[1].toUpperCase()}"`;
+          return qualifiedName;
+        }
+        // If 1 part (table only), add database and schema
+        else if (identifierParts.length === 1) {
+          const qualifiedName = `"${this.database.toUpperCase()}"."${this.schema.toUpperCase()}"."${identifierParts[0].toUpperCase()}"`;
           return qualifiedName;
         }
 
-        return `"${identifier.toUpperCase()}"`;
+        return `"${cleaned.toUpperCase()}"`;
       }
     );
 
