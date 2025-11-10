@@ -4,6 +4,7 @@
         CAST(NULL AS STRING) AS touchpoint_event_id,
         CAST(NULL AS TIMESTAMP) AS occurred_at,
         CAST(NULL AS STRING) AS touchpoint_type,
+        CAST(NULL AS STRING) AS source,
         CAST(NULL AS STRING) AS attribution_deduplication_key
     {% else %}
         -- Touchpoint identification
@@ -14,6 +15,8 @@
         occurred_at,
         -- Touchpoint classification
         touchpoint_type,
+        -- Source system
+        source,
         attribution_deduplication_key
     {% endif %}
 {% endmacro %}

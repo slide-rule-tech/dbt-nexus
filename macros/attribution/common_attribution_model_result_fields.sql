@@ -7,7 +7,8 @@
         CAST(NULL AS STRING) AS touchpoint_event_id,
         CAST(NULL AS STRING) AS attributed_event_id,
         CAST(NULL AS STRING) AS person_id,
-        CAST(NULL AS TIMESTAMP) AS attributed_event_occurred_at
+        CAST(NULL AS TIMESTAMP) AS attributed_event_occurred_at,
+        CAST(NULL AS STRING) AS source
     {% else %}
         -- Attribution result identification
         attribution_model_result_id,
@@ -23,6 +24,8 @@
         -- Person context
         person_id,
         -- Event timing
-        attributed_event_occurred_at
+        attributed_event_occurred_at,
+        -- Source system
+        source
     {% endif %}
 {% endmacro %}

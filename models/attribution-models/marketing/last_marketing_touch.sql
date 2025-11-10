@@ -1,5 +1,5 @@
 {{ config(
-    enabled=var('nexus', {}).get('attribution_models', {}).get('last_marketing_touch', {}).get('enabled', true),
+    enabled=var('nexus', {}).get('attribution_models', {}).get('last_marketing_touch', {}).get('enabled', false),
     materialized='table', 
     tags=['attribution', 'marketing', 'template-attribution-model']
 ) }}

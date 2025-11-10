@@ -16,7 +16,7 @@
 WITH empty_result AS (
     SELECT {{ nexus.common_touchpoint_fields(return_empty=true) }}
 )
-SELECT {{ common_touchpoint_fields() }}
+SELECT {{ nexus.common_touchpoint_fields() }}
 FROM empty_result
 WHERE 1 = 0
 {% endif %}
