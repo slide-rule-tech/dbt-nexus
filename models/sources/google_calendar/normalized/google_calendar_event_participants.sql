@@ -34,7 +34,7 @@ WITH source_data AS (
         END as is_recurring,
         _ingested_at,
         _raw_record
-    FROM {{ ref('google_calendar_events_base') }}
+    FROM {{ ref('google_calendar_events_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
 ),

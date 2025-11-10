@@ -18,7 +18,7 @@ WITH source_data AS (
         _stream_id,
         _sync_timestamp,
         _sync_token
-    FROM {{ ref('google_calendar_events_base') }}
+    FROM {{ ref('google_calendar_events_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
 ),
