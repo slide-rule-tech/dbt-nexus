@@ -36,7 +36,8 @@ with source_data as (
     {{ col }}{% if not loop.last %},{% endif %}
     {% endfor %}
   from {{ ref(model_name) }}
-  {% if target.name != 'prod' and limit is not none %}
+  {% set target_name = (target.name | lower) if target.name is not none else '' %}
+  {% if not (target_name.startswith('prod') or target_name == 'default') and limit is not none %}
   limit {{ limit }}
   {% endif %}
 )

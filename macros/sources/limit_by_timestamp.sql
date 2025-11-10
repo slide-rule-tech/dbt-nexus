@@ -38,9 +38,10 @@
 #}
 
     {%- set limit_timestamp = none -%}
-    
+    {%- set target_name = (target.name | lower) if target.name is not none else '' -%}
+
     {#- Determine which limit to use based on target -#}
-    {%- if target.name in ['dev', 'development'] -%}
+    {%- if target_name.startswith('dev') -%}
         {#- Dev environment: check parameter first, then variable -#}
         {%- if dev_limit is not none -%}
             {%- set limit_timestamp = dev_limit -%}
@@ -48,7 +49,7 @@
             {%- set limit_timestamp = var('dev_timestamp_limit') -%}
         {%- endif -%}
         
-    {%- elif target.name in ['prod', 'production'] -%}
+    {%- elif target_name.startswith('prod') or target_name == 'default' -%}
         {#- Prod environment: check parameter first, then variable -#}
         {%- if prod_limit is not none -%}
             {%- set limit_timestamp = prod_limit -%}
