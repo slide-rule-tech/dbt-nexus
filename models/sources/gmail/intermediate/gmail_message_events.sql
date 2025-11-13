@@ -12,7 +12,7 @@ SELECT
     'email' as event_type,
     subject as event_description,
     'gmail' as source,
-    CAST(FLOOR(RAND() * 100) + 1 AS INT64) as value,
+    null as value,
     
     -- Additional context
     message_id,
