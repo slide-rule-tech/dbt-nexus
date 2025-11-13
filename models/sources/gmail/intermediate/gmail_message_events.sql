@@ -13,6 +13,7 @@ SELECT
     subject as event_description,
     'gmail' as source,
     null as value,
+    null as value_unit,
     
     -- Additional context
     message_id,
