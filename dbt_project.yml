@@ -39,6 +39,7 @@ seeds:
 
 vars:
   # Nexus source configuration
+
   nexus:
     max_recursion: 5
     edge_quality:
