@@ -170,6 +170,13 @@ nav:
       - Macros:
           - Generate Nexus IDs: macros/generate-nexus-ids.md
           - Nexus dbt Schema Names: macros/nexus-dbt-schema-names.md
+      - Metadata:
+          - Overview: metadata/index.md
+          - Tables:
+              - Events: metadata/tables/events.md
+              - Entity Traits: metadata/tables/entity_traits.md
+              - Entity Identifiers: metadata/tables/entity_identifiers.md
+              - Relationships: metadata/tables/relationships.md
       - Development:
           - Changelog: changelog.md
           - Contributing: CONTRIBUTING.md
