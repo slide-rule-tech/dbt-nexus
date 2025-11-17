@@ -13,7 +13,6 @@
     'touchpoint_batch_id',
     'touchpoint_event_id',
     'attributed_event_id',
-    'person_id',
     'entity_id',
     'entity_type',
     'attributed_event_occurred_at'

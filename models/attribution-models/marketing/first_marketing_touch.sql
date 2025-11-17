@@ -24,7 +24,7 @@ with touchpoint_batches as (
 web_touchpoints as (
     select
         touchpoint_batch_id,
-        entity_id as person_id,
+        entity_id,
         touchpoint_occurred_at,
         touchpoint_event_id,
         -- Attribution fields (already cleaned in source touchpoints)
@@ -41,17 +41,17 @@ web_touchpoints as (
 -- Identify the first touchpoint for each person
 first_touchpoints as (
     select
-        person_id,
+        entity_id,
         min(touchpoint_occurred_at) as first_touchpoint_occurred_at
     from web_touchpoints
-    group by person_id
+    group by entity_id
 ),
 
 -- Get the complete first touchpoint record for each person
 first_touchpoint_details as (
     select
         wt.touchpoint_batch_id,
-        wt.person_id,
+        wt.entity_id,
         wt.touchpoint_occurred_at,
         wt.touchpoint_event_id,
         wt.source,
@@ -62,34 +62,36 @@ first_touchpoint_details as (
         wt.touchpoint_type
     from web_touchpoints wt
     inner join first_touchpoints ft
-        on wt.person_id = ft.person_id
+        on wt.entity_id = ft.entity_id
         and wt.touchpoint_occurred_at = ft.first_touchpoint_occurred_at
 ),
 
 -- Get all events for persons who have first touchpoints
 person_events as (
     select
-        pp.entity_id as person_id,
+        pp.entity_id,
+        pp.entity_participant_id,
         e.event_id,
         e.occurred_at as event_occurred_at
     from {{ ref('nexus_entity_participants') }} pp
     inner join {{ ref('nexus_events') }} e
         on pp.event_id = e.event_id
     inner join first_touchpoint_details ftd
-        on pp.entity_id = ftd.person_id
+        on pp.entity_id = ftd.entity_id
     where pp.entity_type = 'person'  -- Filter for person entities only
 ),
 
 -- Final output: attribute all events to first touchpoint if event occurs after touchpoint
 final_output as (
     select
-        {{ nexus.create_nexus_id('attribution_model_result', ['ftd.touchpoint_batch_id', 'pe.event_id', 'ftd.person_id']) }} as attribution_model_result_id,
+        {{ nexus.create_nexus_id('attribution_model_result', ['ftd.touchpoint_batch_id', 'pe.event_id', 'ftd.entity_id']) }} as attribution_model_result_id,
         ftd.touchpoint_occurred_at,
         'first_marketing_touch' as attribution_model_name,
         ftd.touchpoint_batch_id,
         ftd.touchpoint_event_id,
         pe.event_id as attributed_event_id,
-        ftd.person_id,
+        ftd.entity_id,
+        pe.entity_participant_id,
         pe.event_occurred_at as attributed_event_occurred_at,
         -- Marketing attribution fields from the first touchpoint
         ftd.source,
@@ -99,9 +101,9 @@ final_output as (
         ftd.gclid
     from first_touchpoint_details ftd
     inner join person_events pe
-        on ftd.person_id = pe.person_id
+        on ftd.entity_id = pe.entity_id
         and pe.event_occurred_at >= ftd.touchpoint_occurred_at  -- Event must occur after first touchpoint
 )
 
 select * from final_output
-order by person_id, touchpoint_occurred_at, attributed_event_id
+order by entity_id, touchpoint_occurred_at, attributed_event_id
