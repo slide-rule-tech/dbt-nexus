@@ -31,10 +31,8 @@
     grp_edg
   {%- elif type == 'entity_edge' -%}
     ent_edg
-  {%- elif type == 'person_participant' -%}
-    per_prt
-  {%- elif type == 'group_participant' -%}
-    grp_prt
+  {%- elif type == 'entity_participant' -%}
+    ent_prt
   {%- elif type == 'nexus' -%}
     nx
   {%- elif type == 'touchpoint' -%}

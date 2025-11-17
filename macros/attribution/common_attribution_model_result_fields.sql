@@ -6,7 +6,8 @@
         CAST(NULL AS STRING) AS touchpoint_batch_id,
         CAST(NULL AS STRING) AS touchpoint_event_id,
         CAST(NULL AS STRING) AS attributed_event_id,
-        CAST(NULL AS STRING) AS person_id,
+        CAST(NULL AS STRING) AS entity_id,
+        CAST(NULL AS STRING) AS entity_participant_id,
         CAST(NULL AS TIMESTAMP) AS attributed_event_occurred_at,
         CAST(NULL AS STRING) AS source
     {% else %}
@@ -21,8 +22,10 @@
         touchpoint_event_id,
         -- Attribution target
         attributed_event_id,
-        -- Person context
-        person_id,
+        -- Entity context
+        entity_id,
+        -- Entity participant reference
+        entity_participant_id,
         -- Event timing
         attributed_event_occurred_at,
         -- Source system
