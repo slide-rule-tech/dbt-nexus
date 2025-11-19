@@ -49,6 +49,25 @@ vars:
       error_autofilter: false
       warning_threshold: 10
 
+  # Common event fields - standard columns that appear in all event models
+  # Used to exclude standard fields from metadata column listings
+  # Note: Column names match actual database column names (e.g., 'value' not 'event_value')
+  common_event_fields:
+    - event_id
+    - occurred_at
+    - event_name
+    - event_description
+    - value
+    - value_unit
+    - significance
+    - event_type
+    - source
+    - source_table
+    - _ingested_at
+    - _processed_at
+    - _dbt_source_relation
+    - realtime_processed
+
   # Attribution models configuration
   attribution_models:
     last_fbclid:
