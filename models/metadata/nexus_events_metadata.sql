@@ -53,16 +53,19 @@
     {% endif %}
 {% endfor %}
 
-{# Get distinct event metadata from nexus_events #}
+{# Get distinct event metadata from nexus_events with first and last seen timestamps #}
 WITH distinct_events AS (
-    SELECT DISTINCT
+    SELECT 
         event_name,
         event_type,
         source,
         value_unit,
-        source_table
+        source_table,
+        MIN(occurred_at) as first_seen_at,
+        MAX(occurred_at) as last_seen_at
     FROM {{ ref('nexus_events') }}
     WHERE event_name IS NOT NULL
+    GROUP BY event_name, event_type, source, value_unit, source_table
 )
 
 SELECT
@@ -71,17 +74,31 @@ SELECT
     de.source,
     de.value_unit,
     de.source_table,
+    de.first_seen_at,
+    de.last_seen_at,
     {% if source_table_column_map %}
         CASE
             {% for source_table, columns in source_table_column_map.items() %}
-            WHEN de.source_table = '{{ source_table }}' THEN TO_JSON_STRING([
-                {% for col in columns %}
-                STRUCT(
-                    '{{ col.name }}' as column_name,
-                    '{{ col.type }}' as column_type
-                ){% if not loop.last %},{% endif %}
-                {% endfor %}
-            ])
+            WHEN de.source_table = '{{ source_table }}' THEN 
+                {% if target.type == 'snowflake' %}
+                    TO_JSON(ARRAY_CONSTRUCT(
+                        {% for col in columns %}
+                        OBJECT_CONSTRUCT(
+                            'column_name', '{{ col.name }}',
+                            'column_type', '{{ col.type }}'
+                        ){% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ))::VARCHAR
+                {% else %}
+                    TO_JSON_STRING([
+                        {% for col in columns %}
+                        STRUCT(
+                            '{{ col.name }}' as column_name,
+                            '{{ col.type }}' as column_type
+                        ){% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ])
+                {% endif %}
             {% endfor %}
             ELSE NULL
         END as columns_json

@@ -9,9 +9,10 @@ with
 ){{ "," if not loop.last }}
 {% endfor %}
 
-select * from person_participants
 {% for entity_type in entity_types %}
-{% if not loop.first %}
+{% if loop.first %}
+select * from {{ entity_type }}_participants
+{% else %}
 union all
 select * from {{ entity_type }}_participants
 {% endif %}
