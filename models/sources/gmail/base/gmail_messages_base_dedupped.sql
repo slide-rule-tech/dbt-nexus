@@ -10,7 +10,7 @@ WITH source_data AS (
     SELECT 
         *,
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as gmail_message_id
-    FROM {{ source('gmail', 'messages') }}
+    FROM {{ ref('gmail_messages_base') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
 ),
 
@@ -29,8 +29,9 @@ SELECT
     _connection_id,
     _stream_id,
     _raw_record,
-    _sync_timestamp,
-    _sync_token
+    _sync_id,
+    _account,
+    _sync_metadata
 FROM deduplicated
 WHERE rn = 1
 

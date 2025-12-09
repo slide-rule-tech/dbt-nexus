@@ -1,23 +1,36 @@
 {{ config(materialized = 'table', tags=['states']) }}
 
-{%- set states = var('states', []) -%}
-{% set states_to_union = [] %}
-{% for state in states %}
-    {% do states_to_union.append(ref(state)) %}
-{% endfor %}
+{# Collect state names to union based on configured states #}
+{% set states_list = [] %}
 
-{% if states_to_union %}
+{# Support both new and legacy config patterns #}
+{% set nexus_config = var('nexus', {}) %}
+{% set states_config = nexus_config.get('states', []) %}
+
+{% if states_config %}
+    {# New pattern: nexus.states list #}
+    {% for state in states_config %}
+        {% do states_list.append(state) %}
+    {% endfor %}
+{% elif var('states', none) %}
+    {# Legacy pattern: states list at root level #}
+    {% for state in var('states') %}
+        {% do states_list.append(state) %}
+    {% endfor %}
+{% endif %}
+
+{% if states_list %}
 WITH unioned AS (
-    {% for state in states %}
+    {% for state in states_list %}
         {{ "UNION ALL" if not loop.first }}
         SELECT 
-            {{ common_state_fields() }}
+            {{ nexus.common_state_fields() }}
         FROM {{ ref(state) }}
     {% endfor %}
 )
 
 SELECT
-    {{ common_state_fields() }}
+    {{ nexus.common_state_fields() }}
 FROM unioned 
 ORDER BY state_entered_at DESC
 
@@ -25,11 +38,11 @@ ORDER BY state_entered_at DESC
 -- Return empty result when no states are configured
 WITH empty_result AS (
     SELECT
-        {{ common_state_fields(return_empty=true) }}
+        {{ nexus.common_state_fields(return_empty=true) }}
 )
 
 SELECT 
-    {{ common_state_fields() }}
+    {{ nexus.common_state_fields() }}
 FROM empty_result
 where 1 = 0
 {% endif %}

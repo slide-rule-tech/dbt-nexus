@@ -26,17 +26,17 @@ The main state model that unions all individual state models.
 
 ### Schema
 
-| Column             | Type      | Description                                   |
-| ------------------ | --------- | --------------------------------------------- |
-| `entity_id`        | string    | Unique identifier for the entity              |
-| `entity_type`      | string    | Type of entity (`person`, `group`)            |
-| `state_name`       | string    | Name of the state dimension                   |
-| `state_value`      | string    | Current value of the state                    |
-| `state_entered_at` | timestamp | When this state was entered                   |
-| `state_exited_at`  | timestamp | When this state was exited (NULL for current) |
-| `is_current`       | boolean   | Whether this is the current state             |
-| `source`           | string    | Source system that generated this state       |
-| `_ingested_at`     | timestamp | When the record was processed                 |
+| Column             | Type      | Description                                                         |
+| ------------------ | --------- | ------------------------------------------------------------------- |
+| `state_id`         | string    | Unique identifier for the state record (nexus ID with `st_` prefix) |
+| `entity_id`        | string    | Unique identifier for the entity                                    |
+| `entity_type`      | string    | Type of entity (`person`, `group`)                                  |
+| `state_name`       | string    | Name of the state dimension                                         |
+| `state_value`      | string    | Current value of the state                                          |
+| `state_entered_at` | timestamp | When this state was entered                                         |
+| `state_exited_at`  | timestamp | When this state was exited (NULL for current)                       |
+| `is_current`       | boolean   | Whether this is the current state                                   |
+| `trigger_event_id` | string    | The event_id that triggered this state change                       |
 
 ### Example Query
 
@@ -98,22 +98,29 @@ models/
 -- models/states/billing_lifecycle.sql
 {{ config(
     materialized='incremental',
-    unique_key='id',
+    unique_key='state_id',
     tags=['states', 'billing']
 ) }}
 
 WITH events AS (
-    SELECT * FROM {{ ref('nexus_events') }}
-    WHERE event_name IN ('subscription_created', 'subscription_cancelled', 'trial_started')
+    SELECT
+        ne.*,
+        nep.entity_id,
+        nep.entity_type
+    FROM {{ ref('nexus_events') }} ne
+    INNER JOIN {{ ref('nexus_entity_participants') }} nep
+        ON ne.event_id = nep.event_id
+    WHERE nep.entity_type = 'group'
+        AND ne.event_name IN ('subscription_created', 'subscription_cancelled', 'trial_started')
     {% if is_incremental() %}
-    AND occurred_at > (SELECT MAX(state_entered_at) FROM {{ this }})
+    AND ne.occurred_at > (SELECT MAX(state_entered_at) FROM {{ this }})
     {% endif %}
 ),
 
 state_changes AS (
     SELECT
         entity_id,
-        'group' as entity_type,
+        entity_type,
         'billing_lifecycle' as state_name,
         CASE
             WHEN event_name = 'trial_started' THEN 'trialing'
@@ -121,14 +128,13 @@ state_changes AS (
             WHEN event_name = 'subscription_cancelled' THEN 'cancelled'
         END as state_value,
         occurred_at as state_entered_at,
-        source,
-        _ingested_at
+        event_id as trigger_event_id
     FROM events
     WHERE entity_id IS NOT NULL
 )
 
 SELECT
-    {{ dbt_utils.generate_surrogate_key(['entity_id', 'state_name', 'state_entered_at']) }} as id,
+    {{ nexus.create_nexus_id('state', ['entity_id', 'state_name', 'state_entered_at', 'trigger_event_id']) }} as state_id,
     entity_id,
     entity_type,
     state_name,
@@ -145,9 +151,9 @@ SELECT
         ) IS NULL THEN TRUE
         ELSE FALSE
     END as is_current,
-    source,
-    _ingested_at
+    trigger_event_id
 FROM state_changes
+ORDER BY entity_id, state_entered_at
 ```
 
 ## Derived States
@@ -160,7 +166,7 @@ Derived states combine multiple base states using the `derived_state` macro.
 -- models/states/active_shop_status.sql
 {{ config(
     materialized='incremental',
-    unique_key='id',
+    unique_key='state_id',
     tags=['states', 'derived']
 ) }}
 
@@ -197,6 +203,11 @@ Derived states combine multiple base states using the `derived_state` macro.
 - Use incremental materialization for performance
 - Add appropriate tags for organization
 - Document each state with a companion `.md` file
+- Use `nexus.create_nexus_id('state', ...)` to generate `state_id` with the
+  `st_` prefix
+- Include `trigger_event_id` to track which event caused each state change
+- Join `nexus_events` with `nexus_entity_participants` to get `entity_id` and
+  `entity_type`
 
 ### Performance
 

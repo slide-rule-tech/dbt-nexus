@@ -23,7 +23,7 @@ WITH source_data AS (
                  AND ARRAY_LENGTH(JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence')) > 0 THEN TRUE
             ELSE FALSE
         END AS is_recurring
-    FROM {{ source('google_calendar', 'events') }}
+    FROM {{ ref('google_calendar_events_base') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
 ),
@@ -45,8 +45,9 @@ deduplicated AS (
         _connection_id,
         _stream_id,
         _raw_record,
-        _sync_timestamp,
-        _sync_token,
+        _sync_id,
+        _account,
+        _sync_metadata,
         ROW_NUMBER() OVER (
             PARTITION BY event_key
             ORDER BY _ingested_at DESC
@@ -60,8 +61,9 @@ SELECT
     _connection_id,
     _stream_id,
     _raw_record,
-    _sync_timestamp,
-    _sync_token
+    _sync_id,
+    _account,
+    _sync_metadata
 FROM deduplicated
 WHERE rn = 1
 

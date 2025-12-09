@@ -22,10 +22,6 @@ SELECT
     message_id_header,
     sent_at,
     subject,
-    body,
-    attachments_array,
-    ARRAY_LENGTH(REGEXP_EXTRACT_ALL(COALESCE(body, ''), r'\b\w+\b')) as body_word_count,
-    IFNULL(ARRAY_LENGTH(attachments_array), 0) as attachments_count,
     'gmail_message_events' as source_table,
     _ingested_at
 FROM {{ ref('gmail_messages') }}

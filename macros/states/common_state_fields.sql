@@ -11,7 +11,7 @@
         CAST(NULL AS STRING) AS trigger_event_id
     {% else %}
         -- State identification
-        {{ create_nexus_id('state', ['entity_id', 'entity_type', 'state_name', 'state_value', 'state_entered_at']) }} AS state_id,
+        {{ nexus.create_nexus_id('state', ['entity_id', 'state_name', 'state_entered_at', 'trigger_event_id']) }} AS state_id,
         -- Entity identification
         entity_id,
         entity_type,

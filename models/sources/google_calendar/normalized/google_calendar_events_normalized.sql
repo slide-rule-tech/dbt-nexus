@@ -16,8 +16,9 @@ WITH source_data AS (
         _ingested_at,
         _connection_id,
         _stream_id,
-        _sync_timestamp,
-        _sync_token
+        _sync_id,
+        _account,
+        _sync_metadata
     FROM {{ ref('google_calendar_events_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
@@ -103,8 +104,9 @@ extracted AS (
         _raw_record as raw_record,
         _connection_id,
         _stream_id,
-        _sync_timestamp,
-        _sync_token,
+        _sync_id,
+        _account,
+        _sync_metadata,
         'google_calendar' as source
     FROM source_data
 ),
@@ -143,8 +145,9 @@ SELECT
     raw_record,
     _connection_id,
     _stream_id,
-    _sync_timestamp,
-    _sync_token,
+    _sync_id,
+    _account,
+    _sync_metadata,
     source
 FROM with_composite_key
 -- Deduplication: keep latest event per event_key (iCalUID for single, iCalUID + instanceStart for recurring)

@@ -28,12 +28,15 @@ sources:
           - name: _raw_record
             description: "Raw JSON record containing Gmail message data"
             data_type: json
-          - name: _sync_timestamp
-            description: "Timestamp-based cursor for incremental sync"
-            data_type: timestamp
-          - name: _sync_token
-            description: "Token-based cursor (history ID) for incremental sync"
+          - name: _sync_id
+            description: "Sync identifier"
             data_type: string
+          - name: _account
+            description: "Account identifier"
+            data_type: string
+          - name: _sync_metadata
+            description: "Additional sync metadata"
+            data_type: json
 
 models:
   # Union Layer Tests - Events
