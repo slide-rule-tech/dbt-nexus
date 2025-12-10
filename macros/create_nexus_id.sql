@@ -11,6 +11,8 @@
     rel
   {%- elif type == 'state' -%}
     st
+  {%- elif type == 'entity_state' -%}
+    es
   {%- elif type == 'person_identifier' -%}
     per_idfr
   {%- elif type == 'group_identifier' -%}
@@ -72,6 +74,8 @@
     {%- set p = 'rel' -%}
   {%- elif type == 'state' -%}
     {%- set p = 'st' -%}
+  {%- elif type == 'entity_state' -%}
+    {%- set p = 'es' -%}
   {%- elif type == 'person_identifier' -%}
     {%- set p = 'per_idfr' -%}
   {%- elif type == 'group_identifier' -%}
