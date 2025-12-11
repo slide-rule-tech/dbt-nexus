@@ -8,14 +8,17 @@
     materialized='table'
 ) }}
 
+with identifiers as (
 {{ nexus.unpivot_identifiers(
     model_name='segment_events',
-    columns=['segment_anonymous_id'] + var('segment', {}).get('identifiers', []),
+    columns=['segment_anonymous_id'] + var('nexus', {}).get('sources', {}).get('segment', {}).get('identifiers', []),
     event_id_field='event_id',
     edge_id_field='event_id',
     additional_columns=['occurred_at', "'segment' as source"],
-    entity_type='person',
-    role_column="'visitor'"
-) }}
+        entity_type='person',
+        role_column="'visitor'"
+    ) }}
+)
 
+select * from identifiers
 order by occurred_at desc

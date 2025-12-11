@@ -10,7 +10,7 @@
 
 {{ nexus.unpivot_traits(
     model_name='segment_events',
-    columns=['segment_anonymous_id'] + var('nexus', {}).get('segment', {}).get('traits', []),
+    columns=['segment_anonymous_id'] + var('nexus', {}).get('sources', {}).get('segment', {}).get('traits', []),
     identifier_column='segment_anonymous_id',
     identifier_type='segment_anonymous_id',
     event_id_field='event_id',
