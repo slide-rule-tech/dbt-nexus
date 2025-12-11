@@ -27,9 +27,10 @@ WITH events_with_entities AS (
         AND DATE(e.occurred_at) <= '{{ end_date }}'
 ),
 
--- Find active entity_state for each event
+-- Find active entity_state for each event-entity combination
 -- Tie handling: If event occurs exactly when state changes (occurred_at = valid_from),
 -- use the PREVIOUS state (strictly less than ensures initial state wins)
+-- Note: Partition by both event_id AND entity_id because an event can have multiple entity participants
 active_states AS (
     SELECT 
         ewe.event_id,
@@ -37,7 +38,7 @@ active_states AS (
         ewe.entity_type,
         es.entity_state_id,
         ROW_NUMBER() OVER (
-            PARTITION BY ewe.event_id
+            PARTITION BY ewe.event_id, ewe.entity_id
             ORDER BY es.valid_from DESC
         ) as state_rank
     FROM events_with_entities ewe
