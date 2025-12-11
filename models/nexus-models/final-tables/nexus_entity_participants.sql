@@ -1,6 +1,6 @@
 {{ config(materialized='table', tags=['identity-resolution', 'participants', 'realtime']) }}
 
-{% set entity_types = var('nexus', {}).get('entity_types') %}
+{% set entity_types = var('nexus', {}).get('entity_types', []) %}
 
 with 
 {% for entity_type in entity_types %}
