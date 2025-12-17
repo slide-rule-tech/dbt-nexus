@@ -4,55 +4,69 @@
     tags=['gmail', 'intermediate', 'group_identifiers']
 ) }}
 
--- Extract group (domain) identifiers from gmail message participants
+-- Extract group (domain) identifiers from gmail thread participants
 WITH participants AS (
-    SELECT * FROM {{ ref('gmail_message_participants') }}
+    SELECT * FROM {{ ref('gmail_thread_participants') }}
 ),
 
 -- Filter out generic domains
 domains_filtered AS (
     SELECT DISTINCT
-        {{ nexus.create_nexus_id('event', ['message_id']) }} as event_id,
-        sent_at,
+        {{ nexus.create_nexus_id('event', ['thread_id', "'thread started'"]) }} as event_id,
+        thread_id,
+        first_participated_at,
         _ingested_at,
         domain,
-        role
+        roles
     FROM participants
     WHERE {{ filter_non_generic_domains('domain') }}
       AND domain NOT LIKE '%>%'
 ),
 
+-- Unnest roles to create one identifier per role
+domains_with_roles AS (
+    SELECT 
+        event_id,
+        thread_id,
+        first_participated_at,
+        _ingested_at,
+        domain,
+        role
+    FROM domains_filtered,
+    UNNEST(roles) as role
+),
+
 -- Create domain identifiers
 domain_identifiers AS (
     SELECT
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'domain', "'group'", 'role', 'sent_at']) }} as entity_identifier_id,
+        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'domain', "'group'", 'role', 'first_participated_at']) }} as entity_identifier_id,
         event_id,
         {{ nexus.create_nexus_id('edge', ['event_id', 'domain', "'group'", 'role']) }} as edge_id,
         'group' as entity_type,
         'domain' as identifier_type,
         domain as identifier_value,
         'gmail' as source,
-        sent_at as occurred_at,
+        first_participated_at as occurred_at,
         _ingested_at,
         role
-    FROM domains_filtered
+    FROM domains_with_roles
     WHERE domain IS NOT NULL
 ),
 
 -- Add redirected domains (www. versions)
 redirected_domains AS (
     SELECT
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', nexus.redirected_domain('domain'), "'group'", 'role', 'sent_at']) }} as entity_identifier_id,
+        {{ nexus.create_nexus_id('entity_identifier', ['event_id', nexus.redirected_domain('domain'), "'group'", 'role', 'first_participated_at']) }} as entity_identifier_id,
         event_id,
         {{ nexus.create_nexus_id('edge', ['event_id', nexus.redirected_domain('domain'), "'group'", 'role']) }} as edge_id,
         'group' as entity_type,
         'domain' as identifier_type,
         {{ nexus.redirected_domain('domain') }} as identifier_value,
         'gmail' as source,
-        sent_at as occurred_at,
+        first_participated_at as occurred_at,
         _ingested_at,
         role
-    FROM domains_filtered
+    FROM domains_with_roles
     WHERE domain IS NOT NULL
 ),
 
@@ -89,3 +103,4 @@ SELECT
 FROM deduplicated_identifiers
 WHERE rn = 1
 ORDER BY occurred_at DESC
+

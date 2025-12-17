@@ -16,18 +16,23 @@ declarations - all through simple configuration.
 ## Overview
 
 The Gmail template source transforms raw Gmail message data into the nexus
-framework using the v0.3.0 entity-centric architecture:
+framework using a split architecture that handles per-account normalization and
+cross-account aggregation:
 
-- **📧 Email Events**: Each message becomes a `message_sent` event
+- **📧 Email Events**: Each message becomes a `message_sent` event; each thread
+  becomes a `thread started` event
 - **👤 Person Entities**: Extracts email addresses from senders and recipients
 - **🏢 Group Entities**: Creates groups from non-generic email domains
 - **🔗 Relationships**: Links people to their organizations via email domains
   (membership type)
-- **🏷️ Entity Traits**: Captures names and email addresses for all entities
-- **🔄 Cross-Account Deduplication**: Uses `Message-ID` header to deduplicate
-  emails across multiple Gmail accounts
+- **🔄 Cross-Account Deduplication**: Uses `Message-ID` header
+  (`message_id_header`) to deduplicate emails across multiple Gmail accounts
+- **🧵 Thread Grouping**: Uses `first_message_id_header` to group messages into
+  threads across accounts
 - **📨 Participant Roles**: Distinguishes between `sender`, `recipient`, `cced`,
   and `bcced` participants
+- **🔑 Account Mapping**: Maintains dictionaries mapping accounts to
+  Gmail-specific IDs (`gmail_message_ids`, `gmail_thread_ids`)
 
 ## Quick Start
 
@@ -178,164 +183,231 @@ The `_raw_record` column should contain Gmail API message format:
 
 ## Generated Models
 
-Gmail uses the **four-layer source architecture** with split normalized models
-for optimal performance:
+Gmail uses a **split architecture** with per-account and cross-account layers
+for optimal performance and cross-account deduplication:
 
-### Layer 1: Base - `gmail_messages_base.sql`
+### Layer 1: Base - `gmail_messages_base_dedupped.sql`
 
-Simple passthrough with zero transformation overhead:
-
-**Key Features:**
-
-- Direct `SELECT *` from source table
-- No JSON parsing or transformations
-- Minimal overhead for maximum performance
-
-### Layer 2: Normalized - Split Structure
-
-#### `gmail_messages.sql` - Message-Level Data
-
-Clean, deduplicated email messages.
+Simple passthrough with basic deduplication:
 
 **Key Features:**
 
-- **Cross-Account Deduplication**: Uses `Message-ID` header as primary
-  identifier
-- **Header Extraction**: Extracts `Message-ID` and `Subject` from headers array
-- **Timestamp Conversion**: Converts `internalDate` (milliseconds) to `sent_at`
-  timestamp
-- **Thread Support**: Preserves `threadId` for conversation threading
-- **Body Content**: Extracts `body_text` and `attachments` array
+- Direct `SELECT *` from source table with deduplication
+- Minimal transformation overhead
+- Uses `QUALIFY` to keep latest record per Gmail message ID per account
 
-**Contains:**
+### Layer 2: Normalized - Split Architecture
+
+The normalized layer is split into two tiers:
+
+#### Data Model Relationships
+
+```mermaid
+erDiagram
+    gmail_messages ||--o{ gmail_message_participants : "has"
+    gmail_threads ||--o{ gmail_messages : "contains"
+    gmail_threads ||--o{ gmail_thread_participants : "has"
+
+    gmail_messages {
+        string message_id PK "Message-ID header"
+        string thread_id FK "From first_message_id_header"
+        timestamp sent_at
+        string subject
+        string gmail_message_ids "JSON dict"
+        string gmail_thread_ids "JSON dict"
+        string label_ids "JSON dict"
+        array all_label_ids
+    }
+
+    gmail_message_participants {
+        string message_id FK "Message-ID header"
+        string email
+        string role "sender/recipient/cced/bcced"
+        string domain
+        timestamp sent_at
+    }
+
+    gmail_threads {
+        string thread_id PK "first_message_id_header"
+        string subject
+        timestamp first_message_sent_at
+        timestamp last_message_sent_at
+        string gmail_thread_ids "JSON dict"
+        string label_ids "JSON dict"
+        array all_label_ids
+    }
+
+    gmail_thread_participants {
+        string thread_id FK "first_message_id_header"
+        string email
+        array roles
+        string domain
+        timestamp first_participated_at
+        timestamp last_participated_at
+    }
+```
+
+#### Per-Account Models (`gmail_normalized_by_account/`)
+
+These models normalize data using Gmail-specific IDs (per account):
+
+- **`gmail_messages_by_account.sql`**: Per-account message normalization
+
+  - Uses `gmail_message_id` (from `$.id`) as primary key
+  - Extracts `message_id_header` (Message-ID header) for cross-account linking
+  - Extracts `gmail_thread_id` (from `$.threadId`)
+  - Extracts subject, labels, snippet, size_estimate
+  - Cleans subject by removing RE:/FWD: prefixes
+  - Decodes HTML entities in snippet
+
+- **`gmail_threads_by_account.sql`**: Per-account thread aggregation
+
+  - Groups messages by `gmail_thread_id` and `_account`
+  - Aggregates thread metadata (subject, timestamps, message counts)
+  - Creates `first_message_id_header` for cross-account thread linking
+  - Aggregates `label_ids` from all messages in thread
+
+- **`gmail_message_participants_by_account.sql`**: Per-account participant
+  extraction
+
+  - One row per participant per message per account
+  - Uses `gmail_message_id` for linking
+  - Extracts and normalizes email addresses from headers
+
+- **`gmail_thread_participants_by_account.sql`**: Per-account thread participant
+  aggregation
+  - Groups participants by `gmail_thread_id` and `_account`
+  - Aggregates roles and participation timestamps
+
+#### Cross-Account Models
+
+These models aggregate per-account data using cross-account identifiers:
+
+- **`gmail_messages.sql`**: Cross-account message aggregation
+  - Groups by `message_id_header` (Message-ID header)
+  - Creates dictionaries mapping `_stream_id` to `gmail_message_id` and
+    `gmail_thread_id`
+  - Aggregates `label_ids` per account and creates `all_label_ids` array
+  - Joins with threads to get `thread_id` from `first_message_id_header`
+  - Keeps latest values using `ARRAY_AGG` with `ORDER BY sent_at DESC`
+
+**Key Fields:**
 
 ```sql
-message_id               -- Primary key from Message-ID header
-thread_id                -- Thread identifier
-gmail_message_id         -- Gmail-specific ID (from $.id)
-message_id_header        -- Message-ID header value
-sent_at                  -- Parsed timestamp from internalDate
-subject                  -- Email subject
-body                     -- Email body text
-attachments_array        -- Array of attachment objects
-_ingested_at             -- Ingestion timestamp
-raw_record               -- Full JSON record
-_connection_id           -- Nango connection ID
-_stream_id               -- Stream identifier
-_sync_timestamp          -- Sync timestamp
-_sync_token              -- Sync token (history ID)
+message_id               -- Primary key from message_id_header (Message-ID)
+thread_id                -- Thread ID from first_message_id_header
+sent_at                  -- Latest sent_at timestamp
+subject                  -- Cleaned subject (latest)
+raw_subject              -- Original subject (latest)
+in_reply_to              -- In-Reply-To header (latest)
+snippet                  -- Message snippet (HTML decoded)
+size_estimate            -- Message size estimate
+gmail_message_ids        -- JSON dict: {"account": "gmail_message_id"}
+gmail_thread_ids         -- JSON dict: {"account": "gmail_thread_id"}
+label_ids                -- JSON dict: {"account": ["label1", "label2"]}
+all_label_ids           -- Array of all unique labels across accounts
+raw_record               -- Full JSON record (latest)
 source                   -- "gmail"
+_ingested_at             -- Latest ingestion timestamp
 ```
 
-**Deduplication Logic:**
+- **`gmail_threads.sql`**: Cross-account thread aggregation
+  - Groups by `first_message_id_header` (from per-account threads)
+  - Creates `gmail_thread_ids` dictionary mapping accounts to Gmail thread IDs
+  - Aggregates `label_ids` per account and creates `all_label_ids` array
+  - Aggregates thread metadata (subject, timestamps)
 
-- Uses `Message-ID` header value as primary `message_id`
-- Deduplicates across accounts:
-  `QUALIFY row_number() OVER (PARTITION BY message_id ORDER BY sent_at DESC) = 1`
-- Only processes messages with valid `Message-ID` header
-
-**Why Message-ID instead of Gmail ID?**
-
-Gmail message IDs (`$.id`) are unique within a single account, but the same
-email appears with different IDs across different accounts. `Message-ID` is a
-standard email header that's stable across accounts, making it perfect for
-cross-account deduplication.
-
-#### `gmail_message_participants.sql` - Participant-Level Data
-
-One row per participant per message, normalized and validated.
-
-**Key Features:**
-
-- Extracts all participants from headers: `From`, `To`, `Cc`, `Bcc`
-- Uses Gmail email parsing macros for consistency
-- Normalizes email addresses using `validate_and_normalize_email()`
-- Extracts domains for group entity creation
-- Preserves participant roles: `sender`, `recipient`, `cced`, `bcced`
-
-**Contains:**
+**Key Fields:**
 
 ```sql
-message_id               -- Message-ID header (matches gmail_messages)
-name                     -- Participant name (extracted or from header)
-email                    -- Normalized email address
-domain                   -- Extracted domain
-role                     -- "sender", "recipient", "cced", or "bcced"
-sent_at                  -- Message send time
-_ingested_at             -- Ingestion timestamp
+thread_id                -- Primary key from first_message_id_header
+subject                  -- Thread subject (from first message)
+raw_subject              -- Original subject (from first message)
+first_message_sent_at    -- Earliest message timestamp
+last_message_sent_at     -- Latest message timestamp
+gmail_thread_ids         -- JSON dict: {"account": "gmail_thread_id"}
+label_ids                -- JSON dict: {"account": ["label1", "label2"]}
+all_label_ids           -- Array of all unique labels across accounts
+_ingested_at             -- Earliest ingestion timestamp
 ```
 
-**Role Types:**
+- **`gmail_message_participants.sql`**: Cross-account participant aggregation
 
-- `sender`: Person who sent the email (from `From` header)
-- `recipient`: Person in `To` field
-- `cced`: Person in `Cc` field
-- `bcced`: Person in `Bcc` field
+  - Groups by `message_id_header`, `email`, and `role`
+  - Joins with `gmail_messages_by_account` to get `message_id_header`
+  - Keeps latest participant information per message
 
-**Participant Extraction Pattern:**
+- **`gmail_thread_participants.sql`**: Cross-account thread participant
+  aggregation
+  - Groups by `thread_id` (from `first_message_id_header`), `email`, and
+    `domain`
+  - Aggregates roles and participation timestamps across accounts
 
-1. Extract `From` header → single sender
-2. Split `To` header by comma → multiple recipients
-3. Split `Cc` header by comma → multiple CC recipients
-4. Split `Bcc` header by comma → multiple BCC recipients
-5. Parse each email using `parse_gmail_email()` macro
-6. Extract name using `extract_gmail_name()` macro
-7. Validate and normalize using `validate_and_normalize_email()` macro
+### Layer 3: Intermediate - Events and Identifiers
 
-### Layer 3: Intermediate - 6 Models
+- **`gmail_message_events.sql`**: Message events with full metadata
 
-Separate person/group logic for better debugging and transparency:
+  - Creates `message sent` events from `gmail_messages`
+  - Includes all message fields (gmail_message_ids, gmail_thread_ids, labels,
+    snippet, etc.)
 
-- `gmail_message_events.sql` - Message events with metadata (reads from
-  `gmail_messages`)
-- `gmail_message_person_identifiers.sql` - Sender/recipient email identifiers
-  (reads from `gmail_message_participants`)
-- `gmail_message_group_identifiers.sql` - Domain identifiers filtered (reads
-  from `gmail_message_participants`)
-- `gmail_message_person_traits.sql` - Names and emails (reads from
-  `gmail_message_participants`)
-- `gmail_message_group_traits.sql` - Domain names (reads from
-  `gmail_message_participants`)
-- `gmail_message_relationship_declarations.sql` - Person→domain memberships
-  (reads from `gmail_message_participants`)
+- **`gmail_thread_events.sql`**: Thread started events
 
-**Key Pattern:** All intermediate models read directly from normalized tables
-without joins. Person/group models read from `gmail_message_participants`, event
-model reads from `gmail_messages`.
+  - Creates `thread started` events from `gmail_threads`
+  - Uses `first_message_sent_at` as `occurred_at`
 
-### Layer 4: Union - 4 Models (Nexus Integration)
+- **`gmail_message_person_identifiers.sql`**: Person identifiers from message
+  participants
+- **`gmail_message_group_identifiers.sql`**: Group (domain) identifiers from
+  message participants
+- **`gmail_thread_person_identifiers.sql`**: Person identifiers from thread
+  participants
+- **`gmail_thread_group_identifiers.sql`**: Group (domain) identifiers from
+  thread participants
+
+**Key Pattern:** Event models read from normalized cross-account models.
+Identifier models read from participant models and create identifiers linked to
+events via `event_id`.
+
+### Layer 4: Union - Nexus Integration
 
 These models feed directly into the nexus pipeline:
 
 #### `gmail_events`
 
-Creates nexus-compatible events:
+Unified events from messages and threads:
 
 ```sql
 event_id               -- Unique event identifier (evt_ prefix)
-event_name             -- "message_sent"
-occurred_at            -- Email send time (sent_at)
-event_description      -- Email subject
+event_name             -- "message sent" or "thread started"
+occurred_at            -- Email send time (sent_at) or thread start (first_message_sent_at)
+event_description      -- Email subject or thread subject
 event_type             -- "email"
 source                 -- "gmail"
+source_table           -- "gmail_message_events" or "gmail_thread_events"
 _ingested_at           -- Ingestion timestamp
-message_id             -- Message-ID header
+-- Additional fields from messages/threads
+message_id             -- Message-ID header (for message events)
 thread_id              -- Thread identifier
+gmail_message_ids      -- Account mapping dictionary
+gmail_thread_ids       -- Account mapping dictionary
+label_ids              -- Account label mapping
+all_label_ids         -- All unique labels
 ```
 
 #### `gmail_entity_identifiers`
 
-Unified person + group identifiers:
+Unified person + group identifiers from messages and threads:
 
 ```sql
 entity_identifier_id   -- Unique identifier (ent_idfr_ prefix)
-event_id               -- Reference to email event
+event_id               -- Reference to email/thread event
 edge_id                -- Groups related identifiers
 entity_type            -- "person" or "group"
 identifier_type        -- "email" or "domain"
 identifier_value       -- Email address or domain
-role                   -- Participation role (see below)
-occurred_at            -- Email timestamp
+role                   -- Participation role
+occurred_at            -- Email/thread timestamp
 source                 -- "gmail"
 _ingested_at           -- Ingestion timestamp
 ```
@@ -345,44 +417,8 @@ _ingested_at           -- Ingestion timestamp
 - Person roles: `sender`, `recipient`, `cced`, `bcced`
 - Group roles: `sender`, `recipient`, `cced`, `bcced` (for domain tracking)
 
-#### `gmail_entity_traits`
-
-Unified person + group traits:
-
-```sql
-entity_trait_id        -- Unique trait identifier (ent_tr_ prefix)
-event_id               -- Reference to email event
-entity_type            -- "person" or "group"
-identifier_type        -- "email" or "domain"
-identifier_value       -- Email address or domain
-trait_name             -- "name", "email" (for persons) or "domain_name" (for domains)
-trait_value            -- The trait value
-occurred_at            -- Email timestamp
-source                 -- "gmail"
-_ingested_at           -- Ingestion timestamp
-```
-
-#### `gmail_relationship_declarations`
-
-Person→group relationship declarations:
-
-```sql
-relationship_declaration_id  -- Unique ID (rel_decl_ prefix)
-event_id                     -- Reference to email event
-occurred_at                  -- Email timestamp
-entity_a_identifier          -- Person email address
-entity_a_identifier_type     -- "email"
-entity_a_type                -- "person"
-entity_a_role                -- "sender", "recipient", "cced", or "bcced"
-entity_b_identifier          -- Email domain
-entity_b_identifier_type     -- "domain"
-entity_b_type                -- "group"
-entity_b_role                -- "organization"
-relationship_type            -- "membership"
-relationship_direction       -- "a_to_b"
-is_active                    -- true
-source                       -- "gmail"
-```
+**Note:** Traits and relationship declarations are not generated for Gmail (as
+per user requirements).
 
 **Filtered Generic Domains:**
 
@@ -391,41 +427,66 @@ source                       -- "gmail"
 - googlemail.com, ymail.com, rocketmail.com, protonmail.com
 - mail.com, zoho.com
 
-## Cross-Account Deduplication
+## Cross-Account Architecture
 
-Gmail uses the `Message-ID` header for cross-account deduplication:
+Gmail uses a **split architecture** to handle cross-account deduplication and
+aggregation:
 
-### Message-ID Header
+### Per-Account Normalization
 
-- **Primary Key**: `Message-ID` header value from email headers
+First, data is normalized per account using Gmail-specific IDs:
+
+- **`gmail_messages_by_account`**: Uses `gmail_message_id` (from `$.id`) as
+  primary key
+- **`gmail_threads_by_account`**: Uses `gmail_thread_id` (from `$.threadId`) as
+  primary key
+- Extracts `message_id_header` (Message-ID header) for cross-account linking
+- Extracts `first_message_id_header` from threads for cross-account thread
+  grouping
+
+### Cross-Account Aggregation
+
+Then, data is aggregated across accounts using standard email identifiers:
+
+- **Messages**: Grouped by `message_id_header` (Message-ID header)
+- **Threads**: Grouped by `first_message_id_header` (from the first message in
+  thread)
+- **Participants**: Grouped by `message_id_header`, `email`, and `role`
+
+### Message-ID Header for Deduplication
+
+- **Primary Key**: `message_id_header` (Message-ID header value) for messages
 - **Deduplication**: Messages with the same `Message-ID` across different Gmail
   accounts are treated as the same email
 - **Use Case**: Same email appearing in sender's and all recipients' inboxes
 
-### Deduplication Logic
+### Thread Grouping
 
-```sql
--- Extract Message-ID header
-message_id_header = (
-  SELECT JSON_EXTRACT_SCALAR(header, '$.value')
-  FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
-  WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'message-id'
-  LIMIT 1
-)
+- **Thread Key**: `first_message_id_header` (Message-ID of the first message in
+  thread)
+- **Grouping**: All messages in a thread share the same
+  `first_message_id_header`
+- **Cross-Account**: Threads are linked across accounts using this identifier
 
--- Use Message-ID as primary identifier
--- Deduplicate keeping latest by sent_at
-QUALIFY row_number() OVER (
-  PARTITION BY message_id
-  ORDER BY sent_at DESC
-) = 1
-```
+### Account Mapping Dictionaries
 
-This ensures the same email (identified by `Message-ID`) appearing in multiple
-Gmail accounts is only counted once, while preserving all participant
-information from each account's perspective.
+The cross-account models maintain dictionaries to map accounts to Gmail-specific
+IDs:
 
-### Why Not Gmail Message ID?
+- **`gmail_message_ids`**:
+  `{"account1@example.com": "gmail_id_1", "account2@example.com": "gmail_id_2"}`
+- **`gmail_thread_ids`**:
+  `{"account1@example.com": "thread_id_1", "account2@example.com": "thread_id_2"}`
+- **`label_ids`**:
+  `{"account1@example.com": ["INBOX", "SENT"], "account2@example.com": ["INBOX"]}`
+
+This allows you to:
+
+- Track which Gmail account a message/thread belongs to
+- Access account-specific labels
+- Link back to per-account data when needed
+
+### Why Message-ID Instead of Gmail ID?
 
 Gmail message IDs (`$.id`) are account-specific. The same email has different
 IDs when it appears in:
@@ -435,7 +496,7 @@ IDs when it appears in:
 - CC recipient's Inbox
 
 `Message-ID` is standardized by RFC 2822 and is consistent across all accounts,
-making it the perfect deduplication key.
+making it the perfect deduplication key for cross-account aggregation.
 
 ## Integration Examples
 
@@ -524,18 +585,37 @@ ORDER BY total_participations DESC;
 ```sql
 -- Analyze email threads with participant counts
 SELECT
-    thread_id,
-    COUNT(DISTINCT message_id) as message_count,
-    COUNT(DISTINCT email) as unique_participants,
-    ARRAY_AGG(DISTINCT subject ORDER BY sent_at LIMIT 1)[OFFSET(0)] as thread_subject,
-    MIN(sent_at) as thread_start,
-    MAX(sent_at) as thread_end
-FROM {{ ref('gmail_message_participants') }} p
-JOIN {{ ref('gmail_messages') }} m ON p.message_id = m.message_id
-WHERE sent_at >= CURRENT_DATE - INTERVAL 90 DAY
-GROUP BY thread_id
+    t.thread_id,
+    t.subject,
+    t.first_message_sent_at,
+    t.last_message_sent_at,
+    COUNT(DISTINCT m.message_id) as message_count,
+    COUNT(DISTINCT tp.email) as unique_participants,
+    t.gmail_thread_ids
+FROM {{ ref('gmail_threads') }} t
+LEFT JOIN {{ ref('gmail_messages') }} m ON t.thread_id = m.thread_id
+LEFT JOIN {{ ref('gmail_thread_participants') }} tp ON t.thread_id = tp.thread_id
+WHERE t.first_message_sent_at >= CURRENT_DATE - INTERVAL 90 DAY
+GROUP BY t.thread_id, t.subject, t.first_message_sent_at, t.last_message_sent_at, t.gmail_thread_ids
 HAVING message_count > 1
-ORDER BY thread_start DESC;
+ORDER BY t.first_message_sent_at DESC;
+```
+
+### Cross-Account Message Tracking
+
+```sql
+-- Find messages that appear in multiple accounts
+SELECT
+    message_id,
+    subject,
+    sent_at,
+    JSON_EXTRACT_SCALAR(gmail_message_ids, '$.account1@example.com') as account1_gmail_id,
+    JSON_EXTRACT_SCALAR(gmail_message_ids, '$.account2@example.com') as account2_gmail_id,
+    all_label_ids
+FROM {{ ref('gmail_messages') }}
+WHERE JSON_EXTRACT(gmail_message_ids, '$') IS NOT NULL
+  AND ARRAY_LENGTH(JSON_EXTRACT_ARRAY(JSON_OBJECT_KEYS(gmail_message_ids))) > 1
+ORDER BY sent_at DESC;
 ```
 
 ## Performance Considerations

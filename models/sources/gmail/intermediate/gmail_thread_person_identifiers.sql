@@ -4,21 +4,34 @@
     tags=['gmail', 'intermediate', 'person_identifiers']
 ) }}
 
--- Extract person identifiers from gmail message participants
+-- Extract person identifiers from gmail thread participants
 WITH participants AS (
-    SELECT * FROM {{ ref('gmail_message_participants') }}
+    SELECT * FROM {{ ref('gmail_thread_participants') }}
 ),
 
 participants_with_event_id AS (
     SELECT 
-        {{ nexus.create_nexus_id('event', ['message_id']) }} as event_id,
-        message_id,
+        {{ nexus.create_nexus_id('event', ['thread_id', "'thread started'"]) }} as event_id,
+        thread_id,
         email,
-        sent_at,
+        first_participated_at,
         _ingested_at,
-        role
+        roles
     FROM participants
     WHERE email IS NOT NULL
+),
+
+-- Unnest roles to create one identifier per role
+participants_with_roles AS (
+    SELECT 
+        event_id,
+        thread_id,
+        email,
+        first_participated_at,
+        _ingested_at,
+        role
+    FROM participants_with_event_id,
+    UNNEST(roles) as role
 ),
 
 identifiers AS (
@@ -30,10 +43,10 @@ identifiers AS (
         'email' as identifier_type,
         email as identifier_value,
         'gmail' as source,
-        sent_at as occurred_at,
+        first_participated_at as occurred_at,
         _ingested_at,
         role
-    FROM participants_with_event_id
+    FROM participants_with_roles
 ),
 
 -- Deduplicate: same entity_identifier_id can appear from multiple streams/ingestions
@@ -62,3 +75,4 @@ SELECT
 FROM deduplicated_identifiers
 WHERE rn = 1
 ORDER BY occurred_at DESC
+

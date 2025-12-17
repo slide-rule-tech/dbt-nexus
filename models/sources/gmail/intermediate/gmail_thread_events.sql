@@ -4,32 +4,28 @@
     tags=['gmail', 'intermediate', 'events']
 ) }}
 
--- Extract message events from normalized gmail messages
+-- Extract thread started events from normalized gmail threads
 SELECT
-    {{ nexus.create_nexus_id('event', ['message_id']) }} as event_id,
-    sent_at as occurred_at,
-    'message sent' as event_name,
+    {{ nexus.create_nexus_id('event', ['thread_id', '"thread started"']) }} as event_id,
+    first_message_sent_at as occurred_at,
+    'thread started' as event_name,
     'email' as event_type,
     subject as event_description,
     'gmail' as source,
     null as value,
     null as value_unit,
-    'gmail_message_events' as source_table,
+    'gmail_thread_events' as source_table,
     _ingested_at,
     
     -- Additional fields
-    message_id,
     thread_id,
-    gmail_message_ids,
     gmail_thread_ids,
-    sent_at,
+    first_message_sent_at,
+    last_message_sent_at,
     subject,
-    in_reply_to,
     raw_subject,
-    snippet,
-    size_estimate,
     label_ids,
     all_label_ids
     
-FROM {{ ref('gmail_messages') }}
+FROM {{ ref('gmail_threads') }}
 

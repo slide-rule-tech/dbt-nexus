@@ -4,63 +4,49 @@
     tags=['gmail', 'normalized']
 ) }}
 
--- Normalized thread participants: Aggregate participants by thread
--- Shows all participants in each thread with their roles and participation stats
-WITH messages AS (
-    SELECT * FROM {{ ref('gmail_messages') }}
+-- Cross-account normalized thread participants: Group per-account participants by first_message_id_header
+WITH per_account_participants AS (
+    SELECT * FROM {{ ref('gmail_thread_participants_by_account') }}
 ),
 
-participants AS (
-    SELECT * FROM {{ ref('gmail_message_participants') }}
+per_account_threads AS (
+    SELECT * FROM {{ ref('gmail_threads_by_account') }}
 ),
 
--- Join participants with messages to get thread_id
-participants_with_threads AS (
+participants_with_thread_id AS (
     SELECT 
-        p.message_id,
-        p.participant_raw,
-        p.name,
-        p.email,
-        p.domain,
-        p.role,
-        p.sent_at,
-        p._ingested_at,
-        m.thread_id
-    FROM participants p
-    INNER JOIN messages m ON p.message_id = m.message_id
-    WHERE m.thread_id IS NOT NULL
+        pat.first_message_id_header as thread_id,
+        pap.email,
+        pap.name,
+        pap.participant_raw,
+        pap.domain,
+        pap.roles,
+        pap.first_participated_at,
+        pap.last_participated_at,
+        pap._ingested_at
+    FROM per_account_participants pap
+    INNER JOIN per_account_threads pat
+        ON pap.gmail_thread_id = pat.gmail_thread_id
+        AND pap._account = pat._account
+    WHERE pat.first_message_id_header IS NOT NULL
 ),
 
--- Aggregate participants by thread and email
 thread_participants AS (
     SELECT
         thread_id,
         email,
-        
-        -- Participant info (use most common name, or first if tie)
-        ARRAY_AGG(name ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)] as name,
-        ARRAY_AGG(participant_raw ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)] as participant_raw,
+        ARRAY_AGG(name ORDER BY first_participated_at ASC LIMIT 1)[OFFSET(0)] as name,
+        ARRAY_AGG(participant_raw ORDER BY first_participated_at ASC LIMIT 1)[OFFSET(0)] as participant_raw,
         domain,
-        
-        -- Roles this participant has had in the thread (collect all, deduplicate later)
-        ARRAY_AGG(role) as roles_raw,
-        
-        -- Participation stats
-        COUNT(DISTINCT message_id) as message_count,
-        MIN(sent_at) as first_participated_at,
-        MAX(sent_at) as last_participated_at,
-        MIN(_ingested_at) as first_ingested_at,
-        MAX(_ingested_at) as last_ingested_at,
-        
-        -- Count by role
-        COUNTIF(role = 'sender') as sender_count,
-        COUNTIF(role = 'recipient') as recipient_count,
-        COUNTIF(role = 'cced') as cced_count,
-        COUNTIF(role = 'bcced') as bcced_count
-    FROM participants_with_threads
-    WHERE email IS NOT NULL
+        ARRAY_CONCAT_AGG(roles) as roles_raw,
+        MIN(first_participated_at) as first_participated_at,
+        MAX(last_participated_at) as last_participated_at,
+        MIN(_ingested_at) as _ingested_at
+    FROM participants_with_thread_id
     GROUP BY thread_id, email, domain
-)
+),
+
+final as (
 
 SELECT 
     thread_id,
@@ -68,7 +54,6 @@ SELECT
     name,
     participant_raw,
     domain,
-    -- Deduplicate and sort roles
     ARRAY(
         SELECT DISTINCT role 
         FROM UNNEST(roles_raw) as role
@@ -80,18 +65,11 @@ SELECT
                 WHEN 'bcced' THEN 4
             END
     ) as roles,
-    message_count,
     first_participated_at,
     last_participated_at,
-    first_ingested_at,
-    last_ingested_at,
-    sender_count,
-    recipient_count,
-    cced_count,
-    bcced_count
+    _ingested_at
 FROM thread_participants
 ORDER BY thread_id, 
-    -- Helper for ordering: primary role (lowest priority number)
     CASE 
         WHEN 'sender' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 1
         WHEN 'recipient' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 2
@@ -101,4 +79,7 @@ ORDER BY thread_id,
     END,
     first_participated_at ASC,
     email
+)
 
+select * from final
+ORDER BY last_participated_at desc

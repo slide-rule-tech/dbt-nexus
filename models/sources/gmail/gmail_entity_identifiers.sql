@@ -8,7 +8,9 @@
 {{ dbt_utils.union_relations(
     relations=[
         ref('gmail_message_person_identifiers'),
-        ref('gmail_message_group_identifiers')
+        ref('gmail_message_group_identifiers'),
+        ref('gmail_thread_person_identifiers'),
+        ref('gmail_thread_group_identifiers')
     ]
 ) }}
 

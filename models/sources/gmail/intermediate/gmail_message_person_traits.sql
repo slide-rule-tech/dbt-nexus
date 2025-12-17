@@ -53,7 +53,31 @@ name_traits AS (
         _ingested_at
     FROM participants_with_event_id
     WHERE email IS NOT NULL
+),
+
+-- Deduplicate: same entity_trait_id can appear from multiple streams/ingestions
+-- Keep the row with the most recent _ingested_at
+deduplicated_traits AS (
+    SELECT 
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY entity_trait_id 
+            ORDER BY _ingested_at DESC
+        ) as rn
+    FROM name_traits
 )
 
-SELECT * FROM name_traits
+SELECT 
+    entity_trait_id,
+    event_id,
+    entity_type,
+    identifier_type,
+    identifier_value,
+    trait_name,
+    trait_value,
+    source,
+    occurred_at,
+    _ingested_at
+FROM deduplicated_traits
+WHERE rn = 1
 ORDER BY occurred_at DESC
