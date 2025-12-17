@@ -37,7 +37,7 @@ grouped_participants AS (
     FROM per_account_participants
     WHERE message_id IS NOT NULL
     GROUP BY message_id, email, role
-)
+),
 
 final as (
 SELECT 

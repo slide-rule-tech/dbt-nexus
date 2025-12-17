@@ -42,6 +42,17 @@ grouped_messages AS (
             ),
             '}'
         ) as gmail_message_ids,
+        -- Create JSON object mapping email (stream_id) to gmail_thread_id
+        -- Format: {"email1": "thread_id1", "email2": "thread_id2"}
+        CONCAT(
+            '{',
+            STRING_AGG(
+                CONCAT('"', _stream_id, '": "', gmail_thread_id, '"'),
+                ', '
+                ORDER BY _stream_id
+            ),
+            '}'
+        ) as gmail_thread_ids,
         -- Create JSON object mapping email (stream_id) to label_ids array
         -- Format: {"email1": ["label1", "label2"], "email2": ["label3"]}
         CONCAT(
@@ -94,6 +105,7 @@ joined as (
         gm.source,
         gm._ingested_at,
         gm.gmail_message_ids,
+        gm.gmail_thread_ids,
         gm.label_ids,
         al.all_label_ids
     FROM grouped_messages gm

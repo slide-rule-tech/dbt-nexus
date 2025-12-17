@@ -224,6 +224,7 @@ participants_combined AS (
 
 -- Per-account deduplication: same gmail_message_id, email, and role can appear multiple times
 -- due to multiple ingestions. Keep the most recent ingestion.
+final as (
 SELECT 
     gmail_message_id,
     participant_raw,
@@ -253,4 +254,7 @@ ORDER BY gmail_message_id,
         WHEN 'bcced' THEN 4
     END,
     email
+)
 
+select * from final
+order by sent_at desc

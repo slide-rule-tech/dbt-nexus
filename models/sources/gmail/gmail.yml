@@ -198,3 +198,39 @@ models:
           - not_null:
               config:
                 severity: error
+
+  # Normalized Layer Tests - Messages
+  - name: gmail_messages
+    description:
+      "Cross-account normalized messages grouped by message_id_header"
+    tests:
+      - unique:
+          column_name: message_id
+          config:
+            severity: error
+    columns:
+      - name: message_id
+        description:
+          "Message ID from message-id header (cross-account identifier)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  # Normalized Layer Tests - Threads
+  - name: gmail_threads
+    description:
+      "Cross-account normalized threads grouped by first_message_id_header"
+    tests:
+      - unique:
+          column_name: thread_id
+          config:
+            severity: error
+    columns:
+      - name: thread_id
+        description:
+          "Thread ID from first_message_id_header (cross-account identifier)"
+        tests:
+          - not_null:
+              config:
+                severity: error
