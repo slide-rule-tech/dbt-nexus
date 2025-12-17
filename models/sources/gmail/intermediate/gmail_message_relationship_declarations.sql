@@ -14,6 +14,7 @@ participants_with_domains AS (
     SELECT
         {{ nexus.create_nexus_id('event', ['message_id']) }} as event_id,
         sent_at,
+        _ingested_at,
         email as entity_a_identifier,
         domain as entity_b_identifier,
         role
@@ -40,12 +41,46 @@ relationships AS (
         'membership' as relationship_type,
         'a_to_b' as relationship_direction,
         true as is_active,
-        'gmail' as source
+        'gmail' as source,
+        _ingested_at
     FROM participants_with_domains
+),
+
+relationships_with_ids AS (
+    SELECT
+        {{ nexus.create_nexus_id('relationship_declaration', ['event_id', 'entity_a_identifier', 'entity_b_identifier', 'entity_a_role', 'occurred_at']) }} as relationship_declaration_id,
+        event_id,
+        occurred_at,
+        entity_a_identifier,
+        entity_a_identifier_type,
+        entity_a_type,
+        entity_a_role,
+        entity_b_identifier,
+        entity_b_identifier_type,
+        entity_b_type,
+        entity_b_role,
+        relationship_type,
+        relationship_direction,
+        is_active,
+        source,
+        _ingested_at
+    FROM relationships
+),
+
+-- Deduplicate: same relationship_declaration_id can appear from multiple streams/ingestions
+-- Keep the row with the most recent _ingested_at
+deduplicated_relationships AS (
+    SELECT 
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY relationship_declaration_id 
+            ORDER BY _ingested_at DESC
+        ) as rn
+    FROM relationships_with_ids
 )
 
 SELECT
-    {{ nexus.create_nexus_id('relationship_declaration', ['event_id', 'entity_a_identifier', 'entity_b_identifier', 'entity_a_role', 'occurred_at']) }} as relationship_declaration_id,
+    relationship_declaration_id,
     event_id,
     occurred_at,
     entity_a_identifier,
@@ -60,5 +95,6 @@ SELECT
     relationship_direction,
     is_active,
     source
-FROM relationships
+FROM deduplicated_relationships
+WHERE rn = 1
 ORDER BY occurred_at DESC

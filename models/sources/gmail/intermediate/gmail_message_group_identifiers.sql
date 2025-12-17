@@ -54,9 +54,38 @@ redirected_domains AS (
         role
     FROM domains_filtered
     WHERE domain IS NOT NULL
+),
+
+-- Combine domain and redirected domain identifiers
+all_identifiers AS (
+    SELECT * FROM domain_identifiers
+    UNION ALL
+    SELECT * FROM redirected_domains
+),
+
+-- Deduplicate: same entity_identifier_id can appear from multiple streams/ingestions
+-- Keep the row with the most recent _ingested_at
+deduplicated_identifiers AS (
+    SELECT 
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY entity_identifier_id 
+            ORDER BY _ingested_at DESC
+        ) as rn
+    FROM all_identifiers
 )
 
-SELECT * FROM domain_identifiers
-UNION ALL
-SELECT * FROM redirected_domains
+SELECT 
+    entity_identifier_id,
+    event_id,
+    edge_id,
+    entity_type,
+    identifier_type,
+    identifier_value,
+    source,
+    occurred_at,
+    _ingested_at,
+    role
+FROM deduplicated_identifiers
+WHERE rn = 1
 ORDER BY occurred_at DESC
