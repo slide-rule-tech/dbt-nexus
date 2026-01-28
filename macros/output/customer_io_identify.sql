@@ -94,10 +94,18 @@ WITH base_entities AS (
       {% endfor %}
 )
 
+{# Determine the actual column name for deduplication in the output #}
+{% set dedupe_output_name = merged_renames.get(dedupe_column, dedupe_column) %}
+{% if dedupe_column == user_id_column %}
+    {% set dedupe_output_name = 'userId' %}
+{% elif dedupe_column == anonymous_id_column %}
+    {% set dedupe_output_name = 'anonymousId' %}
+{% endif %}
+
 SELECT *
 FROM base_entities
 QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY LOWER(TRIM("{{ merged_renames.get(dedupe_column, dedupe_column) }}")) 
+    PARTITION BY LOWER(TRIM("{{ dedupe_output_name }}")) 
     ORDER BY "timestamp" DESC NULLS LAST
 ) = 1
 
