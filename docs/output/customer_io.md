@@ -1,9 +1,18 @@
-# Customer.io Identify Sync
+# Customer.io Integration
 
-This document describes the `customer_io_identify` macro for generating
-Customer.io-compatible identify sync output from `nexus_entities`.
+This document describes how to generate Customer.io-compatible output for syncing
+**people** (Identify) and **events** (Track) via the Snowflake Reverse ETL integration.
 
 ## Overview
+
+| Sync Type         | Model                 | Source                                   |
+| ----------------- | --------------------- | ---------------------------------------- |
+| Identify (people) | `customer_io_persons` | `nexus_entities` (person)                |
+| Track (events)    | `customer_io_events`  | `nexus_events` (filtered by source/type) |
+
+---
+
+# People (Identify Sync)
 
 The `customer_io_identify` macro generates a table formatted for Customer.io's
 [Reverse ETL Snowflake integration](https://docs.customer.io/integrations/data-in/connections/reverse-etl/snowflake/#identify).
@@ -166,6 +175,65 @@ Rename traits to match Customer.io attribute naming conventions:
 ) }}
 ```
 
+### Filtering by Customer Journey and Adding Custom Traits
+
+Filter to only paying customers and add customer journey state as a trait:
+
+```sql
+{{ config(materialized='view') }}
+
+-- Only include persons who have reached "paying customer" state
+with paying_customers as (
+    select distinct entity_id
+    from {{ ref('high_level_customer_journey') }}
+    where state_value != 'lead'
+),
+
+current_journey_state as (
+    select
+        e.email,
+        hlcj.state_value
+    from {{ ref('high_level_customer_journey') }} hlcj
+    inner join {{ ref('nexus_entities') }} e
+        on hlcj.entity_id = e.entity_id
+    where hlcj.is_current = true
+),
+
+persons as (
+{{ nexus.customer_io_identify(
+    entity_type='person',
+    user_id_column='email',
+    anonymous_id_column='segment_anonymous_id',
+    dedupe_column='email',
+    ignore_traits=[
+        'location_lobbie_integration_uuid',
+        'location_name',
+        'location_id',
+        'facebook_pixel_id',
+        'facebook_access_key',
+        'google_ads_account_id',
+        'facebook_account_id'
+    ],
+    filters=[
+        "email IS NOT NULL",
+        "entity_id IN (SELECT entity_id FROM paying_customers)"
+    ]
+) }}
+),
+
+persons_with_state as (
+    select
+        p.*,
+        cjs.state_value as "customer_journey_state"
+    from persons p
+    left join current_journey_state cjs
+        on p."userId" = cjs.email
+)
+
+select * from persons_with_state
+order by "timestamp" desc
+```
+
 ## Setting Up Customer.io Reverse ETL
 
 Follow these steps to sync data from your Snowflake warehouse to Customer.io.
@@ -246,3 +314,142 @@ If you see duplicates after sync:
 1. Verify the `dedupe_column` is correct
 2. Check for null values in the dedupe column (these won't deduplicate)
 3. Consider adding a filter to exclude null dedupe values
+
+---
+
+# Events (Track Sync)
+
+For tracking events in Customer.io, create a model that outputs data formatted
+for Customer.io's
+[Track sync](https://docs.customer.io/integrations/data-in/connections/reverse-etl/snowflake/#track).
+Each row represents one event to be tracked against a person.
+
+## Required Columns
+
+| Column        | Description                                                    |
+| ------------- | -------------------------------------------------------------- |
+| `userId`      | Email or user identifier (required for Track)                  |
+| `anonymousId` | Segment anonymous ID (optional, alternative to userId)         |
+| `timestamp`   | When the event occurred (use `TO_TIMESTAMP_NTZ()`)             |
+| `event`       | Event name (e.g. `appointment scheduled`, `payment completed`) |
+
+## Event Properties
+
+All additional columns become event properties in Customer.io. Common properties:
+
+| Column              | Description                         |
+| ------------------- | ----------------------------------- |
+| `event_type`        | Event category (e.g. `appointment`, `transaction`) |
+| `value`             | Numeric value (e.g. payment amount) |
+| `value_unit`        | Currency or unit (e.g. `USD`)       |
+| `event_data_source` | Source system (e.g. `lobbie`)       |
+
+### Source-Specific Properties
+
+Include relevant properties from your source system. For example, appointment
+events might include:
+
+| Column                     | Description                              |
+| -------------------------- | ---------------------------------------- |
+| `appointment_id`           | Unique appointment identifier            |
+| `appointment_type`         | Type of appointment                      |
+| `appointment_start_datetime` | Scheduled start time                   |
+| `appointment_end_datetime` | Scheduled end time                       |
+| `appointment_number`       | Nth appointment for this person          |
+| `location_id`              | Location identifier                      |
+| `location_name`            | Location display name                    |
+
+Payment events might include:
+
+| Column           | Description                                     |
+| ---------------- | ----------------------------------------------- |
+| `payment_number` | Nth payment for this person                     |
+| `product_name`   | Product or service purchased                    |
+| `cost`           | Payment amount                                  |
+| `contract_id`    | Contract ID (for recurring payments)            |
+| `is_recurring`   | Boolean flag for recurring payment              |
+| `payment_date`   | Date payment was processed                      |
+
+## Example Model
+
+```sql
+-- models/output/customer_io/customer_io_events.sql
+{{ config(materialized='view') }}
+
+-- Only include events for persons already in customer_io_persons
+with customer_io_person_ids as (
+    select "userId" as email
+    from {{ ref('customer_io_persons') }}
+),
+
+source_events as (
+    select
+        e.event_id,
+        e.occurred_at,
+        e.event_name,
+        e.event_type,
+        e.value,
+        e.value_unit,
+        e.source
+    from {{ ref('nexus_events') }} e
+    where e.source = 'your_source'
+),
+
+person_participants as (
+    select event_id, entity_id as person_entity_id
+    from {{ ref('nexus_entity_participants') }}
+    where entity_type = 'person'
+),
+
+persons as (
+    select e.entity_id, e.email, e.segment_anonymous_id
+    from {{ ref('nexus_entities') }} e
+    inner join customer_io_person_ids cip on e.email = cip.email
+    where e.entity_type = 'person'
+),
+
+events_with_person as (
+    select
+        se.*,
+        p.email,
+        p.segment_anonymous_id
+    from source_events se
+    inner join person_participants pp on se.event_id = pp.event_id
+    inner join persons p on pp.person_entity_id = p.entity_id
+    where p.email is not null
+)
+
+select
+    email as "userId",
+    segment_anonymous_id as "anonymousId",
+    to_timestamp_ntz(occurred_at) as "timestamp",
+    event_name as "event",
+    event_type as "event_type",
+    value as "value",
+    value_unit as "value_unit",
+    source as "event_data_source"
+from events_with_person
+order by "timestamp" desc
+```
+
+## Reverse ETL Query
+
+Use this query in Customer.io, replacing `YOUR_SCHEMA` with your actual schema:
+
+```sql
+SELECT *
+FROM YOUR_SCHEMA.customer_io_events
+WHERE TO_TIMESTAMP_NTZ("timestamp") > TO_TIMESTAMP_NTZ({{last_sync_time}})
+```
+
+## Best Practices
+
+- Use a **Track** sync type (not Identify) when setting up the sync in
+  Customer.io
+- Filter events to only include persons who exist in your `customer_io_persons`
+  model to avoid orphaned events
+- Use `{{last_sync_time}}` to avoid duplicate traffic and improve performance
+- Event syncs only ingest events after `last_sync_time`; backfilling requires a
+  separate one-off sync without the WHERE clause
+- Quote column names (`"columnName"`) for Snowflake compatibility
+- Use `TO_TIMESTAMP_NTZ()` for all timestamp columns
