@@ -1,14 +1,17 @@
 # Customer.io Integration
 
 This document describes how to generate Customer.io-compatible output for syncing
-**people** (Identify) and **events** (Track) via the Snowflake Reverse ETL integration.
+**people** (Identify), **events** (Track), **objects** (Group), and
+**relationships** (Group with userId) via the Snowflake Reverse ETL integration.
 
 ## Overview
 
-| Sync Type         | Model                 | Source                                   |
-| ----------------- | --------------------- | ---------------------------------------- |
-| Identify (people) | `customer_io_persons` | `nexus_entities` (person)                |
-| Track (events)    | `customer_io_events`  | `nexus_events` (filtered by source/type) |
+| Sync Type                | Model                            | Source                          |
+| ------------------------ | -------------------------------- | ------------------------------- |
+| Identify (people)        | `customer_io_persons`            | `nexus_entities` (person)       |
+| Track (events)           | `customer_io_events`             | `nexus_events`                  |
+| Group (objects)          | `customer_io_<object_type>`      | `nexus_entities` (group)        |
+| Group (relationships)    | `customer_io_<object>_relationships` | `nexus_relationships`       |
 
 ---
 
@@ -453,3 +456,415 @@ WHERE TO_TIMESTAMP_NTZ("timestamp") > TO_TIMESTAMP_NTZ({{last_sync_time}})
   separate one-off sync without the WHERE clause
 - Quote column names (`"columnName"`) for Snowflake compatibility
 - Use `TO_TIMESTAMP_NTZ()` for all timestamp columns
+
+---
+
+# Objects (Group Sync)
+
+Customer.io supports
+[custom objects](https://docs.customer.io/journeys/objects/) that represent
+non-person entities like companies, locations, accounts, or products. Objects
+can be related to people, enabling powerful segmentation like "people associated
+with location X" or "people whose primary account is Y".
+
+## Prerequisites: Create Object Type in Customer.io
+
+Before syncing objects, create an object type in Customer.io:
+
+1. Go to **Data & Integrations** → **Objects**
+2. Click **Create object type**
+3. Configure the object type:
+   - **Name**: e.g., `Location`, `Account`, `Company`
+   - **Singular**: e.g., `location`
+   - **Plural**: e.g., `locations`
+   - **ID attribute**: e.g., `location_id`
+4. Click **Create**
+5. Note the **Object Type ID** (visible in URL or settings) - you'll need this
+   for your dbt model
+
+## Required Columns
+
+| Column         | Description                                           |
+| -------------- | ----------------------------------------------------- |
+| `groupId`      | Unique identifier for the object (required)           |
+| `objectTypeId` | Customer.io object type ID (required, e.g., `'1'`)    |
+| `timestamp`    | When the object was last updated                      |
+
+All additional columns become object attributes (traits).
+
+## Example: Location Objects
+
+```sql
+-- models/output/customer_io/customer_io_locations.sql
+{{ config(materialized='view') }}
+
+with locations as (
+    select
+        entity_id,
+        location_id,
+        location_name,
+        location_lobbie_integration_uuid,
+        _updated_at,
+        _created_at
+    from {{ ref('nexus_entities') }}
+    where entity_type = 'group'
+      and location_id is not null
+)
+
+select
+    -- Customer.io Group sync required fields
+    location_id as "groupId",
+    '1' as "objectTypeId",  -- Your object type ID from Customer.io
+    to_timestamp_ntz(_updated_at) as "timestamp",
+    
+    -- Object traits (stored as attributes on the location)
+    location_name as "location_name",
+    location_lobbie_integration_uuid as "location_lobbie_integration_uuid",
+    entity_id as "nexus_entity_id",
+    to_timestamp_ntz(_created_at) as "created_at"
+    
+from locations
+order by "timestamp" desc
+```
+
+## Reverse ETL Query
+
+```sql
+SELECT *
+FROM YOUR_SCHEMA.customer_io_locations
+WHERE TO_TIMESTAMP_NTZ("timestamp") > TO_TIMESTAMP_NTZ({{last_sync_time}})
+```
+
+## Customer.io Setup
+
+1. Go to **Data & Integrations** → **Integrations** → **Snowflake**
+2. Click **Add Sync**
+3. Select **Group** as the sync type
+4. Configure column mappings:
+   - **Object ID**: `groupId`
+   - **Object Type ID**: `objectTypeId`
+   - **User ID**: *Leave empty* (creates objects without relationships)
+   - **Timestamp**: `timestamp`
+5. Map additional columns as object attributes
+6. Enable the sync
+
+---
+
+# Relationships (Group Sync with userId)
+
+Relationships connect people to objects. When you include a `userId` in a Group
+sync, Customer.io creates (or updates) the relationship between that person and
+the object.
+
+## Relationship Attributes
+
+Customer.io supports storing attributes on the *relationship* itself, not just
+on the object. This is powerful for modeling things like:
+
+- "Is this the person's primary location?"
+- "When did they first interact with this location?"
+- "What is their role in this account?"
+
+**Important**: Relationship attributes must be passed as a JSON object in a
+column named `relationshipAttributes`. Regular columns are stored on the object,
+not the relationship.
+
+## Required Columns
+
+| Column                   | Description                                        |
+| ------------------------ | -------------------------------------------------- |
+| `groupId`                | Object identifier (required)                       |
+| `objectTypeId`           | Customer.io object type ID (required)              |
+| `userId`                 | Person identifier - email (required for relationships) |
+| `timestamp`              | When the relationship was last updated             |
+| `relationshipAttributes` | JSON object with relationship-specific attributes  |
+
+## Example: Person-Location Relationships
+
+This model creates relationships between patients and the locations they've
+visited, with attributes like `is_primary_location` and `first_interaction_at`:
+
+```sql
+-- models/output/customer_io/customer_io_location_relationships.sql
+{{ config(materialized='view') }}
+
+-- Only include relationships for persons in customer_io_persons
+with customer_io_person_ids as (
+    select "userId" as email
+    from {{ ref('customer_io_persons') }}
+),
+
+-- Get all person-location relationships with stats
+relationship_stats as (
+    select
+        r.relationship_id,
+        r.entity_a_id as person_id,
+        r.entity_b_id as group_id,
+        g.location_id,
+        g.location_name,
+        p.email,
+        r.established_at as first_interaction_at,
+        r.last_updated_at as last_interaction_at,
+        r._updated_at
+    from {{ ref('nexus_relationships') }} r
+    inner join {{ ref('nexus_entities') }} p 
+        on r.entity_a_id = p.entity_id
+        and p.entity_type = 'person'
+    inner join {{ ref('nexus_entities') }} g 
+        on r.entity_b_id = g.entity_id
+        and g.entity_type = 'group'
+    inner join customer_io_person_ids cip
+        on p.email = cip.email
+    where r.relationship_type = 'membership'
+      and r.entity_a_type = 'person'
+      and r.entity_b_type = 'group'
+      and g.location_id is not null
+      and p.email is not null
+),
+
+-- Rank locations for each person
+ranked_relationships as (
+    select
+        *,
+        row_number() over (
+            partition by person_id 
+            order by last_interaction_at desc
+        ) as rank_by_recency,
+        row_number() over (
+            partition by person_id 
+            order by first_interaction_at asc
+        ) as rank_by_first,
+        count(*) over (partition by person_id) as location_count
+    from relationship_stats
+),
+
+final as (
+    select
+        -- Customer.io Group sync required fields
+        location_id as "groupId",
+        '1' as "objectTypeId",
+        email as "userId",
+        to_timestamp_ntz(_updated_at) as "timestamp",
+        
+        -- Relationship attributes as JSON object
+        -- See: https://docs.customer.io/integrations/data-in/connections/reverse-etl/snowflake/#relationship-attributes
+        object_construct(
+            'is_primary_location', case when rank_by_recency = 1 then true else false end,
+            'is_most_recent_location', case when rank_by_recency = 1 then true else false end,
+            'is_first_location', case when rank_by_first = 1 then true else false end,
+            'has_multiple_locations', case when location_count > 1 then true else false end,
+            'location_count', location_count,
+            'first_interaction_at', to_timestamp_ntz(first_interaction_at),
+            'last_interaction_at', to_timestamp_ntz(last_interaction_at),
+            'location_name', location_name
+        ) as "relationshipAttributes"
+        
+    from ranked_relationships
+)
+
+select * from final
+order by "timestamp" desc
+```
+
+## Example `relationshipAttributes` Output
+
+```json
+{
+  "is_primary_location": true,
+  "is_most_recent_location": true,
+  "is_first_location": false,
+  "has_multiple_locations": true,
+  "location_count": 2,
+  "first_interaction_at": "2025-01-15 10:30:00.000",
+  "last_interaction_at": "2025-09-20 14:45:00.000",
+  "location_name": "GameDay Mens Health - Downtown"
+}
+```
+
+## Reverse ETL Query
+
+```sql
+SELECT *
+FROM YOUR_SCHEMA.customer_io_location_relationships
+WHERE TO_TIMESTAMP_NTZ("timestamp") > TO_TIMESTAMP_NTZ({{last_sync_time}})
+```
+
+## Customer.io Setup
+
+1. Go to **Data & Integrations** → **Integrations** → **Snowflake**
+2. Click **Add Sync**
+3. Select **Group** as the sync type
+4. Configure column mappings:
+   - **Object ID**: `groupId`
+   - **Object Type ID**: `objectTypeId`
+   - **User ID**: `userId` (this creates the relationship!)
+   - **Timestamp**: `timestamp`
+   - **Relationship Attributes**: `relationshipAttributes`
+5. Enable the sync
+
+## Sync Order
+
+For initial setup, run syncs in this order:
+
+1. **Persons** first (creates people profiles)
+2. **Objects** second (creates location/account/etc. objects)
+3. **Relationships** third (links people to objects)
+4. **Events** can run anytime after Persons
+
+After initial setup, syncs can run in parallel.
+
+## Segmentation Use Cases
+
+With relationship attributes synced, you can create segments like:
+
+- **Primary location is X**: Filter where `is_primary_location = true` for a
+  specific location
+- **Multi-location people**: Filter where `has_multiple_locations = true`
+- **Lapsed at primary location**: Filter where `is_primary_location = true` AND
+  `last_interaction_at` is more than 30 days ago
+- **New at location**: Filter where `is_first_location = true` AND
+  `first_interaction_at` is within the last 7 days
+
+---
+
+# Defining Relationship Declarations in Nexus
+
+Before you can sync relationships to Customer.io, you need to define
+relationship declarations in your source models. Nexus processes these
+declarations through its identity resolution pipeline to create the final
+`nexus_relationships` table.
+
+## Enable Relationships for Your Source
+
+In your `dbt_project.yml`, enable relationships for your source:
+
+```yaml
+vars:
+  nexus:
+    sources:
+      your_source:
+        enabled: true
+        events: true
+        entities: ["person", "group"]
+        relationships: true  # Enable relationship processing
+```
+
+## Create Relationship Declaration Model
+
+Create a model named `{source}_relationship_declarations.sql` in your source
+folder. This model should output the following columns:
+
+| Column                       | Description                                      |
+| ---------------------------- | ------------------------------------------------ |
+| `relationship_declaration_id`| Unique ID (use `nexus.create_nexus_id`)          |
+| `event_id`                   | Event that established the relationship          |
+| `occurred_at`                | When the relationship was established            |
+| `entity_a_identifier`        | Identifier for entity A (e.g., patient_id)       |
+| `entity_a_identifier_type`   | Type of identifier (e.g., `'patient_id'`)        |
+| `entity_a_type`              | Entity type: `'person'` or `'group'`             |
+| `entity_a_role`              | Role in relationship (e.g., `'patient'`)         |
+| `entity_b_identifier`        | Identifier for entity B (e.g., location_id)      |
+| `entity_b_identifier_type`   | Type of identifier (e.g., `'location_id'`)       |
+| `entity_b_type`              | Entity type: `'person'` or `'group'`             |
+| `entity_b_role`              | Role in relationship (e.g., `'location'`)        |
+| `relationship_type`          | Type: `'membership'`, `'association'`, etc.      |
+| `relationship_direction`     | Direction: `'a_to_b'`, `'b_to_a'`, `'bidirectional'` |
+| `is_active`                  | Whether relationship is currently active         |
+| `source`                     | Source system name                               |
+
+## Example: Patient-Location Relationships
+
+```sql
+-- models/sources/lobbie/intermediate/lobbie_patient_location_relationship_declarations.sql
+{{ config(
+    materialized='table',
+    tags=['event-processing', 'relationships']
+) }}
+
+with appointment_relationships as (
+    select
+        event_id,
+        occurred_at,
+        patient_id,
+        location_id,
+        'lobbie' as source
+    from {{ ref('lobbie_appointment_events') }}
+    where patient_id is not null
+      and location_id is not null
+),
+
+relationship_declarations as (
+    select distinct
+        {{ nexus.create_nexus_id('relationship_declaration', 
+            ['event_id', 'patient_id', 'location_id', "'patient'", 'occurred_at']) 
+        }} as relationship_declaration_id,
+        
+        event_id,
+        occurred_at,
+        
+        -- Entity A: Person (patient)
+        patient_id as entity_a_identifier,
+        'patient_id' as entity_a_identifier_type,
+        'person' as entity_a_type,
+        'patient' as entity_a_role,
+        
+        -- Entity B: Group (location)
+        location_id as entity_b_identifier,
+        'location_id' as entity_b_identifier_type,
+        'group' as entity_b_type,
+        'location' as entity_b_role,
+        
+        -- Relationship metadata
+        'membership' as relationship_type,
+        'a_to_b' as relationship_direction,
+        true as is_active,
+        source
+        
+    from appointment_relationships
+)
+
+select * from relationship_declarations
+```
+
+## Union Model
+
+Create a top-level model that unions all relationship declarations for your
+source:
+
+```sql
+-- models/sources/lobbie/lobbie_relationship_declarations.sql
+{{ config(
+    materialized='table',
+    tags=['event-processing', 'relationship_declarations']
+) }}
+
+select
+    relationship_declaration_id,
+    event_id,
+    occurred_at,
+    entity_a_identifier,
+    entity_a_identifier_type,
+    entity_a_type,
+    entity_a_role,
+    entity_b_identifier,
+    entity_b_identifier_type,
+    entity_b_type,
+    entity_b_role,
+    relationship_type,
+    relationship_direction,
+    is_active,
+    source
+from {{ ref('lobbie_patient_location_relationship_declarations') }}
+-- UNION ALL additional relationship types here
+order by occurred_at desc
+```
+
+## Run the Pipeline
+
+After creating your relationship declaration models:
+
+1. Run `dbt run` to build the models
+2. Nexus will process the declarations through its identity resolution pipeline
+3. Final relationships appear in `nexus_relationships`
+4. Use `nexus_relationships` as the source for your Customer.io relationship
+   model
