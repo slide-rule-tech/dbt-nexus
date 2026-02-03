@@ -56,7 +56,7 @@ formatted_events as (
         context_page_title as page_title,
         context_page_referrer as page_referrer,
         context_page_url as page_url,
-        *
+        {{ dbt_utils.star(ref('cleaned_segment_all_columns'), except=['anonymous_id', 'id', 'context_page_title', 'context_page_referrer', 'context_page_url', 'page_title', 'page_referrer', 'page_url']) }}
         
 
     from source_data
