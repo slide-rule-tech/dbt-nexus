@@ -31,11 +31,11 @@ touchpoint_events as (
         -- Channel classification
         case 
             when context_campaign_source is not null then 'paid'
-            when context_page_referrer like '%facebook%' or context_page_search like '%fbclid%' then 'social'
-            when context_page_referrer like '%google%' then 'organic'
-            when context_page_referrer is not null 
+            when page_referrer like '%facebook%' or context_page_search like '%fbclid%' then 'social'
+            when page_referrer like '%google%' then 'organic'
+            when page_referrer is not null 
                  {% for exclusion in var('referral_exclusions') -%}
-                 and context_page_referrer not like '{{ exclusion }}'
+                 and page_referrer not like '{{ exclusion }}'
                  {% endfor -%}
                  then 'referral'
             else 'direct'
@@ -44,8 +44,8 @@ touchpoint_events as (
       
         -- Landing page information
         context_page_path as landing_page,
-        context_page_referrer as referrer,
-        context_page_url as landing_url,
+        page_referrer as referrer,
+        page_url as landing_url,
         
         -- Click IDs
         case 
@@ -89,9 +89,9 @@ touchpoint_events as (
         or context_page_search like '%li_fat_id=%'
         
         -- Referrer present (for referral attribution) - exclude internal referrers
-        or (context_page_referrer is not null 
+        or (page_referrer is not null 
             {% for exclusion in var('referral_exclusions') -%}
-            and context_page_referrer not like '{{ exclusion }}'
+            and page_referrer not like '{{ exclusion }}'
             {% endfor -%}
             )
     )
