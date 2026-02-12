@@ -13,7 +13,7 @@ data **operationally useful** for sales, support, and growth teams. Here are
 real examples of how we use dbt-nexus at SlideRule Analytics.
 
 > Read the full story:
-> [**Dbt-Nexus - Data Beyond Dashboards**](https://www.slideruleanalytics.com/blog/dbt-nexus-data-beyond-dashboards)
+> [**Dbt-Nexus - Data Beyond Dashboards**](/blog/dbt-nexus-data-beyond-dashboards)
 
 ## The Problem: Scattered Customer Data
 
@@ -180,5 +180,5 @@ implementation support.
 - [Identity Resolution Logic](identity-resolution.md) - How entity matching
   works
 - [Getting Started Guide](../getting-started/) - Implementation steps
-- [SlideRule Analytics Blog](https://www.slideruleanalytics.com/blog/) - More
+- [Blog](/blog) - More
   real-world examples

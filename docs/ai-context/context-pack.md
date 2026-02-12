@@ -217,7 +217,7 @@ logic.
 ## Links & References
 
 - **Blog Post**:
-  [Data Beyond Dashboards](https://www.slideruleanalytics.com/blog/dbt-nexus-data-beyond-dashboards)
+  [Data Beyond Dashboards](/blog/dbt-nexus-data-beyond-dashboards)
 - **Documentation**: `/docs/index.md`
 - **Demo Data Guide**: `/docs/tutorials/demo-data.md`
 - **Use Cases**: `/docs/explanations/use-cases.md`

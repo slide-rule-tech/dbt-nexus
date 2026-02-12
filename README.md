@@ -8,9 +8,9 @@ groups) and their interactions.
 ## 📖 Documentation
 
 **📚 Complete Documentation**:
-[https://sliderule-analytics.github.io/dbt-nexus](https://slide-rule-tech.github.io/dbt-nexus)  
+[dbt-nexus Documentation](/dbt-nexus/docs)  
 **📖 Blog Post**:
-[Dbt-Nexus - Data Beyond Dashboards](https://www.slideruleanalytics.com/blog/dbt-nexus-data-beyond-dashboards)
+[Dbt-Nexus - Data Beyond Dashboards](/blog/dbt-nexus-data-beyond-dashboards)
 
 ## Prerequisites
 

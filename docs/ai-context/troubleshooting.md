@@ -283,7 +283,7 @@ dbt run --select package:nexus --models tag:identity-resolution
 
 ### Documentation Resources
 
-- [Complete Documentation](https://sliderule-analytics.github.io/dbt-nexus)
+- [Complete Documentation](/dbt-nexus/docs)
 - [GitHub Repository](https://github.com/sliderule-analytics/dbt-nexus)
 - [Model Reference](../reference/models/)
 - [Macro Reference](../reference/macros/)

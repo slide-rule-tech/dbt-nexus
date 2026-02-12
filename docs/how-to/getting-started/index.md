@@ -99,7 +99,7 @@ After completing the getting started guides:
 ## Getting Help
 
 - 📚 **Complete Documentation**:
-  [https://sliderule-analytics.github.io/dbt-nexus](https://sliderule-analytics.github.io/dbt-nexus)
+  [dbt-nexus Documentation](/dbt-nexus/docs)
 - 🐛 **Report Issues**:
   [GitHub Issues](https://github.com/sliderule-analytics/dbt-nexus/issues)
 - 💬 **Community**: [dbt Community Slack](https://community.getdbt.com/)
