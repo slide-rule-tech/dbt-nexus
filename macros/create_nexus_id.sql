@@ -47,6 +47,8 @@
     tch_batch
   {%- elif type == 'attribution_model_result' -%}
     attr_res
+  {%- elif type == 'event_measurement' -%}
+    evt_msr
   {%- else -%}
     {{ type[:3] }}
   {%- endif -%}
@@ -112,6 +114,8 @@
     {%- set p = 'tch_batch' -%}
   {%- elif type == 'attribution_model_result' -%}
     {%- set p = 'attr_res' -%}
+  {%- elif type == 'event_measurement' -%}
+    {%- set p = 'evt_msr' -%}
   {%- else -%}
     {%- set p = type[:3] -%}
   {%- endif -%}

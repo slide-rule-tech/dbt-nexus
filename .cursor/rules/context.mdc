@@ -1,0 +1,15 @@
+# dbt-nexus Package Context
+
+When working in the dbt-nexus package, reference these for context:
+
+## Package docs (at /dbt-nexus/docs/ in the app)
+- Package overview: app/content/org/dbt-nexus/overview/architecture.mdx
+- Identity resolution: app/content/org/dbt-nexus/identity-resolution/index.mdx
+- Source models: app/content/org/dbt-nexus/sources/create-source-models.mdx
+- Event log: app/content/org/dbt-nexus/event-log/format-nexus-events.mdx
+- AI context pack: app/content/org/dbt-nexus/ai-context/context-pack.mdx
+
+## General Nexus context
+- How to perform analysis: app/content/docs/how-to/perform-analysis.mdx
+- Conventions: app/content/docs/ai-context/conventions.mdx
+- Repo map: app/content/docs/ai-context/repo-map.mdx
