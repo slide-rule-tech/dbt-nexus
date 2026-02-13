@@ -7,9 +7,22 @@
 -- Nexus Entity States Model
 -- Pivots nexus_states into a single table with all states as columns
 -- One row per state change (when any state changes, create new row)
--- 
--- To add new states: Add a new MAX(CASE...) line in the pivoted_states CTE
--- The column name should match the state_name value from nexus_states
+--
+-- State columns are discovered dynamically from nexus_states at compile time.
+-- No manual edits needed when new states are added.
+
+-- depends_on: {{ ref('nexus_states') }}
+
+{# Discover distinct state_name values from nexus_states at compile time #}
+{% set state_names = [] %}
+{% if execute %}
+    {% set state_names_query %}
+        select distinct state_name from {{ ref('nexus_states') }} order by state_name
+    {% endset %}
+    {% set state_names = run_query(state_names_query).columns[0].values() %}
+{% endif %}
+
+{% if state_names | length > 0 %}
 
 WITH nexus_states_data AS (
     SELECT * FROM {{ ref('nexus_states') }}
@@ -68,16 +81,15 @@ pivoted_states_raw AS (
     WHERE svat.state_rank = 1
 ),
 
--- Pivot: Convert state_name rows into columns
--- Add new states by adding MAX(CASE WHEN state_name = 'new_state' THEN state_value END) as new_state,
+-- Pivot: Convert state_name rows into columns (dynamically generated)
 pivoted_states AS (
     SELECT
         entity_id,
         entity_type,
         change_timestamp as valid_from,
-        MAX(CASE WHEN state_name = 'lead' THEN state_value END) as lead
-        -- Add more states here as they are added to nexus_states
-        -- Example: , MAX(CASE WHEN state_name = 'billing_lifecycle' THEN state_value END) as billing_lifecycle
+        {% for state_name in state_names %}
+        MAX(CASE WHEN state_name = '{{ state_name }}' THEN state_value END) as {{ state_name }}{{ "," if not loop.last }}
+        {% endfor %}
     FROM pivoted_states_raw
     GROUP BY entity_id, entity_type, change_timestamp
 ),
@@ -99,8 +111,9 @@ with_state_ids AS (
         {{ nexus.create_nexus_id('entity_state', ['entity_id', 'valid_from']) }} as entity_state_id,
         entity_id,
         entity_type,
-        lead,
-        -- Add more state columns here matching pivoted_states
+        {% for state_name in state_names %}
+        {{ state_name }},
+        {% endfor %}
         valid_from,
         valid_to
     FROM states_with_valid_to
@@ -112,8 +125,9 @@ final AS (
         entity_state_id,
         entity_id,
         entity_type,
-        lead,
-        -- Add more state columns here matching pivoted_states
+        {% for state_name in state_names %}
+        {{ state_name }},
+        {% endfor %}
         valid_from,
         valid_to,
         CASE
@@ -129,3 +143,19 @@ final AS (
 
 SELECT * FROM final
 
+{% else %}
+
+-- No states configured - return empty result set
+-- FROM (SELECT 1) provides a row source; WHERE 1=0 filters to zero rows (BigQuery requires FROM for WHERE)
+SELECT
+    CAST(NULL AS STRING) as entity_state_id,
+    CAST(NULL AS STRING) as entity_id,
+    CAST(NULL AS STRING) as entity_type,
+    CAST(NULL AS TIMESTAMP) as valid_from,
+    CAST(NULL AS TIMESTAMP) as valid_to,
+    CAST(NULL AS BOOLEAN) as is_current,
+    CAST(NULL AS STRING) as previous_entity_state_id
+FROM (SELECT 1)
+WHERE 1 = 0
+
+{% endif %}

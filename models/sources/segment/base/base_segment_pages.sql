@@ -2,4 +2,4 @@
     enabled=var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false)
 ) }}
 
-select * from {{ nexus.nexus_source('segment', 'pages') }}
+{{ nexus.union_segment_sources('pages', column_override={"context_campaign_term": "string"}) }}
