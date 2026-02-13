@@ -41,7 +41,7 @@
             cast(null as timestamp) as timestamp,
             cast(null as string) as _dbt_source_relation,
             cast(null as string) as segment_source
-        where false
+        limit 0
         {% endif %}
     {% elif var('nexus', {}).get('sources', {}).get('segment', {}).get('enabled', false) %}
         {# Single-source fallback: segment is enabled but no segment_sources var defined #}
@@ -56,6 +56,6 @@
             cast(null as timestamp) as timestamp,
             cast(null as string) as _dbt_source_relation,
             cast(null as string) as segment_source
-        where false
+        limit 0
     {% endif %}
 {%- endmacro -%}

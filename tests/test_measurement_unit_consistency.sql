@@ -11,7 +11,7 @@ with distinct_pairs as (
     select distinct
         measurement_name,
         value_unit
-    from {{ ref('nexus_event_measurements') }}
+    from {{ ref('nexus_event_measurements_unioned') }}
     where measurement_name is not null
       and value_unit is not null
 ),

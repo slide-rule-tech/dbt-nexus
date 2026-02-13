@@ -15,7 +15,7 @@ WITH measurement_summary AS (
         AVG(value) as avg_value,
         MIN(value) as min_value,
         MAX(value) as max_value
-    FROM {{ ref('nexus_event_measurements') }}
+    FROM {{ ref('nexus_event_measurements_unioned') }}
     WHERE measurement_name IS NOT NULL
     GROUP BY measurement_name, value_unit, source
 )
