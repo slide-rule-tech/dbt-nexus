@@ -13,8 +13,6 @@ SELECT
         ELSE 'internal_meeting'
     END as event_name,
     COALESCE(summary, 'Calendar Event') as event_description,
-    null as value,
-    null as value_unit,
     CASE 
         WHEN has_external_attendees THEN 3
         ELSE 2

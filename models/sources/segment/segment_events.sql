@@ -46,8 +46,6 @@ formatted_events as (
             when segment_event_type = 'group' then 'User grouped'
             when segment_event_type = 'page' then concat('viewed ', context_page_title, ' page')
         end as event_description,
-        null as value,
-        null as value_unit,
         0 as significance,
         current_timestamp() as _ingested_at,
 

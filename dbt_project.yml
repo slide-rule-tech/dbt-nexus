@@ -51,14 +51,11 @@ vars:
 
   # Common event fields - standard columns that appear in all event models
   # Used to exclude standard fields from metadata column listings
-  # Note: Column names match actual database column names (e.g., 'value' not 'event_value')
   common_event_fields:
     - event_id
     - occurred_at
     - event_name
     - event_description
-    - value
-    - value_unit
     - significance
     - event_type
     - source

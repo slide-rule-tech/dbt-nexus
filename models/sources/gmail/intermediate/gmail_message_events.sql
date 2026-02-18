@@ -12,8 +12,6 @@ SELECT
     'email' as event_type,
     subject as event_description,
     'gmail' as source,
-    null as value,
-    null as value_unit,
     'gmail_message_events' as source_table,
     _ingested_at,
     
