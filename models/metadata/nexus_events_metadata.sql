@@ -59,20 +59,18 @@ WITH distinct_events AS (
         event_name,
         event_type,
         source,
-        value_unit,
         source_table,
         MIN(occurred_at) as first_seen_at,
         MAX(occurred_at) as last_seen_at
     FROM {{ ref('nexus_events') }}
     WHERE event_name IS NOT NULL
-    GROUP BY event_name, event_type, source, value_unit, source_table
+    GROUP BY event_name, event_type, source, source_table
 )
 
 SELECT
     de.event_name,
     de.event_type,
     de.source,
-    de.value_unit,
     de.source_table,
     de.first_seen_at,
     de.last_seen_at,
@@ -106,4 +104,4 @@ SELECT
         NULL as columns_json
     {% endif %}
 FROM distinct_events de
-ORDER BY de.source, de.event_type, de.event_name, de.value_unit
+ORDER BY de.source, de.event_type, de.event_name
