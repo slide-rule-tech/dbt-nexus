@@ -1,27 +1,43 @@
 {% macro resolve_relationship_declarations() %}
 
+{% set er_types = nexus.get_er_entity_types() %}
+{% set non_er_types = nexus.get_non_er_entity_types() %}
+{% set entity_config = nexus.get_entity_type_config() %}
+
 with relationship_declarations as (
     select * from {{ ref('nexus_relationship_declarations') }}
 ),
 
--- Get all resolved entity identifiers across all entity types
 all_resolved_identifiers as (
-    {# Support both new unified config and legacy variable #}
-    {% set entity_types = var('nexus', {}).get('entity_types') or var('nexus_entity_types', ['person', 'group']) %}
-    {% for entity_type in entity_types %}
+    {% for entity_type in er_types %}
     select
         identifier_type,
         identifier_value,
         {{ entity_type }}_id as entity_id,
         '{{ entity_type }}' as entity_type
     from {{ ref('nexus_resolved_' ~ entity_type ~ '_identifiers') }}
+    {% if not loop.last or non_er_types | length > 0 %}
+    union all
+    {% endif %}
+    {% endfor %}
+
+    {% for entity_type in non_er_types %}
+    {% set type_config = entity_config[entity_type] %}
+    {% set reg_model = type_config.get('registration_model') %}
+    {% if reg_model %}
+    select
+        '{{ entity_type }}_id' as identifier_type,
+        source_id as identifier_value,
+        entity_id,
+        '{{ entity_type }}' as entity_type
+    from {{ ref(reg_model) }}
     {% if not loop.last %}
     union all
+    {% endif %}
     {% endif %}
     {% endfor %}
 ),
 
--- Resolve entity_a identifiers
 relationships_with_entity_a as (
     select
         rd.relationship_declaration_id,
@@ -45,7 +61,6 @@ relationships_with_entity_a as (
         and rd.entity_a_type = ea.entity_type
 ),
 
--- Resolve entity_b identifiers
 relationships_with_both_entities as (
     select
         r.relationship_declaration_id,
@@ -87,4 +102,3 @@ where entity_a_id is not null
     and entity_b_id is not null
 
 {% endmacro %}
-

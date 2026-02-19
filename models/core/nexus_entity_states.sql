@@ -4,41 +4,46 @@
     tags=['states', 'entity-states']
 ) }}
 
--- Nexus Entity States Model
--- Pivots nexus_states into a single table with all states as columns
--- One row per state change (when any state changes, create new row)
---
--- State columns are discovered dynamically from nexus_states at compile time.
--- No manual edits needed when new states are added.
-
 -- depends_on: {{ ref('nexus_states') }}
 
-{# Discover distinct state_name values from nexus_states at compile time #}
-{% set state_names = [] %}
+{# Discover dimensions and measurements from nexus_states at compile time #}
+{% set dimension_names = [] %}
+{% set measurement_names = [] %}
 {% if execute %}
-    {% set state_names_query %}
-        select distinct state_name from {{ ref('nexus_states') }} order by state_name
+    {% set dim_query %}
+        select distinct state_name
+        from {{ ref('nexus_states') }}
+        where state_category = 'dimension' or state_category is null
+        order by state_name
     {% endset %}
-    {% set state_names = run_query(state_names_query).columns[0].values() %}
+    {% set dimension_names = run_query(dim_query).columns[0].values() %}
+
+    {% set msr_query %}
+        select distinct state_name
+        from {{ ref('nexus_states') }}
+        where state_category = 'measurement'
+        order by state_name
+    {% endset %}
+    {% set measurement_names = run_query(msr_query).columns[0].values() %}
 {% endif %}
 
-{% if state_names | length > 0 %}
+{% set all_state_names = dimension_names + measurement_names %}
+
+{% if all_state_names | length > 0 %}
 
 WITH nexus_states_data AS (
     SELECT * FROM {{ ref('nexus_states') }}
 ),
 
--- Get all unique state change timestamps per entity
--- A change occurs when any state is entered or exited
 state_change_timestamps AS (
     SELECT DISTINCT
         entity_id,
         entity_type,
         state_entered_at as change_timestamp
     FROM nexus_states_data
-    
+
     UNION DISTINCT
-    
+
     SELECT DISTINCT
         entity_id,
         entity_type,
@@ -47,8 +52,6 @@ state_change_timestamps AS (
     WHERE state_exited_at IS NOT NULL
 ),
 
--- Get state values at each change timestamp
--- For each entity-timestamp combination, get the active value of each state
 state_values_at_timestamps AS (
     SELECT
         sct.entity_id,
@@ -56,6 +59,8 @@ state_values_at_timestamps AS (
         sct.change_timestamp,
         ns.state_name,
         ns.state_value,
+        ns.state_numeric_value,
+        ns.state_category,
         ROW_NUMBER() OVER (
             PARTITION BY sct.entity_id, sct.change_timestamp, ns.state_name
             ORDER BY ns.state_entered_at DESC
@@ -66,35 +71,37 @@ state_values_at_timestamps AS (
         AND ns.state_entered_at <= sct.change_timestamp
         AND (ns.state_exited_at IS NULL OR ns.state_exited_at > sct.change_timestamp)
     WHERE ns.state_value IS NOT NULL
+        OR ns.state_numeric_value IS NOT NULL
 ),
 
--- Pivot states into columns
--- Each state_name becomes a column with its state_value
 pivoted_states_raw AS (
     SELECT
-        svat.entity_id,
-        svat.entity_type,
-        svat.change_timestamp,
-        svat.state_name,
-        svat.state_value
-    FROM state_values_at_timestamps svat
-    WHERE svat.state_rank = 1
+        entity_id,
+        entity_type,
+        change_timestamp,
+        state_name,
+        state_value,
+        state_numeric_value,
+        state_category
+    FROM state_values_at_timestamps
+    WHERE state_rank = 1
 ),
 
--- Pivot: Convert state_name rows into columns (dynamically generated)
 pivoted_states AS (
     SELECT
         entity_id,
         entity_type,
         change_timestamp as valid_from,
-        {% for state_name in state_names %}
-        MAX(CASE WHEN state_name = '{{ state_name }}' THEN state_value END) as {{ state_name }}{{ "," if not loop.last }}
+        {% for dim in dimension_names %}
+        MAX(CASE WHEN state_name = '{{ dim }}' THEN state_value END) as {{ dim }},
+        {% endfor %}
+        {% for msr in measurement_names %}
+        MAX(CASE WHEN state_name = '{{ msr }}' THEN state_numeric_value END) as {{ msr }}{{ "," if not loop.last }}
         {% endfor %}
     FROM pivoted_states_raw
     GROUP BY entity_id, entity_type, change_timestamp
 ),
 
--- Calculate valid_to (next change timestamp for this entity)
 states_with_valid_to AS (
     SELECT
         ps.*,
@@ -105,28 +112,36 @@ states_with_valid_to AS (
     FROM pivoted_states ps
 ),
 
--- Add entity_state_id first
 with_state_ids AS (
     SELECT
         {{ nexus.create_nexus_id('entity_state', ['entity_id', 'valid_from']) }} as entity_state_id,
         entity_id,
         entity_type,
-        {% for state_name in state_names %}
-        {{ state_name }},
+        {% for dim in dimension_names %}
+        {{ dim }},
+        {% endfor %}
+        {% for msr in measurement_names %}
+        {{ msr }},
         {% endfor %}
         valid_from,
         valid_to
     FROM states_with_valid_to
 ),
 
--- Add previous_entity_state_id and is_current flag
 final AS (
     SELECT
         entity_state_id,
         entity_id,
         entity_type,
-        {% for state_name in state_names %}
-        {{ state_name }},
+        {% for dim in dimension_names %}
+        {{ dim }},
+        {% endfor %}
+        {% for msr in measurement_names %}
+        {{ msr }},
+        {{ msr }} - COALESCE(LAG({{ msr }}) OVER (
+            PARTITION BY entity_id
+            ORDER BY valid_from
+        ), 0) as {{ msr }}_delta,
         {% endfor %}
         valid_from,
         valid_to,
@@ -145,8 +160,6 @@ SELECT * FROM final
 
 {% else %}
 
--- No states configured - return empty result set
--- FROM (SELECT 1) provides a row source; WHERE 1=0 filters to zero rows (BigQuery requires FROM for WHERE)
 SELECT
     CAST(NULL AS STRING) as entity_state_id,
     CAST(NULL AS STRING) as entity_id,
