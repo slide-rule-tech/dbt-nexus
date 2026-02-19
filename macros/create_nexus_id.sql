@@ -49,6 +49,8 @@
     attr_res
   {%- elif type == 'event_measurement' -%}
     evt_msr
+  {%- elif type == 'event_dimension' -%}
+    evt_dim
   {%- else -%}
     {{ type[:3] }}
   {%- endif -%}
@@ -116,6 +118,8 @@
     {%- set p = 'attr_res' -%}
   {%- elif type == 'event_measurement' -%}
     {%- set p = 'evt_msr' -%}
+  {%- elif type == 'event_dimension' -%}
+    {%- set p = 'evt_dim' -%}
   {%- else -%}
     {%- set p = type[:3] -%}
   {%- endif -%}
