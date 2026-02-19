@@ -6,11 +6,10 @@ with traits as (
     from {{ ref('nexus_entity_traits') }}
 ),
 
--- Get all resolved entity identifiers across all entity types
+-- Get all resolved entity identifiers across ER entity types only
 all_resolved_identifiers as (
-    {# Support both new unified config and legacy variable #}
-    {% set entity_types = var('nexus', {}).get('entity_types') or var('nexus_entity_types', ['person', 'group']) %}
-    {% for entity_type in entity_types %}
+    {% set er_types = nexus.get_er_entity_types() %}
+    {% for entity_type in er_types %}
     select
         identifier_type,
         identifier_value,

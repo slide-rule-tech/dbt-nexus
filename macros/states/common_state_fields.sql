@@ -5,25 +5,23 @@
         CAST(NULL AS STRING) AS entity_type,
         CAST(NULL AS STRING) AS state_name,
         CAST(NULL AS STRING) AS state_value,
+        CAST(NULL AS NUMERIC) AS state_numeric_value,
+        CAST(NULL AS STRING) AS state_category,
         CAST(NULL AS TIMESTAMP) AS state_entered_at,
         CAST(NULL AS TIMESTAMP) AS state_exited_at,
         CAST(NULL AS BOOLEAN) AS is_current,
         CAST(NULL AS STRING) AS trigger_event_id
     {% else %}
-        -- State identification
         {{ nexus.create_nexus_id('state', ['entity_id', 'state_name', 'state_entered_at', 'trigger_event_id']) }} AS state_id,
-        -- Entity identification
         entity_id,
         entity_type,
-        -- State details
         state_name,
         state_value,
-        -- Timestamps
+        state_numeric_value,
+        state_category,
         state_entered_at,
         state_exited_at,
-        -- State metadata
         is_current,
-        -- Event reference
         trigger_event_id
     {% endif %}
-{% endmacro %} 
+{% endmacro %}
