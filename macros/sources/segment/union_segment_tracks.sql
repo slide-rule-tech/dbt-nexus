@@ -20,7 +20,8 @@
 
         select 
             *
-        from  unioned
+        from unioned
+        qualify row_number() over (partition by id order by received_at desc) = 1
         {% else %}
         -- No selected tracks configured on any segment source
         select 

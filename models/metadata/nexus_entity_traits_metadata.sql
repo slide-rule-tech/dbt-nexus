@@ -74,7 +74,7 @@ non_er_traits AS (
         cast(null as string) as entity_type,
         cast(null as string) as trait_name,
         cast(null as string) as trait_column_name
-    WHERE 1 = 0
+    LIMIT 0
     {% endif %}
 ),
 

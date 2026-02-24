@@ -100,11 +100,14 @@ models:
                 severity: warn
                 where: >
                   1 = 1
-                  {% for et_name, et_cfg in var('nexus', {}).get('entity_types', {}).items() %}
-                  {% if et_cfg is mapping and not et_cfg.get('entity_resolution', true) %}
-                  AND entity_type != '{{ et_name }}'
+                  {% set et_val = var('nexus', {}).get('entity_types', {}) %}
+                  {% if et_val is mapping %}
+                    {% for et_name, et_cfg in et_val.items() %}
+                      {% if et_cfg is mapping and not et_cfg.get('entity_resolution', true) %}
+                        AND entity_type != '{{ et_name }}'
+                      {% endif %}
+                    {% endfor %}
                   {% endif %}
-                  {% endfor %}
       - name: last_interaction_at
         description: "Most recent event timestamp for this entity"
         tests:
