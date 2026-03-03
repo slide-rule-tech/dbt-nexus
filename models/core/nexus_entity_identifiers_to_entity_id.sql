@@ -27,6 +27,21 @@
         entity_id,
         '{{ entity_type }}' as entity_type
     from {{ ref(reg_model) }}
+
+    union all
+
+    select distinct
+        reg.entity_id as identifier_id,
+        nei.identifier_type,
+        nei.identifier_value,
+        reg.entity_id as entity_id,
+        '{{ entity_type }}' as entity_type
+    from {{ ref('nexus_entity_identifiers') }} nei
+    inner join {{ ref(reg_model) }} reg
+        on nei.entity_type = '{{ entity_type }}'
+       and nei.identifier_value = reg.source_id
+    where nei.entity_type = '{{ entity_type }}'
+
     {% if not loop.last %}
     union all
     {% endif %}

@@ -211,8 +211,12 @@ SELECT
     participant_raw,
     TRIM(
         REGEXP_REPLACE(
-            REGEXP_REPLACE(participant_name, r'^[\'"]+', ''),
-            r'[\'"]+$', 
+            REGEXP_REPLACE(
+                REGEXP_REPLACE(participant_name, r'^[\'"]+', ''),
+                r'[\'"]+$',
+                ''
+            ),
+            r'\s*\([^)]*@[^)]*\)\s*$',
             ''
         )
     ) as name,

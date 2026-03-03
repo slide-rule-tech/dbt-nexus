@@ -4,6 +4,10 @@
     tags=['gmail', 'normalized', 'by_account']
 ) }}
 
+{% set internal_domains = var('internal_domains', []) %}
+{% set filter_internal_only_messages = var('nexus', {}).get('sources', {}).get('gmail', {}).get('filter_internal_only_messages', false) %}
+{% set should_filter_internal_only_messages = filter_internal_only_messages and (internal_domains | length > 0) %}
+
 -- Per-account normalization: Clean messages using gmail_message_id (not cross-account)
 -- Extracts data from new STANDARD_TABLE_SCHEMA with _raw_record and headers array
 WITH source_data AS (
@@ -33,6 +37,37 @@ headers_extracted AS (
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'in-reply-to'
          LIMIT 1) as in_reply_to_header
     FROM source_data
+),
+
+participant_domain_summary AS (
+    SELECT
+        gmail_message_id,
+        _account,
+        COUNT(*) as participant_count,
+        ARRAY_AGG(DISTINCT LOWER(domain) IGNORE NULLS ORDER BY LOWER(domain)) as participant_domains,
+        {% if internal_domains | length > 0 %}
+        COUNTIF(
+            domain IN (
+                {%- for domain in internal_domains -%}
+                '{{ domain | lower }}'
+                {%- if not loop.last -%},{%- endif -%}
+                {%- endfor -%}
+            )
+        ) as internal_participant_count,
+        COUNTIF(
+            domain NOT IN (
+                {%- for domain in internal_domains -%}
+                '{{ domain | lower }}'
+                {%- if not loop.last -%},{%- endif -%}
+                {%- endfor -%}
+            )
+        ) as external_participant_count
+        {% else %}
+        0 as internal_participant_count,
+        COUNT(*) as external_participant_count
+        {% endif %}
+    FROM {{ ref('gmail_message_participants_by_account') }}
+    GROUP BY gmail_message_id, _account
 ),
 
 -- Final cleaned message with subject, etc. (per-account only)
@@ -90,9 +125,37 @@ cleaned_message AS (
         'gmail' as source
     FROM headers_extracted
     WHERE gmail_message_id IS NOT NULL
+),
+
+filtered_message AS (
+    SELECT
+        cm.*,
+        COALESCE(pds.participant_domains, CAST([] AS ARRAY<STRING>)) as participant_domains,
+        (
+            COALESCE(pds.participant_count, 0) > 0
+            AND COALESCE(pds.external_participant_count, 0) = 0
+        ) as is_internal_only_message,
+        TO_JSON_STRING(STRUCT(
+            COALESCE(pds.participant_count, 0) as participant_count,
+            COALESCE(pds.internal_participant_count, 0) as internal_participant_count,
+            COALESCE(pds.external_participant_count, 0) as external_participant_count,
+            COALESCE(pds.participant_domains, CAST([] AS ARRAY<STRING>)) as domains
+        )) as participant_domain_summary
+    FROM cleaned_message cm
+    LEFT JOIN participant_domain_summary pds
+        ON cm.gmail_message_id = pds.gmail_message_id
+        AND cm._account = pds._account
+    {% if should_filter_internal_only_messages %}
+    WHERE (
+        -- Keep messages when we cannot parse participants.
+        COALESCE(pds.participant_count, 0) = 0
+        -- Keep messages with at least one external participant.
+        OR COALESCE(pds.external_participant_count, 0) > 0
+    )
+    {% endif %}
 )
 
 
-SELECT * FROM cleaned_message
+SELECT * FROM filtered_message
 ORDER BY sent_at ASC
 
