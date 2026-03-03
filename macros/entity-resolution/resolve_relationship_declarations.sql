@@ -31,6 +31,22 @@ all_resolved_identifiers as (
         entity_id,
         '{{ entity_type }}' as entity_type
     from {{ ref(reg_model) }}
+
+    union all
+
+    -- Also map source-specific non-ER identifier types (e.g. orion_account_id)
+    -- when they point to the same registered source_id.
+    select distinct
+        nei.identifier_type,
+        nei.identifier_value,
+        reg.entity_id,
+        '{{ entity_type }}' as entity_type
+    from {{ ref('nexus_entity_identifiers') }} nei
+    inner join {{ ref(reg_model) }} reg
+        on nei.entity_type = '{{ entity_type }}'
+       and nei.identifier_value = reg.source_id
+    where nei.entity_type = '{{ entity_type }}'
+
     {% if not loop.last %}
     union all
     {% endif %}

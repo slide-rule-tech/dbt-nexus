@@ -5,6 +5,29 @@
 {% set entity_config = nexus.get_entity_type_config() %}
 {% set has_er = er_types | length > 0 %}
 {% set has_non_er = non_er_types | length > 0 %}
+{% set er_trait_names = [] %}
+{% if has_er %}
+  {% set er_trait_names_raw = dbt_utils.get_column_values(ref('nexus_resolved_entity_traits'), 'trait_name') | default([]) %}
+  {% for trait_name in er_trait_names_raw %}
+    {% do er_trait_names.append(trait_name | replace(' ', '_') | lower) %}
+  {% endfor %}
+{% endif %}
+{% set non_er_trait_names = [] %}
+{% if has_non_er %}
+  {% for entity_type in non_er_types %}
+    {% set type_config = entity_config[entity_type] %}
+    {% set reg_model = type_config.get('registration_model') %}
+    {% if reg_model %}
+      {% set exclude_cols = ['entity_id', 'entity_type', 'source', 'source_id', '_registered_at', '_source_created_at', '_source_updated_at'] %}
+      {% set cols = adapter.get_columns_in_relation(ref(reg_model)) %}
+      {% for col in cols %}
+        {% if col.name | lower not in exclude_cols %}
+          {% do non_er_trait_names.append(col.name | lower) %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
 
 {% if has_er %}
 with resolved_traits as (
@@ -145,7 +168,12 @@ select
   e.entity_id,
   e.entity_type,
   {% if has_er %}
-  t.*,
+  {% for trait_name in er_trait_names %}
+  {% if trait_name not in non_er_trait_names %}
+  t.{{ trait_name }} as {{ trait_name }},
+  {% endif %}
+  {% endfor %}
+  t.traits_entity_id,
   {% endif %}
   {% if has_non_er %}
   {% for entity_type in non_er_types %}
@@ -156,7 +184,12 @@ select
   {% set cols = adapter.get_columns_in_relation(ref(reg_model)) %}
   {% for col in cols %}
   {% if col.name | lower not in exclude_cols %}
-  reg_{{ entity_type }}.{{ col.name }} as {{ entity_type }}_{{ col.name | lower }},
+  {% set output_col_name = col.name | lower %}
+  {% if output_col_name in er_trait_names %}
+  coalesce(cast(reg_{{ entity_type }}.{{ col.name }} as {{ dbt.type_string() }}), t.{{ output_col_name }}) as {{ output_col_name }},
+  {% else %}
+  reg_{{ entity_type }}.{{ col.name }} as {{ output_col_name }},
+  {% endif %}
   {% endif %}
   {% endfor %}
   {% endif %}
