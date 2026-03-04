@@ -35,7 +35,28 @@ headers_extracted AS (
          LIMIT 1) as subject_header,
         (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'in-reply-to'
-         LIMIT 1) as in_reply_to_header
+         LIMIT 1) as in_reply_to_header,
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+         WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'auto-submitted'
+         LIMIT 1) as auto_submitted_header,
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+         WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'precedence'
+         LIMIT 1) as precedence_header,
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+         WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'list-id'
+         LIMIT 1) as list_id_header,
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+         WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'list-unsubscribe'
+         LIMIT 1) as list_unsubscribe_header,
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+         WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'x-auto-response-suppress'
+         LIMIT 1) as x_auto_response_suppress_header,
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+         WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'x-autoreply'
+         LIMIT 1) as x_autoreply_header,
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+         WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'x-autorespond'
+         LIMIT 1) as x_autorespond_header
     FROM source_data
 ),
 
@@ -79,6 +100,13 @@ cleaned_message AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.historyId') as gmail_history_id,
         message_id_header,
         in_reply_to_header as in_reply_to,
+        auto_submitted_header,
+        precedence_header,
+        list_id_header,
+        list_unsubscribe_header,
+        x_auto_response_suppress_header,
+        x_autoreply_header,
+        x_autorespond_header,
         
         -- Timestamps
         TIMESTAMP_MILLIS(CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.internalDate') AS INT64)) as sent_at,
@@ -113,6 +141,15 @@ cleaned_message AS (
         -- Message content
         {{ nexus.html_decode("JSON_EXTRACT_SCALAR(_raw_record, '$.snippet')") }} as snippet,
         CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.sizeEstimate') AS INT64) as size_estimate,
+        (
+            REGEXP_CONTAINS(LOWER(COALESCE(auto_submitted_header, '')), r'^auto-')
+            OR LOWER(COALESCE(precedence_header, '')) IN ('bulk', 'list', 'junk')
+            OR COALESCE(NULLIF(TRIM(list_id_header), ''), NULL) IS NOT NULL
+            OR COALESCE(NULLIF(TRIM(list_unsubscribe_header), ''), NULL) IS NOT NULL
+            OR COALESCE(NULLIF(TRIM(x_auto_response_suppress_header), ''), NULL) IS NOT NULL
+            OR COALESCE(NULLIF(TRIM(x_autoreply_header), ''), NULL) IS NOT NULL
+            OR COALESCE(NULLIF(TRIM(x_autorespond_header), ''), NULL) IS NOT NULL
+        ) as is_automated_or_bulk_message,
 
         -- Sync metadata
         _ingested_at,
