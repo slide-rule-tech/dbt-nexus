@@ -51,6 +51,8 @@
     evt_msr
   {%- elif type == 'event_dimension' -%}
     evt_dim
+  {%- elif type == 'anomaly' -%}
+    anom
   {%- else -%}
     {{ type[:3] }}
   {%- endif -%}
@@ -120,6 +122,8 @@
     {%- set p = 'evt_msr' -%}
   {%- elif type == 'event_dimension' -%}
     {%- set p = 'evt_dim' -%}
+  {%- elif type == 'anomaly' -%}
+    {%- set p = 'anom' -%}
   {%- else -%}
     {%- set p = type[:3] -%}
   {%- endif -%}
