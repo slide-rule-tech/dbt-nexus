@@ -8,6 +8,16 @@
     materialized='table'
 ) }}
 
+{% set global_event_name_prefix = var('nexus', {}).get('sources', {}).get('segment', {}).get('event_name_prefix', none) %}
+{% set source_prefix_cases = [] %}
+{% for segment_source in var('segment_sources', []) %}
+    {% if segment_source.get('event_name_prefix', none) is not none %}
+        {% set escaped_prefix = segment_source.get('event_name_prefix') | replace("'", "''") %}
+        {% set escaped_source = segment_source.get('name') | replace("'", "''") %}
+        {% do source_prefix_cases.append("when segment_source = '" ~ escaped_source ~ "' then '" ~ escaped_prefix ~ "'") %}
+    {% endif %}
+{% endfor %}
+
 with source_data as (
     select 
         *,
@@ -18,7 +28,17 @@ with source_data as (
             when segment_call_model like '%screens%' then 'screen'
             when segment_call_model like '%groups%' then 'group'
             when segment_call_model like '%page%' then 'page'
-        end as segment_event_type
+        end as segment_event_type,
+        case
+            {% if source_prefix_cases | length > 0 %}
+            {{ source_prefix_cases | join('\n            ') }}
+            {% endif %}
+            {% if global_event_name_prefix is not none %}
+            else '{{ global_event_name_prefix | replace("'", "''") }}'
+            {% else %}
+            else null
+            {% endif %}
+        end as configured_event_name_prefix
     from {{ ref('cleaned_segment_all_columns') }}
 ),
 
@@ -28,12 +48,25 @@ formatted_events as (
         timestamp as occurred_at,
         'web' as event_type,
         case
-            when segment_event_type = 'identify' then 'user identified'
-            when segment_event_type = 'alias' then 'user aliased'
-            when segment_event_type = 'track' then lower(event_text)
-            when segment_event_type = 'screen' then 'screen viewed'
-            when segment_event_type = 'group' then 'user grouped'
-            when segment_event_type = 'page' then 'page viewed'
+            when configured_event_name_prefix is not null then
+                trim(configured_event_name_prefix) || ' ' ||
+                case
+                    when segment_event_type = 'identify' then 'user identified'
+                    when segment_event_type = 'alias' then 'user aliased'
+                    when segment_event_type = 'track' then lower(event_text)
+                    when segment_event_type = 'screen' then 'screen viewed'
+                    when segment_event_type = 'group' then 'user grouped'
+                    when segment_event_type = 'page' then 'page viewed'
+                end
+            else
+                case
+                    when segment_event_type = 'identify' then 'user identified'
+                    when segment_event_type = 'alias' then 'user aliased'
+                    when segment_event_type = 'track' then lower(event_text)
+                    when segment_event_type = 'screen' then 'screen viewed'
+                    when segment_event_type = 'group' then 'user grouped'
+                    when segment_event_type = 'page' then 'page viewed'
+                end
         end as event_name,
         'segment' as source,
 
