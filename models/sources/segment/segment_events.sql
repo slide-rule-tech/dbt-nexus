@@ -29,16 +29,20 @@ with source_data as (
             when segment_call_model like '%groups%' then 'group'
             when segment_call_model like '%page%' then 'page'
         end as segment_event_type,
+        {% if source_prefix_cases | length > 0 %}
         case
-            {% if source_prefix_cases | length > 0 %}
             {{ source_prefix_cases | join('\n            ') }}
-            {% endif %}
             {% if global_event_name_prefix is not none %}
             else '{{ global_event_name_prefix | replace("'", "''") }}'
             {% else %}
             else null
             {% endif %}
         end as configured_event_name_prefix
+        {% elif global_event_name_prefix is not none %}
+        '{{ global_event_name_prefix | replace("'", "''") }}' as configured_event_name_prefix
+        {% else %}
+        null as configured_event_name_prefix
+        {% endif %}
     from {{ ref('cleaned_segment_all_columns') }}
 ),
 
