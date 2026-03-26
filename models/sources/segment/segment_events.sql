@@ -35,13 +35,13 @@ with source_data as (
             {% if global_event_name_prefix is not none %}
             else '{{ global_event_name_prefix | replace("'", "''") }}'
             {% else %}
-            else null
+            else cast(null as {{ dbt.type_string() }})
             {% endif %}
         end as configured_event_name_prefix
         {% elif global_event_name_prefix is not none %}
         '{{ global_event_name_prefix | replace("'", "''") }}' as configured_event_name_prefix
         {% else %}
-        null as configured_event_name_prefix
+        cast(null as {{ dbt.type_string() }}) as configured_event_name_prefix
         {% endif %}
     from {{ ref('cleaned_segment_all_columns') }}
 ),
