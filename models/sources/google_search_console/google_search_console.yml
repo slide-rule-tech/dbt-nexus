@@ -1,0 +1,132 @@
+version: 2
+
+sources:
+  - name: google_search_console
+    description: "Google Search Console reports synced via Nango (JSON in _raw_record)"
+    schema:
+      "{{ var('nexus', {}).get('sources', {}).get('google_search_console',
+      {}).get('schema', 'google_search_console') }}"
+    database:
+      "{{ var('nexus', {}).get('sources', {}).get('google_search_console',
+      {}).get('database', '') }}"
+    tables:
+      - name: gsc_site_report_by_site
+        identifier:
+          "{{ var('nexus', {}).get('sources', {}).get('google_search_console',
+          {}).get('tables', {}).get('gsc_site_report_by_site', {}).get('identifier',
+          'gsc_site_report_by_site') }}"
+        description: "Site-level metrics (deduplicated impressions per search)"
+      - name: gsc_site_report_by_page
+        identifier:
+          "{{ var('nexus', {}).get('sources', {}).get('google_search_console',
+          {}).get('tables', {}).get('gsc_site_report_by_page', {}).get('identifier',
+          'gsc_site_report_by_page') }}"
+        description: "Site metrics with per-URL impression counting"
+      - name: gsc_keyword_page_report
+        identifier:
+          "{{ var('nexus', {}).get('sources', {}).get('google_search_console',
+          {}).get('tables', {}).get('gsc_keyword_page_report', {}).get('identifier',
+          'gsc_keyword_page_report') }}"
+        description: "Keyword + page dimensions (partial coverage)"
+      - name: gsc_page_report
+        identifier:
+          "{{ var('nexus', {}).get('sources', {}).get('google_search_console',
+          {}).get('tables', {}).get('gsc_page_report', {}).get('identifier',
+          'gsc_page_report') }}"
+        description: "Page-level metrics without query (optional / future use)"
+      - name: gsc_keyword_site_report_by_site
+        identifier:
+          "{{ var('nexus', {}).get('sources', {}).get('google_search_console',
+          {}).get('tables', {}).get('gsc_keyword_site_report_by_site', {}).get('identifier',
+          'gsc_keyword_site_report_by_site') }}"
+        description: "Keyword metrics at site aggregation (optional / future use)"
+      - name: gsc_keyword_site_report_by_page
+        identifier:
+          "{{ var('nexus', {}).get('sources', {}).get('google_search_console',
+          {}).get('tables', {}).get('gsc_keyword_site_report_by_page', {}).get('identifier',
+          'gsc_keyword_site_report_by_page') }}"
+        description: "Keyword metrics with page-level counting, no page URL (optional / future use)"
+
+models:
+  - name: google_search_console_events
+    description: "Union layer — GSC metric events for Nexus"
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description: "Unique nexus event identifier"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_%'"
+              config:
+                severity: warn
+      - name: occurred_at
+        description: "Day the metrics apply to"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: event_type
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: source
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: google_search_console_event_dimensions
+    description: "Union layer — search dimensions for GSC events"
+    tests:
+      - unique:
+          column_name: event_dimension_id
+          config:
+            severity: error
+    columns:
+      - name: event_dimension_id
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: event_id
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: dimension_name
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: google_search_console_event_measurements
+    description: "Union layer — clicks/impressions measurements for GSC events"
+    tests:
+      - unique:
+          column_name: event_measurement_id
+          config:
+            severity: error
+    columns:
+      - name: event_measurement_id
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: event_id
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: measurement_name
+        tests:
+          - not_null:
+              config:
+                severity: error

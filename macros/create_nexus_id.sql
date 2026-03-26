@@ -53,6 +53,8 @@
     evt_dim
   {%- elif type == 'anomaly' -%}
     anom
+  {%- elif type == 'computed_trait' -%}
+    ct
   {%- else -%}
     {{ type[:3] }}
   {%- endif -%}
@@ -124,6 +126,8 @@
     {%- set p = 'evt_dim' -%}
   {%- elif type == 'anomaly' -%}
     {%- set p = 'anom' -%}
+  {%- elif type == 'computed_trait' -%}
+    {%- set p = 'ct' -%}
   {%- else -%}
     {%- set p = type[:3] -%}
   {%- endif -%}

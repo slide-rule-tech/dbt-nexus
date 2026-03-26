@@ -12,6 +12,25 @@
     {% do er_trait_names.append(trait_name | replace(' ', '_') | lower) %}
   {% endfor %}
 {% endif %}
+{% set has_computed_traits = var('nexus', {}).get('computed_traits', []) | length > 0 %}
+{% set computed_trait_names = [] %}
+{% if has_computed_traits and execute %}
+  {% set ct_relation = adapter.get_relation(
+      database=target.database,
+      schema=target.schema,
+      identifier='nexus_computed_traits') %}
+  {% if ct_relation %}
+    {% set ct_query %}
+      select distinct trait_name
+      from {{ ref('nexus_computed_traits') }}
+      where trait_name is not null
+      order by trait_name
+    {% endset %}
+    {% for trait_name in run_query(ct_query).columns[0].values() %}
+      {% do computed_trait_names.append(trait_name | replace(' ', '_') | lower) %}
+    {% endfor %}
+  {% endif %}
+{% endif %}
 {% set non_er_trait_names = [] %}
 {% if has_non_er %}
   {% for entity_type in non_er_types %}
@@ -162,6 +181,12 @@ pivoted_traits as (
 {% endfor %}
 {% endif %}
 
+{% if has_computed_traits and computed_trait_names | length > 0 %}
+pivoted_computed_traits as (
+  {{ nexus.pivot_traits('nexus_computed_traits', 'entity_id', 'ct_') }}
+),
+{% endif %}
+
 _placeholder as (select 1 as _p)
 
 select
@@ -192,6 +217,13 @@ select
   {% endif %}
   {% endif %}
   {% endfor %}
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+  {% if has_computed_traits and computed_trait_names | length > 0 %}
+  {% for t in computed_trait_names %}
+  {% if t not in er_trait_names and t not in non_er_trait_names %}
+  ct.{{ t }},
   {% endif %}
   {% endfor %}
   {% endif %}
@@ -258,4 +290,7 @@ left join {{ entity_type }}_registration reg_{{ entity_type }}
 {% endfor %}
 {% endif %}
 left join entity_interaction_timestamps eit on e.entity_id = eit.entity_id
+{% if has_computed_traits and computed_trait_names | length > 0 %}
+left join pivoted_computed_traits ct on e.entity_id = ct.ct_entity_id
+{% endif %}
 {% endmacro %}
