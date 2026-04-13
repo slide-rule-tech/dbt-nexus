@@ -29,6 +29,16 @@ WITH yaml_dimensions AS (
 ),
 {% else %}
 WITH yaml_dimensions AS (
+    {% if target.type == 'bigquery' %}
+    SELECT
+        CAST(NULL AS STRING) AS dimension_name,
+        CAST(NULL AS STRING) AS label,
+        CAST(NULL AS STRING) AS description,
+        CAST(NULL AS STRING) AS aliases,
+        CAST(NULL AS STRING) AS tags,
+        CAST(NULL AS STRING) AS example_questions
+    LIMIT 0
+    {% else %}
     SELECT
         CAST(NULL AS VARCHAR) AS dimension_name,
         CAST(NULL AS VARCHAR) AS label,
@@ -37,6 +47,7 @@ WITH yaml_dimensions AS (
         CAST(NULL AS VARCHAR) AS tags,
         CAST(NULL AS VARCHAR) AS example_questions
     WHERE 1 = 0
+    {% endif %}
 ),
 {% endif %}
 
