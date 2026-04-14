@@ -1,5 +1,10 @@
-{# Snowflake string literals use single quotes; double quotes delimit identifiers, not strings.
-   Escape any embedded single quote as '' so YAML filters like event_name = 'x' compile safely. #}
+{# Snowflake escapes single quotes as '', while BigQuery expects \'.
+   Use adapter-aware escaping so metadata strings compile across warehouses. #}
 {% macro metrics_metadata_sql_str(value) -%}
-'{{ (value | default("", true)) | string | replace("'", "''") }}'
+{%- set raw_value = (value | default("", true)) | string -%}
+{%- if target.type == 'bigquery' -%}
+    '{{ raw_value | replace("\\", "\\\\") | replace("'", "\\'") }}'
+{%- else -%}
+    '{{ raw_value | replace("'", "''") }}'
+{%- endif -%}
 {%- endmacro %}
