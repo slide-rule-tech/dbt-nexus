@@ -14,6 +14,7 @@
       Notes:
         - Regex is intentionally conservative (common production heuristic).
         - Extend as needed for IDN/Unicode if your warehouse & data require it.
+        - TypeScript mirror: app/src/lib/validate-and-normalize-email.ts (keep in sync).
     -#}
     {%- set pattern = '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$' -%}
 
