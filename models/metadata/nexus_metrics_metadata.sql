@@ -32,6 +32,25 @@
 
 {% else %}
 
+    {% if target.type == 'bigquery' %}
+    SELECT
+        CAST(NULL AS STRING) AS model,
+        CAST(NULL AS STRING) AS metric_name,
+        CAST(NULL AS STRING) AS label,
+        CAST(NULL AS STRING) AS aliases,
+        CAST(NULL AS STRING) AS metric_type,
+        CAST(NULL AS STRING) AS tables,
+        CAST(NULL AS STRING) AS metric_sql,
+        CAST(NULL AS STRING) AS filter,
+        CAST(NULL AS STRING) AS format,
+        CAST(NULL AS STRING) AS unit,
+        CAST(NULL AS STRING) AS polarity,
+        CAST(NULL AS INT64) AS precision,
+        CAST(NULL AS STRING) AS tags,
+        CAST(NULL AS STRING) AS description,
+        CAST(NULL AS STRING) AS example_questions
+    LIMIT 0
+    {% else %}
     SELECT
         CAST(NULL AS VARCHAR) AS model,
         CAST(NULL AS VARCHAR) AS metric_name,
@@ -49,5 +68,6 @@
         CAST(NULL AS VARCHAR) AS description,
         CAST(NULL AS VARCHAR) AS example_questions
     WHERE 1 = 0
+    {% endif %}
 
 {% endif %}
