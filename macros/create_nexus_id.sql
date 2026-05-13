@@ -130,8 +130,6 @@
     {%- set p = 'ct' -%}
   {%- elif type == 'scope' -%}
     {%- set p = 'scp' -%}
-  {%- elif type == 'auth_identity' -%}
-    {%- set p = 'auth' -%}
   {%- else -%}
     {%- set p = type[:3] -%}
   {%- endif -%}

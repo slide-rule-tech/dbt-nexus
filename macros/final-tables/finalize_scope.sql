@@ -6,8 +6,8 @@
 
       with raw_scope_tuples as (
         select
-          viewer_entity_id,
-          viewer_entity_type,
+          viewer_identifier_type,
+          viewer_identifier_value,
           resource_entity_id,
           resource_entity_type,
           relationship,
@@ -23,16 +23,22 @@
   The CTE must produce exactly the columns above. finalize_scope adds
   scope_id, scope_name, is_active, _created_at, _updated_at, _processed_at.
 
+  Asymmetric stability: the viewer side carries a source identifier
+  (typically email) because the auth subject lives outside the warehouse
+  and must survive ER re-resolutions. The resource side uses entity_id
+  because everything downstream queries fresh state from the same dbt
+  run — cross-run instability never bites resources.
+
   source_cte defaults to 'raw_scope_tuples' but can be overridden.
 #}
 
 {% macro finalize_scope(scope_name, source_cte='raw_scope_tuples') %}
 
 select
-    {{ nexus.create_nexus_id('scope', ['viewer_entity_id', 'resource_entity_id', "'" ~ scope_name ~ "'", 'relationship']) }} as scope_id,
+    {{ nexus.create_nexus_id('scope', ['viewer_identifier_value', 'resource_entity_id', "'" ~ scope_name ~ "'", 'relationship']) }} as scope_id,
     '{{ scope_name }}' as scope_name,
-    viewer_entity_id,
-    viewer_entity_type,
+    viewer_identifier_type,
+    viewer_identifier_value,
     resource_entity_id,
     resource_entity_type,
     relationship,
