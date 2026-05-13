@@ -185,21 +185,12 @@ models:
 
   - name: nexus_scopes
     description:
-      "Union view across the project's nexus_scope_* models. Single read
-      surface for the permission translation layer that turns
-      (viewer_identifier, role) into the set of resource_entity_ids a
-      viewer can access. Each row is a Zanzibar-style
+      "Auto-discovered union view across every nexus_scope_* model in the
+      project. Single read surface for the permission translation layer
+      that turns (viewer_entity_id, role) into the set of resource_entity_ids
+      a viewer can access. Each row is a Zanzibar-style
       (viewer, relationship, resource) tuple with the auth role that
-      activates it.
-
-      Asymmetric stability: the viewer side carries a source identifier
-      (typically email) because the auth subject lives outside the
-      warehouse and must survive ER re-resolutions. The resource side
-      uses entity_id — fine because everything downstream queries fresh
-      state from the same dbt run.
-
-      Empty stub when no scope models are declared via the
-      nexus_scope_models project var."
+      activates it. Empty stub when no scope models exist."
     tests:
       - unique:
           column_name: scope_id
@@ -216,20 +207,14 @@ models:
         description: "Constant per scope model (e.g. 'advisor_to_household')"
         tests:
           - not_null
-      - name: viewer_identifier_type
-        description:
-          "Kind of identifier carried in viewer_identifier_value
-          (typically 'email'). Source-stable, durable across ER."
+      - name: viewer_entity_id
+        description: "Entity ID of the viewer (auth-user side)"
         tests:
           - not_null
-      - name: viewer_identifier_value
-        description:
-          "The stable identifier itself — matched against the auth
-          provider's session subject at query time."
-        tests:
-          - not_null
+      - name: viewer_entity_type
+        description: "Entity type of the viewer, typically 'person'"
       - name: resource_entity_id
-        description: "Entity ID of the resource being unlocked (current dbt run)"
+        description: "Entity ID of the resource being unlocked"
         tests:
           - not_null
       - name: resource_entity_type
@@ -255,6 +240,52 @@ models:
         description: "Precomputed (revoked_at is null)"
         tests:
           - not_null
+
+  - name: nexus_auth_identities
+    description:
+      "Maps an authenticated session (auth_provider, auth_subject) to a
+      person entity_id in nexus_entities. Default implementation: lowercase
+      email match. Clients can override by creating their own model with
+      this same name to add alias support, manual overrides, or
+      service-account mappings."
+    tests:
+      - unique:
+          column_name: auth_identity_id
+          config:
+            severity: error
+    columns:
+      - name: auth_identity_id
+        description: "Unique identifier for this auth-to-entity mapping"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: auth_provider
+        description:
+          "Channel/source of the auth subject. Default impl uses 'email';
+          override impls may use 'betterauth', 'clerk', 'service', etc."
+        tests:
+          - not_null
+      - name: auth_subject
+        description:
+          "The subject claim from the auth provider — for the default
+          email-match impl this is the lowercased email address."
+        tests:
+          - not_null
+      - name: entity_id
+        description: "Resolved person entity_id in nexus_entities"
+        tests:
+          - not_null
+      - name: match_method
+        description:
+          "How the binding was established (e.g. 'email_exact',
+          'manual_override', 'service')."
+      - name: is_active
+        description: "Whether this binding is currently active"
+        tests:
+          - not_null
+      - name: established_at
+        description: "When this identity binding was first observed"
 
   - name: nexus_entity_states
     description:

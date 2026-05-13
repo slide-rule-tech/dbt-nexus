@@ -23,8 +23,8 @@
 select
     cast(null as {{ dbt.type_string() }}) as scope_id,
     cast(null as {{ dbt.type_string() }}) as scope_name,
-    cast(null as {{ dbt.type_string() }}) as viewer_identifier_type,
-    cast(null as {{ dbt.type_string() }}) as viewer_identifier_value,
+    cast(null as {{ dbt.type_string() }}) as viewer_entity_id,
+    cast(null as {{ dbt.type_string() }}) as viewer_entity_type,
     cast(null as {{ dbt.type_string() }}) as resource_entity_id,
     cast(null as {{ dbt.type_string() }}) as resource_entity_type,
     cast(null as {{ dbt.type_string() }}) as relationship,
@@ -44,8 +44,8 @@ where 1 = 0
 select
     scope_id,
     scope_name,
-    viewer_identifier_type,
-    viewer_identifier_value,
+    viewer_entity_id,
+    viewer_entity_type,
     resource_entity_id,
     resource_entity_type,
     relationship,
