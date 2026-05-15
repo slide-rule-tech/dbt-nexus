@@ -20,6 +20,9 @@
 
 {% if scope_models | length == 0 %}
 
+-- Empty stub: zero rows but the full contract column shape. The
+-- `where 1 = 0` filter needs a FROM in BigQuery and Snowflake, so we
+-- select from a one-row dummy and immediately filter it out.
 select
     cast(null as {{ dbt.type_string() }}) as scope_id,
     cast(null as {{ dbt.type_string() }}) as scope_name,
@@ -29,13 +32,14 @@ select
     cast(null as {{ dbt.type_string() }}) as resource_entity_type,
     cast(null as {{ dbt.type_string() }}) as relationship,
     cast(null as {{ dbt.type_string() }}) as role,
-    cast(null as array<{{ dbt.type_string() }}>) as source_record_ids,
+    cast(null as {{ dbt.type_string() }}) as source_record_ids,
     cast(null as timestamp) as granted_at,
     cast(null as timestamp) as revoked_at,
     cast(false as boolean) as is_active,
     cast(null as timestamp) as _created_at,
     cast(null as timestamp) as _updated_at,
     cast(null as timestamp) as _processed_at
+from (select 1) _empty_scopes_stub
 where 1 = 0
 
 {% else %}
