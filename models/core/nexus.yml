@@ -230,8 +230,10 @@ models:
           authenticated user's session role at query time."
       - name: source_record_ids
         description:
-          "Array of source record IDs (relationship_id, trait_id, etc.)
-          that produced this grant; for audit/lineage."
+          "Semicolon-delimited source record IDs (relationship_id,
+          trait_id, etc.) that produced this grant; for audit/lineage.
+          STRING-typed for cross-warehouse portability — BigQuery and
+          Snowflake disagree on array literal syntax."
       - name: granted_at
         description: "When the grant was first observed"
       - name: revoked_at

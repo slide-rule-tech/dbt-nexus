@@ -29,7 +29,7 @@ select
     cast(null as {{ dbt.type_string() }}) as resource_entity_type,
     cast(null as {{ dbt.type_string() }}) as relationship,
     cast(null as {{ dbt.type_string() }}) as role,
-    cast(null as array<{{ dbt.type_string() }}>) as source_record_ids,
+    cast(null as {{ dbt.type_string() }}) as source_record_ids,
     cast(null as timestamp) as granted_at,
     cast(null as timestamp) as revoked_at,
     cast(false as boolean) as is_active,

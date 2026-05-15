@@ -23,6 +23,12 @@
   The CTE must produce exactly the columns above. finalize_scope adds
   scope_id, scope_name, is_active, _created_at, _updated_at, _processed_at.
 
+  `source_record_ids` is a STRING (semicolon-delimited list of provenance
+  IDs — relationship_ids, trait_ids, etc.) rather than an ARRAY so the
+  contract is portable across BigQuery and Snowflake. Use `concat(a, ';',
+  b)` to join multiple IDs; pass an empty string or NULL when there is
+  no provenance to record.
+
   source_cte defaults to 'raw_scope_tuples' but can be overridden.
 #}
 
