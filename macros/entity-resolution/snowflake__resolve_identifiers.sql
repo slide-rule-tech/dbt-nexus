@@ -1,64 +1,63 @@
 {% macro snowflake__resolve_identifiers(entity_type, identifiers_table, edges_table, max_recursion=10) %}
 
-with recursive recursive_components as (
-    -- Base case : start from every identifier that appears in the raw table for this entity_type.
+-- Jinja-unrolled traversal.
+--
+-- Compute depth-bounded reachability over the identifier graph by unrolling
+-- the traversal at compile time. Because `max_recursion` is known to Jinja,
+-- we render one CTE per hop instead of using SQL's `WITH RECURSIVE` primitive.
+-- `UNION` (not UNION ALL) at each level deduplicates `(component, reachable)`
+-- pairs, which naturally absorbs cycles -- no path tracking required.
+--
+-- Output is identical to the prior recursive-CTE implementation for the same
+-- inputs and `max_recursion`. Avoids Snowflake's recursive-operator memory
+-- limits (error 100298) and BigQuery's structural restrictions on
+-- `WITH RECURSIVE` (must be top-level, no UNION ALL with non-recursive CTEs).
+
+with depth_0 as (
+    -- Base case: every identifier starts as its own component.
     select distinct
       identifier_type  as component_identifier_type,
       identifier_value as component_identifier_value,
       identifier_type,
-      identifier_value,
-      -- Keep track of the identifiers that have already been visited using a string path
-      identifier_type || ':' || identifier_value as path,
-      0 as recursion_level
+      identifier_value
     from {{ ref(identifiers_table) }}
     where entity_type = '{{ entity_type }}'
-
-    union all
-
-    -- Recursive case : walk to every neighbour that hasn't been visited yet.
+)
+{% for level in range(1, max_recursion + 1) %}
+,
+depth_{{ level }} as (
+    -- Hop {{ level }}: extend reachability one more edge from depth_{{ level - 1 }}.
+    select * from depth_{{ level - 1 }}
+    union
     select
-      rc.component_identifier_type,
-      rc.component_identifier_value,
+      d.component_identifier_type,
+      d.component_identifier_value,
       e.identifier_type_b  as identifier_type,
-      e.identifier_value_b as identifier_value,
-      -- Append the new identifier to the path string
-      rc.path || '|' || e.identifier_type_b || ':' || e.identifier_value_b as path,
-      rc.recursion_level + 1 as recursion_level
-    from recursive_components rc
+      e.identifier_value_b as identifier_value
+    from depth_{{ level - 1 }} d
     join {{ ref(edges_table) }} e
-      on rc.identifier_type  = e.identifier_type_a
-     and rc.identifier_value = e.identifier_value_a
+      on d.identifier_type  = e.identifier_type_a
+     and d.identifier_value = e.identifier_value_a
      and e.entity_type_a = '{{ entity_type }}'
      and e.entity_type_b = '{{ entity_type }}'
-    -- Use string operations to check for cycles
-    where not contains(rc.path, e.identifier_type_b || ':' || e.identifier_value_b)
-    and rc.recursion_level < {{ max_recursion }}
-),
+)
+{% endfor %}
+,
 
--- Return the deduplicated component mapping (drop the helper `path` column).
-deduplicated as (
-  select distinct
-    component_identifier_type,
-    component_identifier_value,
-    identifier_type,
-    identifier_value
-  from recursive_components
-),
-
--- First apply window functions to get the first values 
+-- Apply window functions to pick the canonical component representative.
 component_values as (
   select
     identifier_type,
     identifier_value,
     first_value(component_identifier_type) over(
-      partition by identifier_type, identifier_value 
+      partition by identifier_type, identifier_value
       order by component_identifier_type, component_identifier_value
     ) as first_component_type,
     first_value(component_identifier_value) over(
-      partition by identifier_type, identifier_value 
+      partition by identifier_type, identifier_value
       order by component_identifier_type, component_identifier_value
     ) as first_component_value
-  from deduplicated
+  from depth_{{ max_recursion }}
 ),
 
 -- Then use those pre-calculated values in the mapping
@@ -114,7 +113,7 @@ select
   identifier_value,
   false as realtime_processed,
   true as existing_{{ entity_type }}
-from deduplicated_identifiers 
+from deduplicated_identifiers
 where row_num = 1
 
-{% endmacro %} 
+{% endmacro %}
