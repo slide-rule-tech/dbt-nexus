@@ -161,6 +161,38 @@ The `nexus_entities` table automatically unions all configured entity types!
 - **Traits**: Single join to all identifiers instead of 2 separate joins + union
 - **Simpler DAG**: Fewer dependencies, faster compilation
 
+### Identity Resolution: Jinja-Unrolled Traversal
+
+`snowflake__resolve_identifiers` and `bigquery__resolve_identifiers` no longer
+use `WITH RECURSIVE`. Because `max_recursion` is a Jinja-known var, the
+traversal is unrolled at compile time into one CTE per hop, with `UNION` (or
+`UNION DISTINCT` on BigQuery) absorbing cycles natively. The unrolled form is
+plain SQL — no warehouse-specific cycle-detection machinery (string concat on
+Snowflake, array-of-struct on BigQuery).
+
+Why:
+
+- Snowflake's recursive operator can't spill to disk; the previous
+  implementation hit `Recursive Join ran out of memory` (error 100298) on
+  large identifier graphs.
+- BigQuery's `WITH RECURSIVE` has structural restrictions (must be top-level
+  of `WITH`, no `UNION ALL` with non-recursive CTEs, no references to
+  upstream CTEs in the recursive body).
+
+**Correctness fix (incidental):** the previous Snowflake implementation
+detected cycles via `not contains(rc.path, ...)` — a substring match on a
+concatenated path string. Short identifier values (`email=p`, `phone=512982`,
+etc.) appear as substrings inside longer path strings (`email:psomething@x.com`,
+`ga4_client_id:1234.512982...`), causing the cycle check to falsely block
+legitimate traversals. Affected identifiers were stranded outside their true
+connected components and assigned non-canonical `entity_id`s. The iterative
+form uses set-based dedup via `UNION`, so substring false positives are
+impossible. Validation against a 12.5M-row Cinch dataset showed 7 stranded
+identifiers (all short-valued) now correctly merged into their true components.
+
+For graphs without short-substring collisions, output is bit-for-bit
+identical to the previous implementation.
+
 ## Migration Guide
 
 See
