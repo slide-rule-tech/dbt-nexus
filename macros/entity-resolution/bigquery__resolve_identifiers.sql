@@ -14,15 +14,58 @@
 -- `WITH RECURSIVE` (must be top-level of `WITH`, no UNION ALL with
 -- non-recursive CTEs, no upstream-CTE references in the recursive body).
 
-with depth_0 as (
+with
+-- See snowflake__resolve_identifiers for the rationale on filtered-orphan
+-- exclusion. Same logic applied here for BigQuery parity.
+identifiers_with_surviving_edges as (
+    select distinct entity_type_a as entity_type, identifier_type_a as identifier_type, identifier_value_a as identifier_value
+    from {{ ref(edges_table) }}
+    union distinct
+    select distinct entity_type_b as entity_type, identifier_type_b as identifier_type, identifier_value_b as identifier_value
+    from {{ ref(edges_table) }}
+),
+
+events_with_survivors as (
+    select distinct ei.edge_id
+    from {{ ref(identifiers_table) }} ei
+    inner join identifiers_with_surviving_edges s
+      on s.entity_type = ei.entity_type
+      and s.identifier_type = ei.identifier_type
+      and s.identifier_value = ei.identifier_value
+    where ei.entity_type = '{{ entity_type }}'
+),
+
+filtered_orphan_identifiers as (
+    -- Identifiers with no surviving edges that co-occurred in some event with
+    -- another identifier that DID survive the noise filter. Excluded from
+    -- depth_0 to avoid spurious singleton entities.
+    select distinct ei.identifier_type, ei.identifier_value
+    from {{ ref(identifiers_table) }} ei
+    inner join events_with_survivors ews
+      on ei.edge_id = ews.edge_id
+    left join identifiers_with_surviving_edges s
+      on s.entity_type = ei.entity_type
+      and s.identifier_type = ei.identifier_type
+      and s.identifier_value = ei.identifier_value
+    where ei.entity_type = '{{ entity_type }}'
+      and s.identifier_value is null
+),
+
+depth_0 as (
     -- Base case: every identifier starts as its own component.
+    -- Excludes filtered orphans (see above).
     select distinct
       identifier_type  as component_identifier_type,
       identifier_value as component_identifier_value,
       identifier_type,
       identifier_value
-    from {{ ref(identifiers_table) }}
+    from {{ ref(identifiers_table) }} ei
     where entity_type = '{{ entity_type }}'
+      and not exists (
+        select 1 from filtered_orphan_identifiers fo
+        where fo.identifier_type = ei.identifier_type
+          and fo.identifier_value = ei.identifier_value
+      )
 )
 {% for level in range(1, max_recursion + 1) %}
 ,

@@ -13,15 +13,81 @@
 -- limits (error 100298) and BigQuery's structural restrictions on
 -- `WITH RECURSIVE` (must be top-level, no UNION ALL with non-recursive CTEs).
 
-with depth_0 as (
+with
+-- Identifiers that co-occurred with other identifiers in some event but had
+-- ALL their potential edges dropped by create_identifier_edges' noise filter
+-- (e.g., a phone shared across hundreds of submissions). Without this step
+-- each such identifier would survive depth_0 as its own singleton component
+-- and turn into a standalone entity -- so a single event whose identifiers
+-- include any of these orphans would resolve to multiple entities, one per
+-- orphan, even though intra-event identifiers belong to one entity by
+-- definition. We drop them from the base set; the non-orphan identifiers in
+-- the same event still merge normally via their surviving edges.
+identifiers_with_surviving_edges as (
+    -- Identifiers that retained at least one edge after the noise filter,
+    -- in either direction.
+    select distinct entity_type_a as entity_type, identifier_type_a as identifier_type, identifier_value_a as identifier_value
+    from {{ ref(edges_table) }}
+    union
+    select distinct entity_type_b as entity_type, identifier_type_b as identifier_type, identifier_value_b as identifier_value
+    from {{ ref(edges_table) }}
+),
+
+events_with_survivors as (
+    -- edge_ids (events) containing at least one identifier that has surviving
+    -- edges. An identifier dropped to a singleton inside such an event is
+    -- almost certainly a noise-filter casualty rather than a legitimate
+    -- isolated participant.
+    select distinct ei.edge_id
+    from {{ ref(identifiers_table) }} ei
+    inner join identifiers_with_surviving_edges s
+      on s.entity_type = ei.entity_type
+      and s.identifier_type = ei.identifier_type
+      and s.identifier_value = ei.identifier_value
+    where ei.entity_type = '{{ entity_type }}'
+),
+
+filtered_orphan_identifiers as (
+    -- "Filtered orphans": identifiers with no surviving edges that co-occurred
+    -- in some event with another identifier that DID survive. Without this
+    -- exclusion they would each become their own singleton component and
+    -- emit a spurious entity per event they appear in -- so a single event
+    -- whose identifiers include any of these orphans would resolve to
+    -- multiple entities, one per orphan, even though intra-event identifiers
+    -- belong to one entity by definition. The non-orphan identifiers in the
+    -- same event still merge normally via their surviving edges.
+    --
+    -- Note the "another survived in the same event" condition: a truly
+    -- isolated single-identifier event (no co-occurring survivors) keeps its
+    -- sole identifier as a legitimate singleton entity.
+    select distinct ei.identifier_type, ei.identifier_value
+    from {{ ref(identifiers_table) }} ei
+    inner join events_with_survivors ews
+      on ei.edge_id = ews.edge_id
+    left join identifiers_with_surviving_edges s
+      on s.entity_type = ei.entity_type
+      and s.identifier_type = ei.identifier_type
+      and s.identifier_value = ei.identifier_value
+    where ei.entity_type = '{{ entity_type }}'
+      and s.identifier_value is null
+),
+
+depth_0 as (
     -- Base case: every identifier starts as its own component.
+    -- Excludes filtered orphans (see above) so they don't surface as
+    -- their own standalone entities.
     select distinct
       identifier_type  as component_identifier_type,
       identifier_value as component_identifier_value,
       identifier_type,
       identifier_value
-    from {{ ref(identifiers_table) }}
+    from {{ ref(identifiers_table) }} ei
     where entity_type = '{{ entity_type }}'
+      and not exists (
+        select 1 from filtered_orphan_identifiers fo
+        where fo.identifier_type = ei.identifier_type
+          and fo.identifier_value = ei.identifier_value
+      )
 )
 {% for level in range(1, max_recursion + 1) %}
 ,
