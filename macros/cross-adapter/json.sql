@@ -62,7 +62,22 @@
     {%- endfor -%}
   {%- endset -%}
   {%- set sf_type = nexus._nexus_json_type_to_sf(type) -%}
-  {{ column }}{{ sf_path }}{%- if sf_type %}::{{ sf_type }}{%- endif -%}
+  {%- if sf_type and sf_type|lower not in ['string','varchar','text'] -%}
+    {# Non-string casts: extract as string first, then TRY_CAST.
+       Snowflake's bare VARIANT::TYPE cast raises a database error when
+       the variant value can't be coerced (e.g. the string 'false' cast
+       to NUMBER produces "Failed to cast variant value 'false' to
+       FIXED"). TRY_CAST gives NULL on failure — but TRY_CAST doesn't
+       accept VARIANT directly, only string-shaped inputs ("Function
+       TRY_CAST cannot be used with arguments of types VARIANT and
+       NUMBER(38,0)"). So we go variant → ::string → try_cast. Matches
+       the DuckDB branch below (which already returns NULL on bad
+       coercion) and replaces the typeof()-guarded variant access that
+       cinch's GA4 model used defensively. #}
+    try_cast({{ column }}{{ sf_path }}::string as {{ sf_type }})
+  {%- else -%}
+    {{ column }}{{ sf_path }}{%- if sf_type %}::{{ sf_type }}{%- endif -%}
+  {%- endif -%}
 {%- elif target.type == 'duckdb' -%}
   {%- set duck_path -%}
     '${%- for tok in tokens -%}
