@@ -8,11 +8,18 @@ sources:
     database:
       "{{ var('nexus', {}).get('sources', {}).get('gmail', {}).get('database',
       '') }}"
-    # See google_calendar.yml for the meta.external_location explanation.
+    # On the duck-dev target, source is read from parquet under
+    #   $NEXUS_LOCAL_EXTRACTS/<schema>/<table>/*.parquet
+    # where <schema> is the per-client schema override (defaults to
+    # 'gmail'). Set NEXUS_LOCAL_EXTRACTS to the client's extracts dir
+    # (e.g. ~/projects/nexus-extracts/slide-rule-tech). Empty string
+    # if unset, which dbt-duckdb treats as no override (falls back to
+    # database/schema/identifier). No-op on warehouse targets.
     meta:
       external_location:
-        "{{ var('nexus', {}).get('sources', {}).get('gmail',
-        {}).get('external_location', '') }}"
+        "{{ env_var('NEXUS_LOCAL_EXTRACTS', '') }}/{{ var('nexus',
+        {}).get('sources', {}).get('gmail', {}).get('schema',
+        'gmail') }}/{name}/*.parquet"
     tables:
       - name: messages
         identifier:
