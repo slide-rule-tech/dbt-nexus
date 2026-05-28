@@ -223,6 +223,9 @@ SELECT
     normalized_email as email,
     SPLIT(normalized_email, '@')[SAFE_OFFSET(1)] as domain,
     role,
+    response_status,
+    is_optional,
+    is_organizer,
     start_time,
     _ingested_at
 FROM participants_combined
