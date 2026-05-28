@@ -29,8 +29,9 @@ CREATE TYPE IF NOT EXISTS timestamp_tz AS TIMESTAMPTZ;
 CREATE TYPE IF NOT EXISTS variant AS JSON;
 
 -- BigQuery type aliases (string, int64, bool already valid in duck;
--- float64 is the one BQ-specific name that duck doesn't recognize).
+-- float64 + number are the BQ-specific names duck doesn't recognize).
 CREATE TYPE IF NOT EXISTS float64 AS DOUBLE;
+CREATE TYPE IF NOT EXISTS number AS DECIMAL(38,9);
 
 -- Snowflake scalar function aliases
 CREATE OR REPLACE MACRO current_timestamp() AS now();
@@ -57,6 +58,13 @@ CREATE OR REPLACE MACRO array_contains(needle, haystack) AS list_contains(haysta
 CREATE OR REPLACE MACRO json_extract_scalar(col, path) AS json_extract_string(col, path);
 CREATE OR REPLACE MACRO json_extract_array(col, path) AS json_extract(col, path);
 CREATE OR REPLACE MACRO to_json_string(col) AS cast(col AS varchar);
+-- BigQuery's TIMESTAMP(x) constructor: from a string or DATETIME,
+-- returns a TIMESTAMP. DuckDB equivalent: cast as timestamp. Wrapping
+-- in try_cast for parse-fail tolerance (BQ raises, so use plain cast
+-- if strict semantics are wanted).
+CREATE OR REPLACE MACRO timestamp(x) AS cast(x AS timestamp);
+CREATE OR REPLACE MACRO parse_timestamp(fmt, s) AS strptime(s, fmt);
+CREATE OR REPLACE MACRO parse_date(fmt, s) AS cast(strptime(s, fmt) AS date);
 -- BigQuery SAFE_CAST / SAFE.CAST returns NULL on cast failure. DuckDB
 -- has try_cast as the native equivalent. SAFE_CAST isn't a macro-
 -- definable function name in duck (the SAFE namespace is BQ-specific),
