@@ -41,6 +41,26 @@ CREATE OR REPLACE MACRO try_to_number(s) AS try_cast(s AS decimal(38,0));
 CREATE OR REPLACE MACRO array_construct() AS list_value();
 CREATE OR REPLACE MACRO array_contains(needle, haystack) AS list_contains(haystack, needle);
 
+-- BigQuery scalar function aliases (used by clients ported from BQ).
+-- These let BigQuery-shaped SQL like
+--     JSON_EXTRACT_SCALAR(_raw_record, '$.id')
+--     UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.lines'))
+--     TO_JSON_STRING(_raw_record)
+-- compile + run on duck without per-call refactoring. The cross-
+-- adapter nexus.json_path / nexus.try_to_date macros are still the
+-- preferred form for *new* code (they cover BQ/Snowflake/duck under
+-- one signature), but shims here unblock large existing BQ codebases.
+CREATE OR REPLACE MACRO json_extract_scalar(col, path) AS json_extract_string(col, path);
+CREATE OR REPLACE MACRO json_extract_array(col, path) AS json_extract(col, path);
+CREATE OR REPLACE MACRO to_json_string(col) AS cast(col AS varchar);
+-- BigQuery SAFE_CAST / SAFE.CAST returns NULL on cast failure. DuckDB
+-- has try_cast as the native equivalent. SAFE_CAST isn't a macro-
+-- definable function name in duck (the SAFE namespace is BQ-specific),
+-- so the cross-adapter approach for `SAFE.CAST` is to refactor to
+-- `try_cast`. We register safe_cast (underscore form) as the alias
+-- since duck accepts that as a function name.
+CREATE OR REPLACE MACRO safe_cast(col, "type") AS try_cast(col AS varchar);
+
 -- Disable expression_rewriter: bug where try_strptime + windowed dedup
 -- in a many-column CTAS surfaces as "invalid timestamp field format"
 -- against a column unrelated to the cast. Small (likely negligible)
