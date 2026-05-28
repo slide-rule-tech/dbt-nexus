@@ -37,6 +37,27 @@
   {%- else -%}
     cast(cast({{ column }} as timestamp) at time zone '{{ source_tz }}' at time zone '{{ target_tz }}' as timestamp)
   {%- endif -%}
+{%- elif target.type == 'bigquery' -%}
+  {#- BigQuery has no convert_timezone(). The equivalent: cast the
+      column to TIMESTAMP (UTC-anchored) and then convert via the
+      'AT TIME ZONE'-shape — BQ uses TIMESTAMP/DATETIME conversion
+      functions. TIMESTAMP() with a tz argument constructs a UTC
+      TIMESTAMP from a DATETIME interpreted in that source tz;
+      DATETIME() converts a TIMESTAMP into a DATETIME at the target
+      tz (giving you the "wall clock" in that zone).
+      Returns TIMESTAMP (UTC-anchored) for round-trip consistency
+      with the Snowflake/DuckDB branches. -#}
+  {%- if source_tz is none -%}
+    {#- 2-arg form: column already in UTC. Cast for safety; return
+        as TIMESTAMP. The DATETIME() call returns wall-clock at
+        target_tz, then TIMESTAMP(..., target_tz) re-anchors it. -#}
+    timestamp(datetime(cast({{ column }} as timestamp), '{{ target_tz }}'), '{{ target_tz }}')
+  {%- else -%}
+    {#- 3-arg form: column wall-clock is in source_tz. Treat as a
+        DATETIME (naive), build a TIMESTAMP anchored at source_tz,
+        then re-anchor wall-clock to target_tz. -#}
+    timestamp(datetime(timestamp(cast({{ column }} as datetime), '{{ source_tz }}'), '{{ target_tz }}'), '{{ target_tz }}')
+  {%- endif -%}
 {%- else -%}
   {#- Snowflake (and other adapters): emit the original
       convert_timezone() call shape verbatim. -#}

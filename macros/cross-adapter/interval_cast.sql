@@ -14,6 +14,12 @@
   {%- if try -%}try_cast({{ column }} as interval)
   {%- else -%}cast({{ column }} as interval)
   {%- endif -%}
+{%- elif target.type == 'bigquery' -%}
+  {#- BigQuery: cast(s as interval) — same form as DuckDB. SAFE_CAST
+      gives NULL on parse failure for the `try` branch. -#}
+  {%- if try -%}safe_cast({{ column }} as interval)
+  {%- else -%}cast({{ column }} as interval)
+  {%- endif -%}
 {%- else -%}
   {%- if try -%}try_cast({{ column }} as interval hour(9) to second(0))
   {%- else -%}cast({{ column }} as interval hour(9) to second(0))

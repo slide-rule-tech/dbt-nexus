@@ -25,6 +25,16 @@
     {%- set fmt = fmt | replace('DD',   '%d') -%}
     try_cast(try_strptime({{ column }}, '{{ fmt }}') as date)
   {%- endif -%}
+{%- elif target.type == 'bigquery' -%}
+  {%- if snowflake_format is none -%}
+    safe_cast({{ column }} as date)
+  {%- else -%}
+    {%- set fmt = snowflake_format -%}
+    {%- set fmt = fmt | replace('YYYY', '%Y') -%}
+    {%- set fmt = fmt | replace('MM',   '%m') -%}
+    {%- set fmt = fmt | replace('DD',   '%d') -%}
+    safe.parse_date('{{ fmt }}', {{ column }})
+  {%- endif -%}
 {%- else -%}
   {%- if snowflake_format is none -%}
     try_to_date({{ column }})
@@ -46,6 +56,16 @@
     {%- set fmt = fmt | replace('MM',   '%m') -%}
     {%- set fmt = fmt | replace('DD',   '%d') -%}
     cast(strptime({{ column }}, '{{ fmt }}') as date)
+  {%- endif -%}
+{%- elif target.type == 'bigquery' -%}
+  {%- if snowflake_format is none -%}
+    cast({{ column }} as date)
+  {%- else -%}
+    {%- set fmt = snowflake_format -%}
+    {%- set fmt = fmt | replace('YYYY', '%Y') -%}
+    {%- set fmt = fmt | replace('MM',   '%m') -%}
+    {%- set fmt = fmt | replace('DD',   '%d') -%}
+    parse_date('{{ fmt }}', {{ column }})
   {%- endif -%}
 {%- else -%}
   {%- if snowflake_format is none -%}

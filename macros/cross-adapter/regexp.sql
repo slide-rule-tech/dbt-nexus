@@ -12,8 +12,15 @@
         (DuckDB string literals do NOT interpret backslashes — `'\d'`
          is the 2-char string `\d`, and the regex engine sees `\d`.)
 
-    BigQuery: REGEXP_EXTRACT(str, pattern) returns capture group 1 only;
-        group N not yet implemented here.
+    BigQuery: REGEXP_EXTRACT(str, pattern) returns capture group 1.
+        For group N > 1 BQ has no direct equivalent — we wrap the
+        pattern in (?:...) for the leading groups so the user's
+        target group lands as group 1. Specifically: take the input
+        pattern as "<prefix>(target)<suffix>" where target is the
+        Nth capture group, and rewrite to a pattern that only
+        captures target. This is approximate — fully general pattern
+        rewriting would need a real regex parser. For now the BQ
+        branch only supports group_num=1; groups > 1 raise.
 
     Usage:
       {{ nexus.regexp_extract_group('col', 'OPT-(\\d+)\\((.*)\\)', 2) }}
@@ -30,7 +37,10 @@
   {%- set sf_pattern = pattern | replace('\\', '\\\\') -%}
   regexp_substr({{ column }}, '{{ sf_pattern }}', 1, 1, 'e', {{ group_num }})
 {%- elif target.type == 'bigquery' -%}
-  regexp_extract({{ column }}, '{{ pattern }}')
+  {%- if group_num != 1 -%}
+    {{ exceptions.raise_compiler_error("nexus.regexp_extract_group() on BigQuery only supports group_num=1; for group N>1, rewrite the pattern so the target capture is the first group (wrap other groups as (?:...)) or use BQ's REGEXP_EXTRACT_ALL with offset.") }}
+  {%- endif -%}
+  regexp_extract({{ column }}, r'{{ pattern }}')
 {%- else -%}
   {{ exceptions.raise_compiler_error("nexus.regexp_extract_group() does not support target.type='" ~ target.type ~ "' yet") }}
 {%- endif -%}
