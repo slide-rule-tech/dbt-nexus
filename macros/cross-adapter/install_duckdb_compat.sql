@@ -56,7 +56,11 @@ CREATE OR REPLACE MACRO array_contains(needle, haystack) AS list_contains(haysta
 -- preferred form for *new* code (they cover BQ/Snowflake/duck under
 -- one signature), but shims here unblock large existing BQ codebases.
 CREATE OR REPLACE MACRO json_extract_scalar(col, path) AS json_extract_string(col, path);
-CREATE OR REPLACE MACRO json_extract_array(col, path) AS json_extract(col, path);
+-- json_extract returns JSON; unnest wants a LIST. Cast to JSON[] so
+-- UNNEST(JSON_EXTRACT_ARRAY(...)) works the same shape as on BQ.
+CREATE OR REPLACE MACRO json_extract_array(col, path) AS json_extract(col, path)::JSON[];
+-- ARRAY_LENGTH on a JSON array: cast then list length.
+CREATE OR REPLACE MACRO array_length(arr) AS len(arr);
 CREATE OR REPLACE MACRO to_json_string(col) AS cast(col AS varchar);
 -- BigQuery's TIMESTAMP(x) constructor: from a string or DATETIME,
 -- returns a TIMESTAMP. DuckDB equivalent: cast as timestamp. Wrapping
