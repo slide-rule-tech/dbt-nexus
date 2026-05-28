@@ -46,5 +46,16 @@ CREATE OR REPLACE MACRO array_contains(needle, haystack) AS list_contains(haysta
 -- against a column unrelated to the cast. Small (likely negligible)
 -- perf cost in dev.
 SET disabled_optimizers='expression_rewriter';
+
+-- Match Snowflake's UTC session timezone. Without this, DuckDB's
+-- session TZ defaults to the host's local TZ, and the SQL idiom
+--   cast(<timestamptz expr> as timestamp)
+-- (used by nexus.convert_timezone among other places) extracts the
+-- wall-clock value in local TZ rather than UTC. The result is
+-- timestamps offset by the local-UTC delta — visible as
+-- boundary events shifting between calendar days/months relative
+-- to Snowflake builds. Pinning the session to UTC aligns duck
+-- with Snowflake's session_parameters.TIMEZONE='UTC'.
+SET TimeZone='UTC';
 {%- endif -%}
 {% endmacro %}
