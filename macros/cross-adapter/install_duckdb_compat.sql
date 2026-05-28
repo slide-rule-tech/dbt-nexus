@@ -65,6 +65,12 @@ CREATE OR REPLACE MACRO to_json_string(col) AS cast(col AS varchar);
 CREATE OR REPLACE MACRO timestamp(x) AS cast(x AS timestamp);
 CREATE OR REPLACE MACRO parse_timestamp(fmt, s) AS strptime(s, fmt);
 CREATE OR REPLACE MACRO parse_date(fmt, s) AS cast(strptime(s, fmt) AS date);
+CREATE OR REPLACE MACRO timestamp_seconds(x) AS to_timestamp(x);
+CREATE OR REPLACE MACRO timestamp_micros(x) AS make_timestamp(x);
+CREATE OR REPLACE MACRO unix_seconds(x) AS cast(epoch(x) AS bigint);
+CREATE OR REPLACE MACRO unix_micros(x) AS cast(epoch_us(x) AS bigint);
+CREATE OR REPLACE MACRO parse_json(s) AS cast(s AS json);
+CREATE OR REPLACE MACRO regexp_contains(s, p) AS regexp_matches(s, p);
 -- BigQuery SAFE_CAST / SAFE.CAST returns NULL on cast failure. DuckDB
 -- has try_cast as the native equivalent. SAFE_CAST isn't a macro-
 -- definable function name in duck (the SAFE namespace is BQ-specific),
