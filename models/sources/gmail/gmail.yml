@@ -8,6 +8,11 @@ sources:
     database:
       "{{ var('nexus', {}).get('sources', {}).get('gmail', {}).get('database',
       '') }}"
+    # See google_calendar.yml for the meta.external_location explanation.
+    meta:
+      external_location:
+        "{{ var('nexus', {}).get('sources', {}).get('gmail',
+        {}).get('external_location', '') }}"
     tables:
       - name: messages
         identifier:
