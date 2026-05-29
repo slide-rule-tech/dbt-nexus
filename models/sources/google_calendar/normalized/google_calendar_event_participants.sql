@@ -167,7 +167,7 @@ attendees_raw AS (
         CAST(JSON_EXTRACT_SCALAR(attendee, '$.optional') AS BOOL) as is_optional,
         CAST(JSON_EXTRACT_SCALAR(attendee, '$.organizer') AS BOOL) as is_organizer
     FROM with_event_key s,
-    UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.attendees')) as attendee
+    UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.attendees')) as {% if target.type == 'duckdb' %}t(attendee){% else %}attendee{% endif %}
     WHERE JSON_EXTRACT_SCALAR(attendee, '$.email') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(attendee, '$.email') != ''
 ),

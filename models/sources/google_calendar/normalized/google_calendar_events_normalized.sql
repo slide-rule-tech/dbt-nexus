@@ -83,7 +83,7 @@ extracted AS (
             SELECT COUNT(*) > 0
             FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.attendees')) as attendee
             WHERE JSON_EXTRACT_SCALAR(attendee, '$.email') IS NOT NULL
-              AND REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(attendee, '$.email'), {% if target.type == 'bigquery' %}r'@(.+)'{% else %}'@(.+)'{% endif %}) NOT IN (
+              AND {% if target.type == 'bigquery' %}REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(attendee, '$.email'), r'@(.+)'){% else %}regexp_extract(JSON_EXTRACT_SCALAR(attendee, '$.email'), '@(.+)', 1){% endif %} NOT IN (
                   {%- for domain in var('internal_domains', []) -%}
                   '{{ domain }}'
                   {%- if not loop.last -%},{%- endif -%}
@@ -91,7 +91,7 @@ extracted AS (
               )
         ) OR (
             JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') IS NOT NULL
-            AND REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email'), {% if target.type == 'bigquery' %}r'@(.+)'{% else %}'@(.+)'{% endif %}) NOT IN (
+            AND {% if target.type == 'bigquery' %}REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email'), r'@(.+)'){% else %}regexp_extract(JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email'), '@(.+)', 1){% endif %} NOT IN (
                 {%- for domain in var('internal_domains', []) -%}
                 '{{ domain }}'
                 {%- if not loop.last -%},{%- endif -%}

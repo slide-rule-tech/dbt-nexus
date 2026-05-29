@@ -27,34 +27,34 @@ WITH source_data AS (
 headers_extracted AS (
     SELECT
         *,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'message-id'
          LIMIT 1) as message_id_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'subject'
          LIMIT 1) as subject_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'in-reply-to'
          LIMIT 1) as in_reply_to_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'auto-submitted'
          LIMIT 1) as auto_submitted_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'precedence'
          LIMIT 1) as precedence_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'list-id'
          LIMIT 1) as list_id_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'list-unsubscribe'
          LIMIT 1) as list_unsubscribe_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'x-auto-response-suppress'
          LIMIT 1) as x_auto_response_suppress_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'x-autoreply'
          LIMIT 1) as x_autoreply_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'x-autorespond'
          LIMIT 1) as x_autorespond_header
     FROM source_data
@@ -140,7 +140,7 @@ cleaned_message AS (
         ) as subject,
 
         -- Labels
-        ARRAY(SELECT JSON_EXTRACT_SCALAR(label, '$') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.labelIds')) as label) as label_ids,
+        ARRAY(SELECT JSON_EXTRACT_SCALAR(label, '$') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.labelIds')) as {% if target.type == 'duckdb' %}t(label){% else %}label{% endif %}) as label_ids,
 
         -- Message content
         {{ nexus.html_decode("JSON_EXTRACT_SCALAR(_raw_record, '$.snippet')") }} as snippet,

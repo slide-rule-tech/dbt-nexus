@@ -56,7 +56,7 @@ SELECT
     domain,
     ARRAY(
         SELECT DISTINCT role 
-        FROM UNNEST(roles_raw) as role
+        FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}
         ORDER BY 
             CASE role 
                 WHEN 'sender' THEN 1
@@ -71,10 +71,10 @@ SELECT
 FROM thread_participants
 ORDER BY thread_id, 
     CASE 
-        WHEN 'sender' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 1
-        WHEN 'recipient' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 2
-        WHEN 'cced' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 3
-        WHEN 'bcced' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 4
+        WHEN 'sender' IN (SELECT role FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}) THEN 1
+        WHEN 'recipient' IN (SELECT role FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}) THEN 2
+        WHEN 'cced' IN (SELECT role FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}) THEN 3
+        WHEN 'bcced' IN (SELECT role FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}) THEN 4
         ELSE 5
     END,
     first_participated_at ASC,
