@@ -35,10 +35,10 @@ thread_participants AS (
     SELECT
         thread_id,
         email,
-        ARRAY_AGG(name ORDER BY first_participated_at ASC LIMIT 1)[OFFSET(0)] as name,
-        ARRAY_AGG(participant_raw ORDER BY first_participated_at ASC LIMIT 1)[OFFSET(0)] as participant_raw,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(name ORDER BY first_participated_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(name ORDER BY first_participated_at ASC){% endif %} as name,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(participant_raw ORDER BY first_participated_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(participant_raw ORDER BY first_participated_at ASC){% endif %} as participant_raw,
         domain,
-        ARRAY_CONCAT_AGG(roles) as roles_raw,
+        {% if target.type == 'bigquery' %}ARRAY_CONCAT_AGG(roles){% else %}flatten(array_agg(roles)){% endif %} as roles_raw,
         MIN(first_participated_at) as first_participated_at,
         MAX(last_participated_at) as last_participated_at,
         MIN(_ingested_at) as _ingested_at

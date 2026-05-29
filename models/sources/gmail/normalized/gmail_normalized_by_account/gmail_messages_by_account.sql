@@ -65,7 +65,11 @@ participant_domain_summary AS (
         gmail_message_id,
         _account,
         COUNT(*) as participant_count,
+        {% if target.type == 'bigquery' -%}
         ARRAY_AGG(DISTINCT LOWER(domain) IGNORE NULLS ORDER BY LOWER(domain)) as participant_domains,
+        {%- else -%}
+        ARRAY_AGG(DISTINCT LOWER(domain) ORDER BY LOWER(domain)) FILTER (WHERE domain IS NOT NULL) as participant_domains,
+        {%- endif %}
         {% if internal_domains | length > 0 %}
         COUNTIF(
             domain IN (
@@ -121,16 +125,16 @@ cleaned_message AS (
                     REGEXP_REPLACE(
                         REGEXP_REPLACE(
                             COALESCE(subject_header, ''),
-                            r'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*',
+                            {% if target.type == 'bigquery' %}r'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*'{% else %}'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*'{% endif %},
                             ''
                         ),
-                        r'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*',
+                        {% if target.type == 'bigquery' %}r'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*'{% else %}'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*'{% endif %},
                         ''
                     ),
-                    r'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*',
+                    {% if target.type == 'bigquery' %}r'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*'{% else %}'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*'{% endif %},
                     ''
                 ),
-                r'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*',
+                {% if target.type == 'bigquery' %}r'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*'{% else %}'^([Rr][Ee]|[Ff][Ww][Dd]?):\s*'{% endif %},
                 ''
             )
         ) as subject,
@@ -142,7 +146,7 @@ cleaned_message AS (
         {{ nexus.html_decode("JSON_EXTRACT_SCALAR(_raw_record, '$.snippet')") }} as snippet,
         CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.sizeEstimate') AS INT64) as size_estimate,
         (
-            REGEXP_CONTAINS(LOWER(COALESCE(auto_submitted_header, '')), r'^auto-')
+            REGEXP_CONTAINS(LOWER(COALESCE(auto_submitted_header, '')), {% if target.type == 'bigquery' %}r'^auto-'{% else %}'^auto-'{% endif %})
             OR LOWER(COALESCE(precedence_header, '')) IN ('bulk', 'list', 'junk')
             OR COALESCE(NULLIF(TRIM(list_id_header), ''), NULL) IS NOT NULL
             OR COALESCE(NULLIF(TRIM(list_unsubscribe_header), ''), NULL) IS NOT NULL
@@ -167,17 +171,26 @@ cleaned_message AS (
 filtered_message AS (
     SELECT
         cm.*,
-        COALESCE(pds.participant_domains, CAST([] AS ARRAY<STRING>)) as participant_domains,
+        COALESCE(pds.participant_domains, {% if target.type == 'bigquery' %}CAST([] AS ARRAY<STRING>){% else %}CAST([] AS VARCHAR[]){% endif %}) as participant_domains,
         (
             COALESCE(pds.participant_count, 0) > 0
             AND COALESCE(pds.external_participant_count, 0) = 0
         ) as is_internal_only_message,
+        {% if target.type == 'bigquery' -%}
         TO_JSON_STRING(STRUCT(
             COALESCE(pds.participant_count, 0) as participant_count,
             COALESCE(pds.internal_participant_count, 0) as internal_participant_count,
             COALESCE(pds.external_participant_count, 0) as external_participant_count,
             COALESCE(pds.participant_domains, CAST([] AS ARRAY<STRING>)) as domains
         )) as participant_domain_summary
+        {%- else -%}
+        cast(to_json({
+            'participant_count': COALESCE(pds.participant_count, 0),
+            'internal_participant_count': COALESCE(pds.internal_participant_count, 0),
+            'external_participant_count': COALESCE(pds.external_participant_count, 0),
+            'domains': COALESCE(pds.participant_domains, CAST([] AS VARCHAR[]))
+        }) AS varchar) as participant_domain_summary
+        {%- endif %}
     FROM cleaned_message cm
     LEFT JOIN participant_domain_summary pds
         ON cm.gmail_message_id = pds.gmail_message_id

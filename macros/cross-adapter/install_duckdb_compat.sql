@@ -59,7 +59,13 @@ CREATE OR REPLACE MACRO array_contains(needle, haystack) AS list_contains(haysta
 CREATE OR REPLACE MACRO json_extract_scalar(col, path) AS json_extract_string(col, path);
 -- json_extract returns JSON; unnest wants a LIST. Cast to JSON[] so
 -- UNNEST(JSON_EXTRACT_ARRAY(...)) works the same shape as on BQ.
-CREATE OR REPLACE MACRO json_extract_array(col, path) AS json_extract(col, path)::JSON[];
+-- BigQuery supports JSON_EXTRACT_ARRAY(col) (1-arg, returns root
+-- array) and JSON_EXTRACT_ARRAY(col, path) (2-arg). DuckDB MACROs
+-- can't be overloaded by arity (CREATE OR REPLACE replaces, doesn't
+-- add an overload), so we use a default `path := '$'` for the
+-- 1-arg form. json_extract(col, '$') returns the root value, which
+-- cast to JSON[] yields the array elements.
+CREATE OR REPLACE MACRO json_extract_array(col, path := '$') AS json_extract(col, path)::JSON[];
 -- ARRAY_LENGTH on a JSON array: cast then list length.
 CREATE OR REPLACE MACRO array_length(arr) AS len(arr);
 CREATE OR REPLACE MACRO to_json_string(col) AS cast(col AS varchar);
@@ -72,10 +78,37 @@ CREATE OR REPLACE MACRO parse_timestamp(fmt, s) AS strptime(s, fmt);
 CREATE OR REPLACE MACRO parse_date(fmt, s) AS cast(strptime(s, fmt) AS date);
 CREATE OR REPLACE MACRO timestamp_seconds(x) AS to_timestamp(x);
 CREATE OR REPLACE MACRO timestamp_micros(x) AS make_timestamp(x);
+CREATE OR REPLACE MACRO timestamp_millis(x) AS make_timestamp(x * 1000);
 CREATE OR REPLACE MACRO unix_seconds(x) AS cast(epoch(x) AS bigint);
 CREATE OR REPLACE MACRO unix_micros(x) AS cast(epoch_us(x) AS bigint);
 CREATE OR REPLACE MACRO parse_json(s) AS cast(s AS json);
 CREATE OR REPLACE MACRO regexp_contains(s, p) AS regexp_matches(s, p);
+-- BigQuery COUNTIF(cond) → duck's count_if(cond) (builtin since ~0.9).
+CREATE OR REPLACE MACRO countif(cond) AS count_if(cond);
+-- (ARRAY_CONCAT_AGG isn't shimmed — duck doesn't support aggregate
+-- macros, so call sites use a Jinja conditional with
+-- flatten(array_agg(arr)) on duck.)
+-- BigQuery's SPLIT(s, sep) → duck's string_split. List shape matches.
+CREATE OR REPLACE MACRO split(s, sep) AS string_split(s, sep);
+-- BigQuery/Snowflake's INITCAP isn't builtin in DuckDB (catalog
+-- error). Re-implement: lowercase the input, then for each space-
+-- separated word uppercase the first letter and concatenate.
+CREATE OR REPLACE MACRO initcap(s) AS
+    list_aggregate(
+        list_transform(
+            string_split(s, ' '),
+            x -> upper(substring(x, 1, 1)) || lower(substring(x, 2))
+        ),
+        'string_agg', ' '
+    );
+
+-- BigQuery SAFE_OFFSET(n) returns 0-indexed array element n (NULL out
+-- of bounds). DuckDB list indexing is 1-based, so translate by +1.
+-- Used inline as `arr[safe_offset(1)]` → arr[2] (second element).
+-- (Skipping the bare OFFSET shim — `offset` is a SQL reserved word in
+-- duck for LIMIT/OFFSET clauses; refactor those sites to safe_offset
+-- if needed.)
+CREATE OR REPLACE MACRO safe_offset(n) AS n + 1;
 -- BigQuery SAFE_CAST / SAFE.CAST returns NULL on cast failure. DuckDB
 -- has try_cast as the native equivalent. SAFE_CAST isn't a macro-
 -- definable function name in duck (the SAFE namespace is BQ-specific),

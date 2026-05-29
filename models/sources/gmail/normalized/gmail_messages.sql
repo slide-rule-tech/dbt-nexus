@@ -19,26 +19,26 @@ grouped_messages AS (
     SELECT 
         message_id_header as message_id,
         message_id_header,
-        ARRAY_AGG(in_reply_to ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as in_reply_to,
-        ARRAY_AGG(auto_submitted_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as auto_submitted_header,
-        ARRAY_AGG(precedence_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as precedence_header,
-        ARRAY_AGG(list_id_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as list_id_header,
-        ARRAY_AGG(list_unsubscribe_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as list_unsubscribe_header,
-        ARRAY_AGG(x_auto_response_suppress_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as x_auto_response_suppress_header,
-        ARRAY_AGG(x_autoreply_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as x_autoreply_header,
-        ARRAY_AGG(x_autorespond_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as x_autorespond_header,
-        LOGICAL_OR(COALESCE(is_automated_or_bulk_message, FALSE)) as is_automated_or_bulk_message,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(in_reply_to ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(in_reply_to ORDER BY sent_at DESC){% endif %} as in_reply_to,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(auto_submitted_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(auto_submitted_header ORDER BY sent_at DESC){% endif %} as auto_submitted_header,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(precedence_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(precedence_header ORDER BY sent_at DESC){% endif %} as precedence_header,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(list_id_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(list_id_header ORDER BY sent_at DESC){% endif %} as list_id_header,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(list_unsubscribe_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(list_unsubscribe_header ORDER BY sent_at DESC){% endif %} as list_unsubscribe_header,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(x_auto_response_suppress_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(x_auto_response_suppress_header ORDER BY sent_at DESC){% endif %} as x_auto_response_suppress_header,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(x_autoreply_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(x_autoreply_header ORDER BY sent_at DESC){% endif %} as x_autoreply_header,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(x_autorespond_header ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(x_autorespond_header ORDER BY sent_at DESC){% endif %} as x_autorespond_header,
+        {% if target.type == 'bigquery' %}LOGICAL_OR{% else %}BOOL_OR{% endif %}(COALESCE(is_automated_or_bulk_message, FALSE)) as is_automated_or_bulk_message,
         MAX(sent_at) as sent_at,
-        ARRAY_AGG(raw_subject ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as raw_subject,
-        ARRAY_AGG(subject ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as subject,
-        ARRAY_AGG(raw_record ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as raw_record,
-        ARRAY_AGG(snippet ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as snippet,
-        ARRAY_AGG(size_estimate ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as size_estimate,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(raw_subject ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(raw_subject ORDER BY sent_at DESC){% endif %} as raw_subject,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(subject ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(subject ORDER BY sent_at DESC){% endif %} as subject,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(raw_record ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(raw_record ORDER BY sent_at DESC){% endif %} as raw_record,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(snippet ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(snippet ORDER BY sent_at DESC){% endif %} as snippet,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(size_estimate ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(size_estimate ORDER BY sent_at DESC){% endif %} as size_estimate,
         'gmail' as source,
         MAX(_ingested_at) as _ingested_at,
         -- Get the latest gmail_thread_id and _account for joining with threads
-        ARRAY_AGG(gmail_thread_id ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as last_gmail_thread_id,
-        ARRAY_AGG(_account ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)] as _account,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(gmail_thread_id ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(gmail_thread_id ORDER BY sent_at DESC){% endif %} as last_gmail_thread_id,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(_account ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(_account ORDER BY sent_at DESC){% endif %} as _account,
         -- Create JSON object mapping email (stream_id) to gmail_message_id
         -- Format: {"email1": "message_id1", "email2": "message_id2"}
         CONCAT(
@@ -92,7 +92,7 @@ all_labels AS (
     FROM (
         SELECT 
             message_id_header,
-            ARRAY_CONCAT_AGG(label_ids) as label_ids
+            {% if target.type == 'bigquery' %}ARRAY_CONCAT_AGG(label_ids){% else %}flatten(array_agg(label_ids)){% endif %} as label_ids
         FROM per_account_messages
         WHERE message_id_header IS NOT NULL
         GROUP BY message_id_header

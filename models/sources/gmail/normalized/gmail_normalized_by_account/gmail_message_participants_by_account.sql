@@ -25,19 +25,19 @@ headers_extracted AS (
         sent_at,
         _ingested_at,
         _account,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM {% if target.type == 'duckdb' %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as t(header){% else %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'message-id'
          LIMIT 1) as message_id_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM {% if target.type == 'duckdb' %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as t(header){% else %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'from'
          LIMIT 1) as from_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM {% if target.type == 'duckdb' %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as t(header){% else %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'to'
          LIMIT 1) as to_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM {% if target.type == 'duckdb' %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as t(header){% else %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'cc'
          LIMIT 1) as cc_header,
-        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header
+        (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM {% if target.type == 'duckdb' %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as t(header){% else %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'bcc'
          LIMIT 1) as bcc_header
     FROM source_data
@@ -83,7 +83,7 @@ to_recipients_parsed AS (
         {{ nexus.parse_gmail_email('TRIM(recipient)') }} as parsed_email,
         {{ nexus.extract_gmail_name('TRIM(recipient)') }} as participant_name
     FROM headers_extracted h,
-    UNNEST(SPLIT(COALESCE(h.to_header, ''), ',')) as recipient
+    UNNEST(SPLIT(COALESCE(h.to_header, ''), ',')) as {% if target.type == 'duckdb' %}t(recipient){% else %}recipient{% endif %}
     WHERE h.to_header IS NOT NULL
     AND TRIM(recipient) != ''
 ),
@@ -114,7 +114,7 @@ cc_recipients_parsed AS (
         {{ nexus.parse_gmail_email('TRIM(recipient)') }} as parsed_email,
         {{ nexus.extract_gmail_name('TRIM(recipient)') }} as participant_name
     FROM headers_extracted h,
-    UNNEST(SPLIT(COALESCE(h.cc_header, ''), ',')) as recipient
+    UNNEST(SPLIT(COALESCE(h.cc_header, ''), ',')) as {% if target.type == 'duckdb' %}t(recipient){% else %}recipient{% endif %}
     WHERE h.cc_header IS NOT NULL
     AND TRIM(recipient) != ''
 ),
@@ -145,7 +145,7 @@ bcc_recipients_parsed AS (
         {{ nexus.parse_gmail_email('TRIM(recipient)') }} as parsed_email,
         {{ nexus.extract_gmail_name('TRIM(recipient)') }} as participant_name
     FROM headers_extracted h,
-    UNNEST(SPLIT(COALESCE(h.bcc_header, ''), ',')) as recipient
+    UNNEST(SPLIT(COALESCE(h.bcc_header, ''), ',')) as {% if target.type == 'duckdb' %}t(recipient){% else %}recipient{% endif %}
     WHERE h.bcc_header IS NOT NULL
     AND TRIM(recipient) != ''
 ),
@@ -230,8 +230,8 @@ SELECT
     participant_raw,
     TRIM(
         REGEXP_REPLACE(
-            REGEXP_REPLACE(participant_name, r'^[\'"]+', ''),
-            r'[\'"]+$', 
+            REGEXP_REPLACE(participant_name, {% if target.type == 'bigquery' %}r'^[\'"]+'{% else %}'^[''"]+'{% endif %}, ''),
+            {% if target.type == 'bigquery' %}r'[\'"]+$'{% else %}'[''"]+$'{% endif %},
             ''
         )
     ) as name,

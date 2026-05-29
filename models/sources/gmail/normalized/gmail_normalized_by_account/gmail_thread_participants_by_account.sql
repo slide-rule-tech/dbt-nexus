@@ -38,8 +38,8 @@ thread_participants AS (
         gmail_thread_id,
         _account,
         email,
-        ARRAY_AGG(name ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)] as name,
-        ARRAY_AGG(participant_raw ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)] as participant_raw,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(name ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(name ORDER BY sent_at ASC){% endif %} as name,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(participant_raw ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(participant_raw ORDER BY sent_at ASC){% endif %} as participant_raw,
         domain,
         ARRAY_AGG(role) as roles_raw,
         MIN(sent_at) as first_participated_at,
@@ -59,7 +59,7 @@ SELECT
     domain,
     ARRAY(
         SELECT DISTINCT role 
-        FROM UNNEST(roles_raw) as role
+        FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}
         ORDER BY 
             CASE role 
                 WHEN 'sender' THEN 1
@@ -74,10 +74,10 @@ SELECT
 FROM thread_participants
 ORDER BY gmail_thread_id, 
     CASE 
-        WHEN 'sender' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 1
-        WHEN 'recipient' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 2
-        WHEN 'cced' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 3
-        WHEN 'bcced' IN (SELECT role FROM UNNEST(roles_raw) as role) THEN 4
+        WHEN 'sender' IN (SELECT role FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}) THEN 1
+        WHEN 'recipient' IN (SELECT role FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}) THEN 2
+        WHEN 'cced' IN (SELECT role FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}) THEN 3
+        WHEN 'bcced' IN (SELECT role FROM UNNEST(roles_raw) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}) THEN 4
         ELSE 5
     END,
     first_participated_at ASC,

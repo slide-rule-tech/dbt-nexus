@@ -33,13 +33,13 @@ extracted AS (
         
         -- Determine instanceStart for recurring events
         -- Priority: originalStartTime.dateTime > start.dateTime > start.date
-        CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 
+        try_cast(
             COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            )
-        ) AS TIMESTAMP) as instance_start,
+            ) AS TIMESTAMP
+        ) as instance_start,
         
         -- Event details
         JSON_EXTRACT_SCALAR(_raw_record, '$.summary') as summary,
@@ -48,19 +48,19 @@ extracted AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.status') as status,
         
         -- Parse start and end times
-        CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 
+        try_cast(
             COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            )
-        ) AS TIMESTAMP) as start_time,
+            ) AS TIMESTAMP
+        ) as start_time,
         
-        CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 
+        try_cast(
             COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.end.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.end.date'), 'T23:59:59Z')
-            )
-        ) AS TIMESTAMP) as end_time,
+            ) AS TIMESTAMP
+        ) as end_time,
         
         -- Check if it's all day event
         CASE 
@@ -83,7 +83,7 @@ extracted AS (
             SELECT COUNT(*) > 0
             FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.attendees')) as attendee
             WHERE JSON_EXTRACT_SCALAR(attendee, '$.email') IS NOT NULL
-              AND REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(attendee, '$.email'), r'@(.+)') NOT IN (
+              AND REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(attendee, '$.email'), {% if target.type == 'bigquery' %}r'@(.+)'{% else %}'@(.+)'{% endif %}) NOT IN (
                   {%- for domain in var('internal_domains', []) -%}
                   '{{ domain }}'
                   {%- if not loop.last -%},{%- endif -%}
@@ -91,7 +91,7 @@ extracted AS (
               )
         ) OR (
             JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') IS NOT NULL
-            AND REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email'), r'@(.+)') NOT IN (
+            AND REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email'), {% if target.type == 'bigquery' %}r'@(.+)'{% else %}'@(.+)'{% endif %}) NOT IN (
                 {%- for domain in var('internal_domains', []) -%}
                 '{{ domain }}'
                 {%- if not loop.last -%},{%- endif -%}
@@ -120,7 +120,7 @@ with_composite_key AS (
         -- Use iCalUID as primary key for single events
         -- Use iCalUID + instanceStart for recurring events
         CASE 
-            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS STRING))
+            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS VARCHAR))
             ELSE ical_uid
         END as event_key
     FROM extracted

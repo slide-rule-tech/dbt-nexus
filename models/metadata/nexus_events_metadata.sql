@@ -87,6 +87,12 @@ SELECT
                         ){% if not loop.last %},{% endif %}
                         {% endfor %}
                     ))::VARCHAR
+                {% elif target.type == 'duckdb' %}
+                    cast(to_json([
+                        {% for col in columns %}
+                        {'column_name': '{{ col.name }}', 'column_type': '{{ col.type }}'}{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ]) AS VARCHAR)
                 {% else %}
                     TO_JSON_STRING([
                         {% for col in columns %}

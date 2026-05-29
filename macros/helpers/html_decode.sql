@@ -9,19 +9,19 @@ REGEXP_REPLACE(
                     REGEXP_REPLACE(
                         REGEXP_REPLACE(
                             COALESCE({{ text }}, ''),
-                            r'&#39;', "'"  -- Apostrophe
+                            {% if target.type == 'bigquery' %}r'&#39;'{% else %}'&#39;'{% endif %}, {% if target.type == 'bigquery' %}"'"{% else %}''''{% endif %}  -- Apostrophe
                         ),
-                        r'&apos;', "'"  -- Apostrophe (named)
+                        {% if target.type == 'bigquery' %}r'&apos;'{% else %}'&apos;'{% endif %}, {% if target.type == 'bigquery' %}"'"{% else %}''''{% endif %}  -- Apostrophe (named)
                     ),
-                    r'&quot;', '"'  -- Double quote
+                    {% if target.type == 'bigquery' %}r'&quot;'{% else %}'&quot;'{% endif %}, '"'  -- Double quote
                 ),
-                r'&amp;', '&'  -- Ampersand
+                {% if target.type == 'bigquery' %}r'&amp;'{% else %}'&amp;'{% endif %}, '&'  -- Ampersand
             ),
-            r'&lt;', '<'  -- Less than
+            {% if target.type == 'bigquery' %}r'&lt;'{% else %}'&lt;'{% endif %}, '<'  -- Less than
         ),
-        r'&gt;', '>'  -- Greater than
+        {% if target.type == 'bigquery' %}r'&gt;'{% else %}'&gt;'{% endif %}, '>'  -- Greater than
     ),
-    r'&#160;', ' '  -- Non-breaking space
+    {% if target.type == 'bigquery' %}r'&#160;'{% else %}'&#160;'{% endif %}, ' '  -- Non-breaking space
 )
 {% endmacro %}
 
