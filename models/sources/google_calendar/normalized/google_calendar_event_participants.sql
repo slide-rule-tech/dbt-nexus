@@ -12,20 +12,23 @@ WITH source_data AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
         -- Determine instanceStart for recurring events
-        CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 
-            COALESCE(
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            )
-        ) AS TIMESTAMP) as instance_start,
-        -- Parse start_time for event timing
-        CAST(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%E*S%Ez', 
-            COALESCE(
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            )
-        ) AS TIMESTAMP) as start_time,
+            ) AS TIMESTAMP){% endif %} as instance_start,
+        -- Parse start_time for event timing
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% endif %} as start_time,
         -- Check if it's a recurring event
         CASE 
             WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') IS NOT NULL THEN true
@@ -62,10 +65,10 @@ organizer_raw AS (
         start_time,
         _ingested_at,
         JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') as participant_raw,
-        {{ nexus.parse_gmail_email('JSON_EXTRACT_SCALAR(_raw_record, "$.organizer.email")') }} as parsed_email,
+        {{ nexus.parse_gmail_email("JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email')") }} as parsed_email,
         COALESCE(
             JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.displayName'),
-            {{ nexus.extract_gmail_name('JSON_EXTRACT_SCALAR(_raw_record, "$.organizer.email")') }}
+            {{ nexus.extract_gmail_name("JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email')") }}
         ) as participant_name,
         'organizer' as role,
         JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.displayName') as display_name,
@@ -107,10 +110,10 @@ creator_raw AS (
         start_time,
         _ingested_at,
         JSON_EXTRACT_SCALAR(_raw_record, '$.creator.email') as participant_raw,
-        {{ nexus.parse_gmail_email('JSON_EXTRACT_SCALAR(_raw_record, "$.creator.email")') }} as parsed_email,
+        {{ nexus.parse_gmail_email("JSON_EXTRACT_SCALAR(_raw_record, '$.creator.email')") }} as parsed_email,
         COALESCE(
             JSON_EXTRACT_SCALAR(_raw_record, '$.creator.displayName'),
-            {{ nexus.extract_gmail_name('JSON_EXTRACT_SCALAR(_raw_record, "$.creator.email")') }}
+            {{ nexus.extract_gmail_name("JSON_EXTRACT_SCALAR(_raw_record, '$.creator.email')") }}
         ) as participant_name,
         'creator' as role,
         JSON_EXTRACT_SCALAR(_raw_record, '$.creator.displayName') as display_name,
@@ -155,10 +158,10 @@ attendees_raw AS (
         s.start_time,
         s._ingested_at,
         JSON_EXTRACT_SCALAR(attendee, '$.email') as participant_raw,
-        {{ nexus.parse_gmail_email('JSON_EXTRACT_SCALAR(attendee, "$.email")') }} as parsed_email,
+        {{ nexus.parse_gmail_email("JSON_EXTRACT_SCALAR(attendee, '$.email')") }} as parsed_email,
         COALESCE(
             JSON_EXTRACT_SCALAR(attendee, '$.displayName'),
-            {{ nexus.extract_gmail_name('JSON_EXTRACT_SCALAR(attendee, "$.email")') }}
+            {{ nexus.extract_gmail_name("JSON_EXTRACT_SCALAR(attendee, '$.email')") }}
         ) as participant_name,
         'attendee' as role,
         JSON_EXTRACT_SCALAR(attendee, '$.displayName') as display_name,
@@ -167,7 +170,7 @@ attendees_raw AS (
         CAST(JSON_EXTRACT_SCALAR(attendee, '$.optional') AS BOOL) as is_optional,
         CAST(JSON_EXTRACT_SCALAR(attendee, '$.organizer') AS BOOL) as is_organizer
     FROM with_event_key s,
-    UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.attendees')) as attendee
+    UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.attendees')) as {% if target.type == 'duckdb' %}t(attendee){% else %}attendee{% endif %}
     WHERE JSON_EXTRACT_SCALAR(attendee, '$.email') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(attendee, '$.email') != ''
 ),
@@ -212,11 +215,11 @@ SELECT
     TRIM(
         REGEXP_REPLACE(
             REGEXP_REPLACE(
-                REGEXP_REPLACE(participant_name, r'^[\'"]+', ''),
-                r'[\'"]+$',
+                REGEXP_REPLACE(participant_name, {% if target.type == 'bigquery' %}r'^[\'"]+'{% else %}'^[''"]+'{% endif %}, ''),
+                {% if target.type == 'bigquery' %}r'[\'"]+$'{% else %}'[''"]+$'{% endif %},
                 ''
             ),
-            r'\s*\([^)]*@[^)]*\)\s*$',
+            {% if target.type == 'bigquery' %}r'\s*\([^)]*@[^)]*\)\s*$'{% else %}'\s*\([^)]*@[^)]*\)\s*$'{% endif %},
             ''
         )
     ) as name,

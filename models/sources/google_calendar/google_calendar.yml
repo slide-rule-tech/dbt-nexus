@@ -9,6 +9,14 @@ sources:
     database:
       "{{ var('nexus', {}).get('sources', {}).get('google_calendar',
       {}).get('database', '') }}"
+    # See gmail.yml for the meta.external_location pattern: parquet
+    # under $NEXUS_LOCAL_EXTRACTS/<schema>/<table>/*.parquet on the
+    # duck-dev target. No-op on warehouse targets.
+    meta:
+      external_location:
+        "{{ env_var('NEXUS_LOCAL_EXTRACTS', '') }}/{{ var('nexus',
+        {}).get('sources', {}).get('google_calendar', {}).get('schema',
+        'google_calendar') }}/{name}/*.parquet"
     tables:
       - name: events
         identifier:

@@ -13,9 +13,10 @@
     subquery + WHERE __rn = 1 form is semantically identical, portable
     across adapters, and dodges the bug.
 
-    On Snowflake we still emit the QUALIFY form for compiled-SQL
-    readability. On DuckDB (and as the safe default) we emit the
-    subquery form.
+    On Snowflake and BigQuery we emit the QUALIFY form (both support
+    it) for compiled-SQL readability. On DuckDB (and as the safe
+    default) we emit the subquery form, using `* EXCLUDE(__nexus_rn)`
+    on duck and `* EXCEPT(__nexus_rn)` on BigQuery for `cols='*'`.
 
     Args:
       source: CTE name or {{ ref('...') }} expression (string)
@@ -25,7 +26,7 @@
       cols: column list for the outer select (defaults to '*')
 #}
 {% macro dedupe(source, partition_by, order_by, cols='*') %}
-{%- if target.type == 'snowflake' -%}
+{%- if target.type == 'snowflake' or target.type == 'bigquery' -%}
 select {{ cols }} from {{ source }}
 qualify row_number() over (partition by {{ partition_by }} order by {{ order_by }}) = 1
 {%- else -%}

@@ -21,8 +21,8 @@ thread_summary AS (
         COUNT(DISTINCT gmail_message_id) as gmail_message_count,
         
         -- Subject (use the earliest message's subject)
-        ARRAY_AGG(subject ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)] as subject,
-        ARRAY_AGG(raw_subject ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)] as raw_subject,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(subject ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(subject ORDER BY sent_at ASC){% endif %} as subject,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(raw_subject ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(raw_subject ORDER BY sent_at ASC){% endif %} as raw_subject,
         
         -- Timestamps
         MIN(sent_at) as first_message_sent_at,
@@ -31,10 +31,10 @@ thread_summary AS (
         MAX(_ingested_at) as last_ingested_at,
         
         -- Root message info (earliest gmail_message_id)
-        ARRAY_AGG(gmail_message_id ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)] as root_gmail_message_id,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(gmail_message_id ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(gmail_message_id ORDER BY sent_at ASC){% endif %} as root_gmail_message_id,
         
         -- First message_id_header (earliest message's message_id_header for cross-account linking)
-        ARRAY_AGG(message_id_header ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)] as first_message_id_header,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(message_id_header ORDER BY sent_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(message_id_header ORDER BY sent_at ASC){% endif %} as first_message_id_header,
         
         -- Gmail message IDs in thread
         ARRAY_AGG(DISTINCT gmail_message_id) as gmail_message_ids
@@ -60,7 +60,7 @@ thread_labels AS (
             gmail_thread_id,
             _account,
             _stream_id,
-            ARRAY_CONCAT_AGG(label_ids) as label_ids
+            {% if target.type == 'bigquery' %}ARRAY_CONCAT_AGG(label_ids){% else %}flatten(array_agg(label_ids)){% endif %} as label_ids
         FROM messages
         WHERE gmail_thread_id IS NOT NULL
           AND _account IS NOT NULL

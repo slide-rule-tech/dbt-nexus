@@ -29,9 +29,9 @@ grouped_participants AS (
         message_id,
         email,
         role,
-        ARRAY_AGG(participant_raw ORDER BY sent_at DESC, _ingested_at DESC LIMIT 1)[OFFSET(0)] as participant_raw,
-        ARRAY_AGG(name ORDER BY sent_at DESC, _ingested_at DESC LIMIT 1)[OFFSET(0)] as name,
-        ARRAY_AGG(domain ORDER BY sent_at DESC, _ingested_at DESC LIMIT 1)[OFFSET(0)] as domain,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(participant_raw ORDER BY sent_at DESC, _ingested_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(participant_raw ORDER BY sent_at DESC, _ingested_at DESC){% endif %} as participant_raw,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(name ORDER BY sent_at DESC, _ingested_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(name ORDER BY sent_at DESC, _ingested_at DESC){% endif %} as name,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(domain ORDER BY sent_at DESC, _ingested_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(domain ORDER BY sent_at DESC, _ingested_at DESC){% endif %} as domain,
         MAX(sent_at) as sent_at,
         MAX(_ingested_at) as _ingested_at
     FROM per_account_participants

@@ -6,7 +6,7 @@
 
 -- Extract thread started events from normalized gmail threads
 SELECT
-    {{ nexus.create_nexus_id('event', ['thread_id', '"thread started"']) }} as event_id,
+    {{ nexus.create_nexus_id('event', ['thread_id', "'thread started'"]) }} as event_id,
     first_message_sent_at as occurred_at,
     'thread started' as event_name,
     'email' as event_type,

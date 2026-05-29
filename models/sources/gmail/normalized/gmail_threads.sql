@@ -12,8 +12,8 @@ WITH per_account_threads AS (
 grouped as (
     SELECT 
         first_message_id_header as thread_id,
-        ARRAY_AGG(subject ORDER BY first_message_sent_at ASC LIMIT 1)[OFFSET(0)] as subject,
-        ARRAY_AGG(raw_subject ORDER BY first_message_sent_at ASC LIMIT 1)[OFFSET(0)] as raw_subject,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(subject ORDER BY first_message_sent_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(subject ORDER BY first_message_sent_at ASC){% endif %} as subject,
+        {% if target.type == 'bigquery' %}ARRAY_AGG(raw_subject ORDER BY first_message_sent_at ASC LIMIT 1)[OFFSET(0)]{% else %}first(raw_subject ORDER BY first_message_sent_at ASC){% endif %} as raw_subject,
         MIN(first_message_sent_at) as first_message_sent_at,
         MAX(last_message_sent_at) as last_message_sent_at,
         
@@ -60,7 +60,7 @@ all_labels AS (
     FROM (
         SELECT 
             first_message_id_header,
-            ARRAY_CONCAT_AGG(label_ids) as label_ids
+            {% if target.type == 'bigquery' %}ARRAY_CONCAT_AGG(label_ids){% else %}flatten(array_agg(label_ids)){% endif %} as label_ids
         FROM per_account_threads
         WHERE first_message_id_header IS NOT NULL
         GROUP BY first_message_id_header

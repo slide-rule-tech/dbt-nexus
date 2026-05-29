@@ -15,10 +15,10 @@ WITH source_data AS (
 ),
 
 deduplicated AS (
-    SELECT 
-        * EXCEPT(gmail_message_id),
+    SELECT
+        {% if target.type == 'duckdb' %}* EXCLUDE(gmail_message_id){% else %}* EXCEPT(gmail_message_id){% endif %},
         ROW_NUMBER() OVER (
-            PARTITION BY gmail_message_id 
+            PARTITION BY gmail_message_id
             ORDER BY _ingested_at DESC
         ) as rn
     FROM source_data
