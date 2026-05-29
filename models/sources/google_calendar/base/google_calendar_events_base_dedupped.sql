@@ -13,13 +13,15 @@ WITH source_data AS (
         -- PARSE_TIMESTAMP with %E*S/%Ez format codes (duck strptime
         -- doesn't recognize). try_cast on both adapters auto-detects
         -- ISO 8601 and is equivalent for this format.
-        try_cast(
-            COALESCE(
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP
-        ) AS instance_start,
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% endif %} AS instance_start,
         CASE
             WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') IS NOT NULL THEN TRUE
             WHEN JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence') IS NOT NULL

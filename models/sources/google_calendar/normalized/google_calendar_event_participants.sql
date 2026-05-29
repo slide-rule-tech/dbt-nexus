@@ -12,20 +12,23 @@ WITH source_data AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
         -- Determine instanceStart for recurring events
-        try_cast(
-            COALESCE(
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP
-        ) as instance_start,
-        -- Parse start_time for event timing
-        try_cast(
-            COALESCE(
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP
-        ) as start_time,
+            ) AS TIMESTAMP){% endif %} as instance_start,
+        -- Parse start_time for event timing
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% endif %} as start_time,
         -- Check if it's a recurring event
         CASE 
             WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') IS NOT NULL THEN true

@@ -33,13 +33,15 @@ extracted AS (
         
         -- Determine instanceStart for recurring events
         -- Priority: originalStartTime.dateTime > start.dateTime > start.date
-        try_cast(
-            COALESCE(
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP
-        ) as instance_start,
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% endif %} as instance_start,
         
         -- Event details
         JSON_EXTRACT_SCALAR(_raw_record, '$.summary') as summary,
@@ -48,19 +50,21 @@ extracted AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.status') as status,
         
         -- Parse start and end times
-        try_cast(
-            COALESCE(
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP
-        ) as start_time,
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% endif %} as start_time,
         
-        try_cast(
-            COALESCE(
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.end.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.end.date'), 'T23:59:59Z')
-            ) AS TIMESTAMP
-        ) as end_time,
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.end.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.end.date'), 'T23:59:59Z')
+            ) AS TIMESTAMP){% endif %} as end_time,
         
         -- Check if it's all day event
         CASE 
