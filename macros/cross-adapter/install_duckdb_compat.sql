@@ -28,10 +28,11 @@ CREATE TYPE IF NOT EXISTS timestamp_ntz AS TIMESTAMP;
 CREATE TYPE IF NOT EXISTS timestamp_tz AS TIMESTAMPTZ;
 CREATE TYPE IF NOT EXISTS variant AS JSON;
 
--- BigQuery type aliases (string, int64, bool already valid in duck;
--- float64 + number are the BQ-specific names duck doesn't recognize).
+-- BigQuery type aliases (int64, bool already valid in duck; float64,
+-- number, string are the BQ-specific names duck doesn't recognize).
 CREATE TYPE IF NOT EXISTS float64 AS DOUBLE;
 CREATE TYPE IF NOT EXISTS number AS DECIMAL(38,9);
+CREATE TYPE IF NOT EXISTS string AS VARCHAR;
 
 -- Snowflake scalar function aliases
 CREATE OR REPLACE MACRO current_timestamp() AS now();

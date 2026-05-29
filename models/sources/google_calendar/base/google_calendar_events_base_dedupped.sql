@@ -9,14 +9,17 @@ WITH source_data AS (
         *,
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') AS calendar_event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') AS ical_uid,
-        CAST(PARSE_TIMESTAMP(
-            '%Y-%m-%dT%H:%M:%E*S%Ez',
+        -- ISO 8601 with fractional seconds + tz offset. BQ needs
+        -- PARSE_TIMESTAMP with %E*S/%Ez format codes (duck strptime
+        -- doesn't recognize). try_cast on both adapters auto-detects
+        -- ISO 8601 and is equivalent for this format.
+        try_cast(
             COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            )
-        ) AS TIMESTAMP) AS instance_start,
+            ) AS TIMESTAMP
+        ) AS instance_start,
         CASE
             WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') IS NOT NULL THEN TRUE
             WHEN JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence') IS NOT NULL
@@ -32,7 +35,7 @@ with_event_key AS (
     SELECT
         *,
         CASE
-            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS STRING))
+            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS VARCHAR))
             ELSE ical_uid
         END AS event_key
     FROM source_data
