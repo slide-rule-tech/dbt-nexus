@@ -156,6 +156,61 @@ Or via command line:
 dbt run --vars '{"nexus_schema_dev": "my_custom_schema"}'
 ```
 
+### Warehouse Optimization (BigQuery partition + cluster)
+
+The core `nexus_*` models can be built with BigQuery `partition_by` /
+`cluster_by` configs tuned to the access pattern of typical analytic
+queries (date-windowed event scans + `event_name` / `entity_type` /
+join-key filters). This is **enabled by default on BigQuery** and is
+**off on other adapters**.
+
+| Table | `partition_by` | `cluster_by` |
+|---|---|---|
+| `nexus_events` | `occurred_at` (month) | `event_name, source` |
+| `nexus_event_dimensions` | `occurred_at` (month) | `event_id` |
+| `nexus_event_measurements` | `occurred_at` (month) | `event_id` |
+| `nexus_entity_participants` | `occurred_at` (month) | `entity_type, event_id` |
+| `nexus_entities` | (none) | `entity_type` |
+| `nexus_relationships` | (none) | `relationship_type, entity_a_type, entity_b_type` |
+
+Monthly (not daily) granularity is intentional: real tenant event
+histories commonly exceed BigQuery's 4000-partition cap when sliced
+daily (e.g. 11+ years of Gmail data). Monthly gives ~333 years of
+headroom; a 90-day query still prunes to ~4 monthly partitions ≈
+120 days scanned, negligibly worse than the exact daily scan.
+
+The same toggle also installs **BigQuery informational primary-key
+and foreign-key constraints** (`NOT ENFORCED`) on the core models as
+post-hook `ALTER TABLE` statements. These let the BigQuery query
+optimizer do join elimination and tighter cardinality estimates on
+artifact queries that join the substrate. They cost nothing (no
+storage, no validation) and rely on the constraint actually holding —
+in nexus, PK uniqueness is enforced by `severity: error` dbt tests
+and FK referential integrity is guaranteed by the build graph (every
+dim/measurement/participant row derives from a nexus_events row), so
+the constraints hold by construction.
+
+`nexus_entity_states` and `nexus_entity_state_participants` retain
+their existing pre-set cluster keys.
+
+To override the default (opt out on BigQuery, or opt in on Snowflake):
+
+```yaml
+# In your dbt_project.yml
+vars:
+  nexus:
+    warehouse_optimization:
+      enabled: false   # force off
+      # enabled: true  # force on (Snowflake: applies cluster_by only;
+      #                 partition_by is BigQuery-specific and is a
+      #                 no-op on other adapters)
+```
+
+Auto mode (`enabled` unset or `null`) keeps the on-for-BigQuery /
+off-for-Snowflake default. Snowflake users should be aware that
+clustering on Snowflake triggers paid background reclustering; only
+opt in if you've measured a benefit.
+
 ## Basic Usage
 
 Once installed and configured, you can reference the public models from the

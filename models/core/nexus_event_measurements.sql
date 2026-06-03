@@ -1,7 +1,22 @@
 {{ config(
     materialized='table',
+    partition_by=nexus.nexus_bq_partition_by('occurred_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['event_id']),
+    post_hook=nexus.nexus_bq_informational_constraints(
+        primary_key='event_id',
+        foreign_keys=[
+            {'column': 'event_id', 'ref_table': 'nexus_events', 'ref_column': 'event_id'},
+        ],
+    ),
     tags=['measurements']
 ) }}
+
+{# Monthly partition: see nexus_events for rationale — event-derived
+   tables routinely exceed the 4000 daily-partition cap. #}
+
+-- depends_on: {{ ref('nexus_events') }}
+-- ^ ensures nexus_events finishes (PK constraint added by its post_hook)
+--   before this model's FK to nexus_events.event_id is added.
 
 -- Nexus Event Measurements (Core)
 -- Pivots nexus_event_measurements_unioned into a wide table with one column per measurement.

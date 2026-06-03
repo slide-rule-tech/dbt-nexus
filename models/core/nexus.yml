@@ -294,15 +294,68 @@ models:
       "Pivoted entity states table with one column per state name.
       One row per state change with valid_from/valid_to temporal bounds."
 
+  - name: nexus_event_dimensions
+    description:
+      "Pivoted event dimensions table with one column per dimension name.
+      One row per event. Dimension columns are discovered dynamically at
+      compile time from nexus_event_dimensions_unioned."
+    tests:
+      # event_id is declared as a BigQuery informational PRIMARY KEY in this
+      # model's config (nexus_bq_informational_constraints). That constraint is
+      # NOT ENFORCED, so the optimizer trusts it for join elimination — this
+      # error-severity uniqueness test is what makes that trust safe.
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description: "Reference to the source event; one row per event (primary key)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
   - name: nexus_event_measurements
     description:
       "Pivoted event measurements table with one column per measurement name.
       One row per event. Measurement columns are discovered dynamically at
       compile time from nexus_event_measurements_unioned."
+    tests:
+      # See nexus_event_dimensions: event_id is a NOT ENFORCED informational PK,
+      # so its uniqueness must be guarded by an error-severity test.
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description: "Reference to the source event; one row per event (primary key)"
+        tests:
+          - not_null:
+              config:
+                severity: error
 
   - name: nexus_entity_participants
     description:
       "Maps events to resolved entities, enabling entity-level event queries"
+    tests:
+      # entity_participant_id is a NOT ENFORCED informational PK. Its uniqueness
+      # currently holds only because occurred_at is functionally determined by
+      # event_id (the id hashes event_id+entity_id+role, the SQL groups by those
+      # plus occurred_at). This error-severity test guards that invariant so the
+      # optimizer never does join elimination on a PK that has silently drifted.
+      - unique:
+          column_name: entity_participant_id
+          config:
+            severity: error
+    columns:
+      - name: entity_participant_id
+        description: "Unique identifier for the event-to-entity participation (primary key)"
+        tests:
+          - not_null:
+              config:
+                severity: error
 
   - name: nexus_attribution_model_results
     description:

@@ -1,4 +1,16 @@
-{{ config(materialized = 'table')}}
+{{ config(
+    materialized='table',
+    partition_by=nexus.nexus_bq_partition_by('occurred_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['event_name', 'source']),
+    post_hook=nexus.nexus_bq_informational_constraints(primary_key='event_id'),
+) }}
+
+{# Monthly (not daily) partitioning on occurred_at: event history in
+   real tenants commonly spans more than the 4000-partition BigQuery
+   cap when partitioned daily (e.g. AWM exceeds 4000 days). Monthly
+   gives 4000 / 12 ≈ 333 years of headroom; a 90-day query still
+   prunes to ~4 monthly partitions ≈ 120 days scanned, negligibly
+   worse than the 90-day exact scan daily would give. #}
 
 {# Collect relations to union based on sources with events #}
 {% set relations_to_union = [] %}
@@ -127,5 +139,12 @@ SELECT
     {% endfor %}
     {{ processed_columns | join(',\n    ') }},
     current_timestamp() as _processed_at
-FROM unioned 
+FROM unioned
+{# BigQuery rejects `ORDER BY` in a CTAS that uses `partition_by`.
+   The ORDER BY at write time was never load-bearing for downstream
+   consumers — BigQuery and Snowflake both re-sort at read time when
+   needed — so we drop it whenever partitioning is on. Without
+   partitioning, preserve the historical ordering hint. #}
+{% if not (nexus.nexus_warehouse_optimization_enabled() and target.type == 'bigquery') %}
 ORDER BY occurred_at DESC
+{% endif %}
