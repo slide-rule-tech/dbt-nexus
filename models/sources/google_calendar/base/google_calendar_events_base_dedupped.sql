@@ -37,7 +37,7 @@ with_event_key AS (
     SELECT
         *,
         CASE
-            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS VARCHAR))
+            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS {% if target.type == 'bigquery' %}STRING{% else %}VARCHAR{% endif %}))
             ELSE ical_uid
         END AS event_key
     FROM source_data
