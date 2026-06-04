@@ -39,7 +39,14 @@ domains_with_roles AS (
 -- Create domain identifiers
 domain_identifiers AS (
     SELECT
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'domain', "'group'", 'role', 'first_participated_at']) }} as entity_identifier_id,
+        -- occurred_at (first_participated_at) is deliberately NOT part of the id.
+        -- It's a property of the event, and one logical event (event_id =
+        -- hash(thread_id)) can arrive from several synced mailboxes with slightly
+        -- different timestamps; keying the id on it gave each copy a distinct id,
+        -- so the dedup below couldn't collapse them and downstream
+        -- entity_participant_id (hash of event_id+entity_id+role) duplicated.
+        -- Keyed on the same components as edge_id and the person identifiers.
+        {{ nexus.create_nexus_id('entity_identifier', ['event_id', 'domain', "'group'", 'role']) }} as entity_identifier_id,
         event_id,
         {{ nexus.create_nexus_id('edge', ['event_id', 'domain', "'group'", 'role']) }} as edge_id,
         'group' as entity_type,
@@ -56,7 +63,7 @@ domain_identifiers AS (
 -- Add redirected domains (www. versions)
 redirected_domains AS (
     SELECT
-        {{ nexus.create_nexus_id('entity_identifier', ['event_id', nexus.redirected_domain('domain'), "'group'", 'role', 'first_participated_at']) }} as entity_identifier_id,
+        {{ nexus.create_nexus_id('entity_identifier', ['event_id', nexus.redirected_domain('domain'), "'group'", 'role']) }} as entity_identifier_id,
         event_id,
         {{ nexus.create_nexus_id('edge', ['event_id', nexus.redirected_domain('domain'), "'group'", 'role']) }} as edge_id,
         'group' as entity_type,

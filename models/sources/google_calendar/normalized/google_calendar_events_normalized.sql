@@ -124,7 +124,7 @@ with_composite_key AS (
         -- Use iCalUID as primary key for single events
         -- Use iCalUID + instanceStart for recurring events
         CASE 
-            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS VARCHAR))
+            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS {% if target.type == 'bigquery' %}STRING{% else %}VARCHAR{% endif %}))
             ELSE ical_uid
         END as event_key
     FROM extracted
