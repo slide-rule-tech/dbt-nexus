@@ -13,7 +13,7 @@ SELECT
     subject as event_description,
     CASE
         WHEN COALESCE(is_automated_or_bulk_message, FALSE) THEN -10
-        ELSE 0
+        ELSE 10
     END as significance,
     'gmail' as source,
     'gmail_message_events' as source_table,

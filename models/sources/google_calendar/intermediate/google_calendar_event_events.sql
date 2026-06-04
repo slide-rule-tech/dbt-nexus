@@ -13,10 +13,10 @@ SELECT
         ELSE 'internal_meeting'
     END as event_name,
     COALESCE(summary, 'Calendar Event') as event_description,
-    CASE 
-        WHEN has_external_attendees THEN 3
-        ELSE 2
-    END as event_significance,
+    -- `event_significance` was a typo: nexus_events selects the column `significance`,
+    -- so calendar rows had NULL significance downstream. Renamed to `significance`
+    -- and bumped to 100 — calendar meetings are the highest-signal engagement.
+    100 as significance,
     'calendar_event' as event_type,
     source,
     _ingested_at,
