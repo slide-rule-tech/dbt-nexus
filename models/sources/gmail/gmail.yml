@@ -49,6 +49,14 @@ sources:
           - name: _sync_metadata
             description: "Additional sync metadata"
             data_type: json
+      - name: message_bodies
+        identifier:
+          "{{ var('nexus', {}).get('sources', {}).get('gmail', {}).get('tables',
+          {}).get('message_bodies', {}).get('identifier', 'gmail_message_bodies')
+          }}"
+        description:
+          "Gmail message bodies pulled on demand by the gmail_message_body BBP
+          enricher. Lean BBP envelope — the body fields live in `_raw_record`."
 
 models:
   # Union Layer Tests - Events
