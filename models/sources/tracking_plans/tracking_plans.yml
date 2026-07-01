@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: tracking_plans
+    description: >
+      Tracking plans — the "Big Beautiful Pipeline" `tracking_plans` collection.
+      A file-defined tracking plan (source of truth = a `.ts` file on the Nexus
+      master branch) projected to each client's warehouse on the BBP contract:
+      the lean envelope columns (`_convex_id`, `_row_id`, `_queued_at`,
+      `_ingested_at`, `_schema_id`, `_producer`, `_actor`) plus a `_raw_record`
+      JSON/VARIANT payload `{organization_id, plan_slug, content_hash, plan}`,
+      where `plan` nests `calls[] / properties[] / event_properties[] /
+      organization`. Append-only + change-gated: one row per plan VERSION, so
+      latest-per-(organization_id, plan_slug) is the current plan.
+    schema: >-
+      {{ var('nexus', {}).get('sources', {}).get('tracking_plans', {}).get('schema',
+      'tracking_plans_disabled_' ~ project_name) }}
+    database: >-
+      {{ var('nexus', {}).get('sources', {}).get('tracking_plans', {}).get('database', '') }}
+    tables:
+      - name: tracking_plans
+        identifier: >-
+          {{ var('nexus', {}).get('sources', {}).get('tracking_plans', {}).get('table', 'tracking_plans') }}
+        description: "Raw tracking_plans collection rows (append-only version log)."
+        columns:
+          - name: _raw_record
+            description: "JSON/VARIANT payload: {organization_id, plan_slug, content_hash, plan{calls,properties,event_properties,organization}}."
+          - name: _ingested_at
+            description: "When this plan version landed (latest wins per org+plan)."
+          - name: _producer
+            description: "Envelope producer (e.g. 'tracking-plans')."
