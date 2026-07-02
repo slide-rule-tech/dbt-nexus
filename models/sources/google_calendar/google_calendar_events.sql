@@ -6,6 +6,8 @@
     tags=['nexus', 'events', 'google_calendar']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'event_id']) }}
+
 -- Union all event types using dbt_utils for column handling
 -- Future: add google_calendar_label_events if needed
 --

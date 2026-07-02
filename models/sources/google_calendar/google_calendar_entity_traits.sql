@@ -6,6 +6,8 @@
     tags=['nexus', 'entity_traits', 'google_calendar']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'entity_trait_id']) }}
+
 -- Union all entity traits using dbt_utils for column handling
 --
 -- Incremental mode (nexus.incremental.enabled): append rows past this

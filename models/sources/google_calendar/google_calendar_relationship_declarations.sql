@@ -6,6 +6,8 @@
     tags=['nexus', 'relationship_declarations', 'google_calendar']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'relationship_declaration_id']) }}
+
 -- Union all relationship declarations using dbt_utils for column handling
 -- Future: add google_calendar_label_relationships if needed
 --

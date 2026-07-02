@@ -6,6 +6,8 @@
     tags=['nexus', 'entity_traits', 'gmail']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'entity_trait_id']) }}
+
 -- Union all person and group traits using dbt_utils for column handling
 WITH unioned_traits AS (
     {{ dbt_utils.union_relations(

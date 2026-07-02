@@ -6,6 +6,8 @@
     tags=['nexus', 'relationship_declarations', 'gmail']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'relationship_declaration_id']) }}
+
 -- Union all relationship declarations using dbt_utils for column handling
 -- Future: add gmail_label_relationships, gmail_thread_relationships
 --

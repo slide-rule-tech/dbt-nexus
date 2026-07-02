@@ -66,8 +66,8 @@ where {{ column }} > coalesce(
         {{ exceptions.raise_compiler_error(
             "nexus incremental upgrade: " ~ this ~ " predates incremental mode "
             ~ "(missing column '" ~ col ~ "'). Rebuild it once with:  "
-            ~ "dbt run --full-refresh --select " ~ this.identifier ~ "+  "
-            ~ "(this model and everything downstream), then resume normal runs."
+            ~ "dbt run --full-refresh --select +" ~ this.identifier ~ "+  "
+            ~ "(this model plus upstream and downstream), then resume normal runs."
         ) }}
       {%- endif -%}
     {%- endfor -%}

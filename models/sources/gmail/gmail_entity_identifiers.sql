@@ -6,6 +6,8 @@
     tags=['nexus', 'entity_identifiers', 'gmail']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'entity_identifier_id']) }}
+
 -- Union all person and group identifiers using dbt_utils for column handling
 --
 -- Incremental mode (nexus.incremental.enabled): append rows past this
