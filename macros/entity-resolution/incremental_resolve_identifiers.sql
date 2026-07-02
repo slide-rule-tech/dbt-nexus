@@ -22,8 +22,14 @@
 --                          rows of the losers are re-pointed to the survivor
 --                          and recorded with resolution_reason='repointed'
 --
--- The emitted rows are exactly the change-set (new + re-pointed); untouched
--- entities never appear, so dbt's merge never touches their rows.
+-- The emitted rows are the change-set (new + re-pointed) plus 'reobserved'
+-- re-emissions of known identifiers seen in this batch. Reobserved rows
+-- carry no new information -- they exist so every processed delta row is
+-- covered by an emitted row bearing the batch watermark, guaranteeing
+-- max(resolved_at_watermark) advances even on change-free batches (otherwise
+-- steady-state batches of already-known identifiers would re-scan an
+-- ever-growing delta forever). Entities untouched by the batch never appear,
+-- so dbt's merge never touches their rows.
 --
 -- Adapter-generic on purpose: the contracted graph is tiny, so plain joins
 -- plus a Jinja-unrolled min-label propagation work on every warehouse -- no
@@ -275,12 +281,44 @@ repointed_rows as (
     on l.loser_entity_id = t.{{ entity_type }}_id
 ),
 
+-- Change-set part 3: watermark advancement. A batch whose identifiers are
+-- all already known and produce no merges (the steady-state common case:
+-- the same people showing up again) would emit nothing, so
+-- max(resolved_at_watermark) would never advance and every subsequent run
+-- would re-scan an ever-growing delta. Re-emit the existing mapping rows of
+-- known identifiers observed in this batch -- unchanged except
+-- resolution_reason='reobserved' and the fresh watermark. Bounded by batch
+-- size. Excluded from nexus_resolution_log (observation is not a resolution
+-- decision). Loser-entity rows are excluded here because repointed_rows
+-- already re-emits them.
+reobserved_rows as (
+  select
+    t.{{ entity_type }}_id as entity_id,
+    t.identifier_type,
+    t.identifier_value,
+    t.event_id,
+    'reobserved' as resolution_reason,
+    cast(null as {{ dbt.type_string() }}) as previous_entity_id
+  from {{ this }} t
+  join delta_nodes dn
+    on dn.identifier_type = t.identifier_type
+    and dn.identifier_value = t.identifier_value
+  where dn.entity_id is not null
+    and not exists (
+      select 1 from losers l
+      where l.loser_entity_id = t.{{ entity_type }}_id
+    )
+),
+
 changes as (
   select entity_id, identifier_type, identifier_value, event_id, resolution_reason, previous_entity_id
   from new_identifier_rows
   union all
   select entity_id, identifier_type, identifier_value, event_id, resolution_reason, previous_entity_id
   from repointed_rows
+  union all
+  select entity_id, identifier_type, identifier_value, event_id, resolution_reason, previous_entity_id
+  from reobserved_rows
 )
 
 select

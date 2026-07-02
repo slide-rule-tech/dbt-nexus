@@ -183,12 +183,22 @@ Nothing else is read from prior runs.
    - **≥2** → merge: biggest-entity-wins survivor; *every* mapping row of
      every loser is re-pointed to the survivor (the whole component moves,
      including identifiers not in this batch).
-6. **Emit only the change-set**: new identifier rows (`born` / `accreted`)
-   plus re-pointed loser rows (`repointed`, with `previous_entity_id`).
-   Untouched entities never appear; dbt's merge never touches their rows.
-7. **Stamp** every emitted row with `resolved_at_watermark = max(_ingested_at)`
+6. **Emit the change-set**: new identifier rows (`born` / `accreted`) plus
+   re-pointed loser rows (`repointed`, with `previous_entity_id`). Untouched
+   entities never appear; dbt's merge never touches their rows.
+7. **Re-emit observations** (`reobserved`): known identifiers seen in this
+   batch whose entity didn't change get their existing mapping row re-emitted
+   unchanged except for the reason and a fresh watermark. This carries no new
+   information — it exists so that *every* processed delta row is covered by
+   an emitted row bearing the batch watermark. Without it, a steady-state
+   batch of already-known identifiers (the common case: the same people
+   showing up again) would emit nothing, `max(resolved_at_watermark)` would
+   stagnate, and every subsequent run would re-scan an ever-growing delta.
+   Bounded by batch size; excluded from the resolution log.
+8. **Stamp** every emitted row with `resolved_at_watermark = max(_ingested_at)`
    of the delta — deterministic (no `now()`), so re-runs are idempotent and
-   the log has a clean cursor.
+   the log has a clean cursor. Steps 6–8 together guarantee the watermark
+   advances past the full processed delta on every non-empty run.
 
 Properties that fall out: empty delta → no-op; duplicate/overlapping batches
 → no-ops (safe under at-least-once delivery and sloppy lookbacks); first run
@@ -256,7 +266,10 @@ monotonicity + idempotency make the worst case a redundant no-op.
 `nexus_resolution_log` (built only when the flag is on): append-only record
 of every resolution decision, unioned across ER entity types, cursored on
 `resolved_at_watermark`. This is the merge log, the downstream invalidation
-stream, and the outbound alias protocol, in one artifact.
+stream, and the outbound alias protocol, in one artifact. `reobserved` rows
+never enter it — observation is watermark bookkeeping, not a resolution
+decision (and the cursor stays safe across reobserved-only batches because
+batch watermarks are strictly increasing).
 
 It is also the **first table in the package that cannot be rebuilt from
 source data**: it records the history of what the pipeline concluded and
@@ -291,6 +304,19 @@ DAG invocation as the resolver (the default `dbt run` does).
   stragglers sharing the boundary timestamp are skipped. Mitigations: run
   after loads complete, or add a lookback (reprocessing is idempotent).
   A configurable lookback is future work.
+- **The `occurred_at` fallback is a backfill hazard.** Sources without
+  `_ingested_at` use `occurred_at` as the watermark column. For those sources
+  a backfilled old event (old `occurred_at`, arriving today) lands *behind*
+  the watermark and is never processed by the resolver. Safe only if such a
+  source's data arrives in roughly event-time order; give real sources a real
+  `_ingested_at`.
+- **The edges table's watermark can idle on pair-free batches.** A batch
+  containing only single-identifier events produces no edges, so the edge
+  model's own high-water mark doesn't advance and those identifier rows are
+  re-scanned by the edge self-join on subsequent runs until a batch with
+  pairs arrives. Benign: the anti-join makes re-derivation a no-op, rows from
+  different events never share an `edge_id` (no spurious cross-batch edges),
+  and the resolver's watermark advances independently via `reobserved` rows.
 - **`max_recursion` semantics change** in incremental mode: it bounds
   within-batch chain diameter over the contracted graph (small), not
   historical component diameter. The default of 5 is generous; a chain of >5

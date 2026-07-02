@@ -47,8 +47,14 @@ select
     resolution_reason,
     resolved_at_watermark
 from changes
+-- 'reobserved' rows are watermark bookkeeping (a known identifier seen
+-- again), not resolution decisions -- they never enter the log. Safe with
+-- the watermark cursor below: batch watermarks are strictly increasing, so
+-- a later loggable batch always clears a cursor left behind by
+-- reobserved-only batches.
+where resolution_reason != 'reobserved'
 {% if is_incremental() %}
-where resolved_at_watermark > coalesce(
+  and resolved_at_watermark > coalesce(
     (select max(resolved_at_watermark) from {{ this }}),
     cast('1970-01-01' as timestamp)
 )
