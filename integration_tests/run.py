@@ -38,6 +38,24 @@ from collections import defaultdict
 from pathlib import Path
 
 IT_DIR = Path(__file__).resolve().parent
+
+
+def _find_dbt():
+    """dbt from PATH, else the monorepo's nexus-python venv, else a real error."""
+    exe = shutil.which("dbt")
+    if exe:
+        return exe
+    venv_dbt = IT_DIR.parents[1] / "nexus-python" / "bin" / "dbt"
+    if venv_dbt.exists():
+        return str(venv_dbt)
+    sys.exit(
+        "dbt not found on PATH (and no ../../nexus-python venv). Activate an "
+        "env with dbt + dbt-duckdb, e.g.:\n"
+        "  source ../../nexus-python/bin/activate"
+    )
+
+
+DBT_EXE = _find_dbt()
 SEED_CSV = IT_DIR / "seeds" / "it_identifier_rows.csv"
 SCENARIO_DB_DIR = IT_DIR / "target" / "scenarios"
 
@@ -144,7 +162,7 @@ def read_scenarios():
 
 
 def dbt(args, db_path, extra_vars=None, quiet=True):
-    cmd = ["dbt", "--no-use-colors", *args]
+    cmd = [DBT_EXE, "--no-use-colors", *args]
     if extra_vars:
         cmd += ["--vars", json.dumps(extra_vars)]
     env = os.environ.copy()
