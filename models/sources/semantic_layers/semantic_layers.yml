@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: semantic_layers
+    description: >
+      Semantic layers — the "Big Beautiful Pipeline" `semantic_layers` collection.
+      A file-defined semantic layer (source of truth = a `.ts` file on the Nexus
+      master branch) projected to each client's warehouse on the BBP contract:
+      the lean envelope columns (`_convex_id`, `_row_id`, `_queued_at`,
+      `_ingested_at`, `_schema_id`, `_producer`, `_actor`) plus a `_raw_record`
+      JSON/VARIANT payload `{organization_id, layer_slug, content_hash, layer}`,
+      where `layer` nests `metrics[] / dimensions[] / organization`.
+      Append-only + change-gated: one row per layer VERSION, so
+      latest-per-(organization_id, layer_slug) is the current layer.
+    schema: >-
+      {{ var('nexus', {}).get('sources', {}).get('semantic_layers', {}).get('schema',
+      'semantic_layers_disabled_' ~ project_name) }}
+    database: >-
+      {{ var('nexus', {}).get('sources', {}).get('semantic_layers', {}).get('database', '') }}
+    tables:
+      - name: semantic_layers
+        identifier: >-
+          {{ var('nexus', {}).get('sources', {}).get('semantic_layers', {}).get('table', 'semantic_layers') }}
+        description: "Raw semantic_layers collection rows (append-only version log)."
+        columns:
+          - name: _raw_record
+            description: "JSON/VARIANT payload: {organization_id, layer_slug, content_hash, layer{metrics,dimensions,organization}}."
+          - name: _ingested_at
+            description: "When this layer version landed (latest wins per org+layer)."
+          - name: _producer
+            description: "Envelope producer (e.g. 'semantic-layers')."

@@ -1,10 +1,131 @@
 {{ config(materialized='table') }}
 
-{% set all_metrics = var('nexus', {}).get('metrics', {}) %}
+{#
+  Nexus Metrics Metadata — one row per metric in the org's semantic layer.
 
+  Source priority:
+    1. Warehouse: if var('nexus').sources.semantic_layers.enabled = true, read
+       from the BBP-projected `semantic_layers` collection (the new path).
+    2. Vars: fall back to var('nexus').metrics (legacy dbt-variables approach,
+       present during transition; remove from client dbt_project.yml after
+       verifying warehouse data matches).
+    3. Empty: no metrics configured → type-safe zero-row result.
+#}
+
+{% set use_warehouse = var('nexus', {}).get('sources', {}).get('semantic_layers', {}).get('enabled', false) %}
+{% set all_metrics = var('nexus', {}).get('metrics', {}) %}
 {% set has_metrics = all_metrics | length > 0 %}
 
-{% if has_metrics %}
+{% if use_warehouse %}
+
+-- ── Warehouse path ────────────────────────────────────────────────────────────
+-- Read the latest semantic layer row per (organization_id, layer_slug) and
+-- unnest the metrics array. Adapter-portable (BigQuery JSON vs Snowflake VARIANT).
+
+with latest as (
+    select _raw_record, _ingested_at
+    from {{ source('semantic_layers', 'semantic_layers') }}
+    qualify row_number() over (
+        partition by
+        {% if target.type == 'bigquery' %}
+            json_value(_raw_record, '$.organization_id'),
+            json_value(_raw_record, '$.layer_slug')
+        {% else %}
+            _raw_record:organization_id::string,
+            _raw_record:layer_slug::string
+        {% endif %}
+        order by _ingested_at desc
+    ) = 1
+)
+
+{% if target.type == 'bigquery' %}
+select
+    json_value(m, '$.model') as model,
+    json_value(m, '$.name') as metric_name,
+    json_value(m, '$.label') as label,
+    nullif(
+        array_to_string(
+            array(select json_value(x) from unnest(json_query_array(m, '$.aliases')) as x),
+            ', '
+        ), ''
+    ) as aliases,
+    json_value(m, '$.type') as metric_type,
+    nullif(
+        array_to_string(
+            array(select json_value(x) from unnest(json_query_array(m, '$.tables')) as x),
+            ', '
+        ), ''
+    ) as tables,
+    json_value(m, '$.metric_sql') as metric_sql,
+    nullif(
+        array_to_string(
+            array(select json_value(x) from unnest(json_query_array(m, '$.filter')) as x),
+            ' AND '
+        ), ''
+    ) as filter,
+    json_value(m, '$.format') as format,
+    json_value(m, '$.unit') as unit,
+    json_value(m, '$.polarity') as polarity,
+    cast(json_value(m, '$.precision') as int64) as precision,
+    nullif(
+        array_to_string(
+            array(select json_value(x) from unnest(json_query_array(m, '$.tags')) as x),
+            ', '
+        ), ''
+    ) as tags,
+    json_value(m, '$.description') as description,
+    nullif(
+        array_to_string(
+            array(select json_value(x) from unnest(json_query_array(m, '$.example_questions')) as x),
+            '; '
+        ), ''
+    ) as example_questions
+from latest,
+     unnest(json_query_array(_raw_record, '$.layer.metrics')) as m
+
+{% else %}
+
+select
+    m.value:model::string as model,
+    m.value:name::string as metric_name,
+    m.value:label::string as label,
+    nullif(
+        (select listagg(f.value::string, ', ') from lateral flatten(input => m.value:aliases) f),
+        ''
+    ) as aliases,
+    m.value:type::string as metric_type,
+    nullif(
+        (select listagg(f.value::string, ', ') from lateral flatten(input => m.value:tables) f),
+        ''
+    ) as tables,
+    m.value:metric_sql::string as metric_sql,
+    nullif(
+        (select listagg(f.value::string, ' AND ') from lateral flatten(input => m.value:filter) f),
+        ''
+    ) as filter,
+    m.value:format::string as format,
+    m.value:unit::string as unit,
+    m.value:polarity::string as polarity,
+    m.value:precision::integer as precision,
+    nullif(
+        (select listagg(f.value::string, ', ') from lateral flatten(input => m.value:tags) f),
+        ''
+    ) as tags,
+    m.value:description::string as description,
+    nullif(
+        (select listagg(f.value::string, '; ') from lateral flatten(input => m.value:example_questions) f),
+        ''
+    ) as example_questions
+from latest,
+     lateral flatten(input => _raw_record:layer:metrics) m
+
+{% endif %}
+
+{% elif has_metrics %}
+
+-- ── Legacy vars path ──────────────────────────────────────────────────────────
+-- Present during transition while client dbt_project.yml vars still exist.
+-- Remove vars (and this branch becomes unreachable) after verifying warehouse data.
 
     {% set ns = namespace(first=true) %}
     {% for model_name, metrics_list in all_metrics.items() %}
@@ -32,6 +153,7 @@
 
 {% else %}
 
+-- ── Empty result ──────────────────────────────────────────────────────────────
     {% if target.type == 'bigquery' %}
     SELECT
         CAST(NULL AS STRING) AS model,
