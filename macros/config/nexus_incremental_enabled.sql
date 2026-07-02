@@ -27,3 +27,26 @@
     {{ return(default) }}
   {%- endif -%}
 {% endmacro %}
+
+{# The standard ingestion-time watermark predicate for incremental source
+   models: only rows ingested after this model's own high-water mark. Renders
+   nothing outside an incremental run, so models stay valid in table mode.
+
+   Usage (note the subquery wrap -- a bare WHERE after union_relations would
+   bind to the union's last branch only):
+
+     select * from (
+         {{ dbt_utils.union_relations(relations=[...]) }}
+     ) unioned
+     {{ nexus.nexus_incremental_source_filter() }}
+
+   The watermark is always ingestion time, never occurred_at -- late-arriving
+   events must still enter (docs/incremental-identity-resolution.md §2.6). #}
+{% macro nexus_incremental_source_filter(column='_ingested_at') %}
+  {%- if is_incremental() %}
+where {{ column }} > coalesce(
+    (select max({{ column }}) from {{ this }}),
+    cast('1970-01-01' as timestamp)
+)
+  {%- endif %}
+{% endmacro %}

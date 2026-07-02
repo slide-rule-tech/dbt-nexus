@@ -1,6 +1,8 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    unique_key='entity_trait_id',
+    on_schema_change='append_new_columns',
     tags=['nexus', 'entity_traits', 'gmail']
 ) }}
 
@@ -14,7 +16,9 @@ WITH unioned_traits AS (
     ) }}
 )
 
--- Deduplicate by entity_trait_id, keeping the most recent record
+-- Deduplicate by entity_trait_id, keeping the most recent record.
+-- Incremental mode: the QUALIFY dedups within the batch; the merge on
+-- entity_trait_id keeps last-write-wins semantics across batches.
 SELECT DISTINCT
     entity_trait_id,
     event_id,
@@ -27,10 +31,10 @@ SELECT DISTINCT
     occurred_at,
     _ingested_at
 FROM unioned_traits
+{{ nexus.nexus_incremental_source_filter() }}
 QUALIFY ROW_NUMBER() OVER (
-    PARTITION BY entity_trait_id 
+    PARTITION BY entity_trait_id
     ORDER BY occurred_at DESC, _ingested_at DESC
 ) = 1
 
 ORDER BY occurred_at DESC
-

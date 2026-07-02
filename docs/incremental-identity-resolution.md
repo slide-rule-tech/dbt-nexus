@@ -293,8 +293,17 @@ DAG invocation as the resolver (the default `dbt run` does).
   discovered at compile time (dynamic schema), and the entity dimension is
   small next to the event-grain tables. Spend the incrementality budget where
   the rows are.
-- **Source event-log models**: still full rebuilds. Straightforward
-  append-only incrementals, but orthogonal to identity resolution.
+- **Source event-log models**: the *final* source models for gmail and
+  google_calendar (`<source>_events`, `_entity_identifiers`,
+  `_entity_traits`, `_relationship_declarations`) are now flag-gated
+  incrementals — watermark append via `nexus_incremental_source_filter()`
+  with a unique-key merge (re-synced upstream records overwrite their prior
+  row) and an incremental-only batch dedup (warehouse merges reject
+  duplicate keys within one batch). The base/intermediate layers underneath
+  stay full rebuilds: that is where the raw-scan cost still lives, and
+  incrementalizing them (especially the windowed dedup in `*_base_dedupped`)
+  is a separate cost project. Other package sources (segment) and
+  consumer-local sources follow the same recipe when wanted.
 - **Quarantine / connection-count maintenance** (§7).
 
 ### 4.7 Known edge cases and assumptions
