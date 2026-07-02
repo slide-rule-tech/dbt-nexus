@@ -103,7 +103,18 @@ select
   identifier_type,
   identifier_value,
   false as realtime_processed,
-  true as existing_{{ entity_type }}
+  true as existing_{{ entity_type }},
+  -- Resolution provenance (see incremental_resolve_identifiers): a full
+  -- resolution is its own epoch. The watermark is the global ingestion
+  -- high-water mark at resolution time so a subsequent incremental run
+  -- picks up exactly where this one left off.
+  'full_resolution' as resolution_reason,
+  cast(null as {{ dbt.type_string() }}) as previous_entity_id,
+  (
+    select max(_ingested_at)
+    from {{ ref(identifiers_table) }}
+    where entity_type = '{{ entity_type }}'
+  ) as resolved_at_watermark
 from deduplicated_identifiers
 where row_num = 1
 

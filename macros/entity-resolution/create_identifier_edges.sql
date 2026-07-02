@@ -7,8 +7,33 @@
 {% set error_autofilter = edge_quality.get('error_autofilter', false) %}
 {% set error_threshold = edge_quality.get('error_threshold', 20) %}
 
+{# Retroactive edge autofiltering removes edges as connection counts grow,
+   which breaks the monotonicity (edges only ever arrive) that incremental
+   identity resolution depends on: removing edges can split components, and
+   splits cannot be processed incrementally. Fail loudly rather than let the
+   incremental graph silently diverge from a full refresh. #}
+{% if nexus.nexus_incremental_enabled() and (critical_autofilter or error_autofilter) %}
+  {{ exceptions.raise_compiler_error(
+      "nexus: incremental identity resolution (nexus.incremental.enabled) is "
+      ~ "incompatible with edge_quality autofiltering (critical_autofilter / "
+      ~ "error_autofilter). Autofiltering retroactively removes edges, which "
+      ~ "can split components -- splits require a full refresh. Disable "
+      ~ "autofiltering or disable incremental mode."
+  ) }}
+{% endif %}
+
 with unpivoted as (
   select * from {{ ref(identifiers_table) }}
+  {% if is_incremental() %}
+  -- Incremental mode: only identifier rows ingested after the high-water
+  -- mark. Both endpoints of an edge come from the same event (same edge_id),
+  -- so they always arrive in the same batch -- filtering the unpivoted rows
+  -- filters whole edges, never half of one.
+  where _ingested_at > coalesce(
+      (select max(_ingested_at) from {{ this }}),
+      cast('1970-01-01' as timestamp)
+  )
+  {% endif %}
 ),
 
 raw_edges as (
@@ -22,6 +47,8 @@ raw_edges as (
     b.identifier_value as identifier_value_b,
     -- Both a and b share the same edge_id, so they have the same source
     coalesce(a.source, b.source) as source,
+    -- Both sides come from the same event, so they share an ingestion batch
+    coalesce(a._ingested_at, b._ingested_at) as _ingested_at,
     -- Create uniqueness hash for deduplication (includes entity_type to prevent collisions)
     {{ dbt_utils.generate_surrogate_key([
       'a.entity_type',
@@ -49,6 +76,7 @@ deduplicated_edges as (
     identifier_type_b,
     identifier_value_b,
     source,
+    _ingested_at,
     edge_uniqueness_hash,
     row_number() over (partition by edge_uniqueness_hash order by edge_uniqueness_hash) as rn
   from raw_edges
@@ -91,9 +119,24 @@ select
   entity_type_b,
   identifier_type_b,
   identifier_value_b,
-  source
+  source,
+  _ingested_at,
+  edge_uniqueness_hash
 from edges_with_total_connection_counts
-where 
+where
+  {% if is_incremental() %}
+  -- An edge re-derived from a new event may already exist (same identifier
+  -- pair seen before via a different event). Keep the first sighting: its
+  -- _ingested_at must stay put so the resolver's watermark treats the edge
+  -- as already absorbed. Re-inserting would be harmless (idempotent no-op
+  -- downstream) but wasteful.
+  not exists (
+    select 1
+    from {{ this }} existing
+    where existing.edge_uniqueness_hash = edges_with_total_connection_counts.edge_uniqueness_hash
+  )
+  and
+  {% endif %}
   -- Filter out identifiers with connections exceeding thresholds (if enabled)
   {% if critical_autofilter or error_autofilter %}
   not (

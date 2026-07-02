@@ -22,13 +22,27 @@
         {% endfor %}
     {% endif %}
 
+    {# Detect whether any source relation carries _ingested_at. Sources that
+       lack it fall back to occurred_at, so the ingestion watermark used by
+       incremental mode degrades gracefully rather than failing to compile. #}
+    {% set ns = namespace(has_ingested_at=false) %}
+    {% if execute %}
+        {% for rel in relations_to_union %}
+            {% for col in adapter.get_columns_in_relation(rel) %}
+                {% if col.name | lower == '_ingested_at' %}
+                    {% set ns.has_ingested_at = true %}
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+    {% endif %}
+
     {% if relations_to_union %}
         with unioned as (
             {{ dbt_utils.union_relations(
                 relations=relations_to_union
             ) }}
         ),
-        
+
         normalized as (
             -- Standardize identifier formats (lowercase emails, etc.)
             select
@@ -47,7 +61,12 @@
                 end as normalized_value,
                 role,
                 source,
-                occurred_at
+                occurred_at,
+                {% if ns.has_ingested_at %}
+                coalesce(_ingested_at, occurred_at) as _ingested_at
+                {% else %}
+                occurred_at as _ingested_at
+                {% endif %}
             from unioned
         )
 
@@ -61,8 +80,18 @@
             normalized_value,
             role,
             source,
-            occurred_at
+            occurred_at,
+            _ingested_at
         from normalized
+        {% if is_incremental() %}
+        -- Incremental mode: only rows ingested after the high-water mark.
+        -- Watermark is on ingestion time, never occurred_at -- late-arriving
+        -- events (old occurred_at, new _ingested_at) must still enter.
+        where _ingested_at > coalesce(
+            (select max(_ingested_at) from {{ this }}),
+            cast('1970-01-01' as timestamp)
+        )
+        {% endif %}
     {% else %}
         {# Return empty result if no relations found #}
         select 
@@ -75,7 +104,8 @@
             cast(null as string) as normalized_value,
             cast(null as string) as role,
             cast(null as string) as source,
-            cast(null as timestamp) as occurred_at
+            cast(null as timestamp) as occurred_at,
+            cast(null as timestamp) as _ingested_at
         where 1=0
     {% endif %}
 {% endmacro %}
