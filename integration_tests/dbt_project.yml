@@ -1,0 +1,72 @@
+# Integration-test harness for dbt-nexus, run against a scratch DuckDB
+# database. See integration_tests/README.md and
+# docs/incremental-identity-resolution.md §6 for the design.
+#
+# This project is the "consumer": it installs the package via `local: ..`
+# exactly the way a client project consumes it from git, wires a synthetic
+# `it` source into the nexus config, and turns the incremental flag on.
+name: "nexus_integration_tests"
+version: "1.0.0"
+config-version: 2
+
+profile: "nexus_integration_tests"
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Same shims a real consumer runs (SRT does); no-op off duckdb.
+on-run-start:
+  - "{{ nexus.install_duckdb_compat() }}"
+
+# The package's adapter-dispatched macros (resolve_identifiers etc.) use the
+# namespace 'dbt_nexus' while the package installs as 'nexus'. Models INSIDE
+# the package resolve the adapter variants through their package-local macro
+# namespace, so ordinary consumers never notice -- but models in THIS project
+# (the shadow resolution) call those macros from the root namespace and need
+# an explicit search order.
+dispatch:
+  - macro_namespace: dbt_nexus
+    search_order: ["nexus_integration_tests", "nexus"]
+
+models:
+  nexus_integration_tests:
+    +tags: ["it"]
+
+seeds:
+  nexus_integration_tests:
+    it_identifier_rows:
+      +column_types:
+        scenario: varchar
+        entity_identifier_id: varchar
+        event_id: varchar
+        edge_id: varchar
+        entity_type: varchar
+        identifier_type: varchar
+        identifier_value: varchar
+        role: varchar
+        source: varchar
+        occurred_at: timestamp
+        _ingested_at: timestamp
+
+vars:
+  # The simulated ingestion clock (see README): the whole scenario lives in
+  # the seed; these two vars decide which slice of it the "source" exposes.
+  # The runner advances it_now across dbt invocations to simulate batches
+  # arriving. Overridden per-step on the CLI.
+  it_scenario: "_none"
+  it_now: "1970-01-01 00:00:00"
+
+  nexus:
+    incremental:
+      enabled: true
+    max_recursion: 5
+    sources:
+      it:
+        enabled: true
+        events: true
+        entities: true
