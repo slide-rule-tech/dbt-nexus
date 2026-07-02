@@ -50,3 +50,26 @@ where {{ column }} > coalesce(
 )
   {%- endif %}
 {% endmacro %}
+
+{# Upgrade guard for enabling incremental mode over an EXISTING deployment.
+   A table built before the flag was turned on lacks the columns the
+   incremental predicates read (e.g. _ingested_at, resolved_at_watermark);
+   left alone, the run would fail confusingly -- or worse, an append-only
+   model would happily duplicate every row. Fail loudly with the remediation
+   instead. No-op on full refreshes and first builds (is_incremental() is
+   false), so the prescribed command is self-clearing. #}
+{% macro nexus_incremental_upgrade_guard(required_columns) %}
+  {%- if is_incremental() and execute -%}
+    {%- set existing = adapter.get_columns_in_relation(this) | map(attribute='name') | map('lower') | list -%}
+    {%- for col in required_columns -%}
+      {%- if col | lower not in existing -%}
+        {{ exceptions.raise_compiler_error(
+            "nexus incremental upgrade: " ~ this ~ " predates incremental mode "
+            ~ "(missing column '" ~ col ~ "'). Rebuild it once with:  "
+            ~ "dbt run --full-refresh --select " ~ this.identifier ~ "+  "
+            ~ "(this model and everything downstream), then resume normal runs."
+        ) }}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+{% endmacro %}
