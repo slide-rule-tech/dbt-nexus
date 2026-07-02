@@ -1,12 +1,94 @@
 {{ config(materialized='table') }}
 
 -- Nexus Event Dimensions Metadata
--- Warehouse stats per (dimension_name, source) plus YAML-authored catalog fields.
--- FULL OUTER JOIN surfaces YAML-only dimensions with is_in_data = false.
+-- Warehouse stats per (dimension_name, source) plus catalog fields from the
+-- semantic layer. FULL OUTER JOIN surfaces catalog-only dimensions with
+-- is_in_data = false.
+--
+-- yaml_dimensions source priority:
+--   1. Warehouse: var('nexus').sources.semantic_layers.enabled = true → BBP source
+--   2. Vars: var('nexus').dimensions list (legacy; remove after warehouse verified)
+--   3. Empty CTE (warehouse stats still populate the right side of the FULL OUTER JOIN)
 
+{% set use_warehouse = var('nexus', {}).get('sources', {}).get('semantic_layers', {}).get('enabled', false) %}
 {% set all_dimensions = var('nexus', {}).get('dimensions', []) %}
 
-{% if all_dimensions | length > 0 %}
+{% if use_warehouse %}
+
+-- ── Warehouse path ────────────────────────────────────────────────────────────
+WITH yaml_dimensions AS (
+    with latest as (
+        select _raw_record
+        from {{ source('semantic_layers', 'semantic_layers') }}
+        qualify row_number() over (
+            partition by
+            {% if target.type == 'bigquery' %}
+                json_value(_raw_record, '$.organization_id'),
+                json_value(_raw_record, '$.layer_slug')
+            {% else %}
+                _raw_record:organization_id::string,
+                _raw_record:layer_slug::string
+            {% endif %}
+            order by _ingested_at desc
+        ) = 1
+    )
+
+    {% if target.type == 'bigquery' %}
+    select
+        json_value(d, '$.name') as dimension_name,
+        coalesce(
+            nullif(json_value(d, '$.label'), ''),
+            initcap(replace(json_value(d, '$.name'), '_', ' '))
+        ) as label,
+        json_value(d, '$.description') as description,
+        nullif(
+            array_to_string(
+                array(select json_value(x) from unnest(json_query_array(d, '$.aliases')) as x),
+                ', '
+            ), ''
+        ) as aliases,
+        nullif(
+            array_to_string(
+                array(select json_value(x) from unnest(json_query_array(d, '$.tags')) as x),
+                ', '
+            ), ''
+        ) as tags,
+        nullif(
+            array_to_string(
+                array(select json_value(x) from unnest(json_query_array(d, '$.example_questions')) as x),
+                '; '
+            ), ''
+        ) as example_questions
+    from latest,
+         unnest(json_query_array(_raw_record, '$.layer.dimensions')) as d
+    {% else %}
+    select
+        d.value:name::string as dimension_name,
+        coalesce(
+            nullif(d.value:label::string, ''),
+            initcap(replace(d.value:name::string, '_', ' '))
+        ) as label,
+        d.value:description::string as description,
+        nullif(
+            (select listagg(f.value::string, ', ') from lateral flatten(input => d.value:aliases) f),
+            ''
+        ) as aliases,
+        nullif(
+            (select listagg(f.value::string, ', ') from lateral flatten(input => d.value:tags) f),
+            ''
+        ) as tags,
+        nullif(
+            (select listagg(f.value::string, '; ') from lateral flatten(input => d.value:example_questions) f),
+            ''
+        ) as example_questions
+    from latest,
+         lateral flatten(input => _raw_record:layer:dimensions) d
+    {% endif %}
+),
+
+{% elif all_dimensions | length > 0 %}
+
+-- ── Legacy vars path ──────────────────────────────────────────────────────────
 WITH yaml_dimensions AS (
     {% set ns = namespace(first=true) %}
     {% for dim in all_dimensions %}
@@ -27,7 +109,10 @@ WITH yaml_dimensions AS (
             {% if dim.get('example_questions') %}{{ nexus.metrics_metadata_sql_str(dim.example_questions | join('; ')) }}{% else %}NULL{% endif %} AS example_questions
     {% endfor %}
 ),
+
 {% else %}
+
+-- ── Empty catalog ─────────────────────────────────────────────────────────────
 WITH yaml_dimensions AS (
     {% if target.type == 'bigquery' %}
     SELECT
@@ -49,6 +134,7 @@ WITH yaml_dimensions AS (
     WHERE 1 = 0
     {% endif %}
 ),
+
 {% endif %}
 
 warehouse_stats AS (
