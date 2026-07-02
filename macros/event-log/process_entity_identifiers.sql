@@ -91,6 +91,12 @@
             (select max(_ingested_at) from {{ this }}),
             cast('1970-01-01' as timestamp)
         )
+        -- Batch-level dedup: warehouse merges reject duplicate unique_key
+        -- values within one batch.
+        qualify row_number() over (
+            partition by entity_identifier_id
+            order by _ingested_at desc
+        ) = 1
         {% endif %}
     {% else %}
         {# Return empty result if no relations found #}
