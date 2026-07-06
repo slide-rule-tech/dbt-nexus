@@ -111,9 +111,16 @@ contracted_edges as (
 ),
 
 sym_edges as (
-  select node_a, node_b from contracted_edges
-  union
-  select node_b as node_a, node_a as node_b from contracted_edges
+  -- select distinct over union all rather than bare UNION: BigQuery requires
+  -- an explicit ALL/DISTINCT keyword and Snowflake doesn't accept DISTINCT,
+  -- so this is the only spelling all three adapters share. (Duplicate edges
+  -- would be harmless anyway -- min-label propagation aggregates -- but
+  -- distinct keeps the working set tight.)
+  select distinct node_a, node_b from (
+    select node_a, node_b from contracted_edges
+    union all
+    select node_b as node_a, node_a as node_b from contracted_edges
+  ) both_directions
 ),
 
 -- Min-label propagation over the contracted graph, unrolled at compile time.
