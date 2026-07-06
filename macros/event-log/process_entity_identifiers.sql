@@ -22,18 +22,47 @@
         {% endfor %}
     {% endif %}
 
-    {# Detect whether any source relation carries _ingested_at. Sources that
-       lack it fall back to occurred_at, so the ingestion watermark used by
-       incremental mode degrades gracefully rather than failing to compile. #}
+    {# _ingested_at discipline. The incremental watermark on this table is
+       ONE clock shared across every unioned source: a source emitting rows
+       behind it silently loses them; a source stamping ahead (now(), clock
+       skew) drags the watermark past every OTHER source's upcoming rows.
+       So in incremental mode _ingested_at is a hard per-source requirement
+       -- fail at build time naming the offenders, never mask with a
+       fallback. Table mode keeps the legacy occurred_at fallback: with no
+       watermark there is nothing to corrupt. #}
     {% set ns = namespace(has_ingested_at=false) %}
+    {% set relations_missing_ingested_at = [] %}
     {% if execute %}
         {% for rel in relations_to_union %}
-            {% for col in adapter.get_columns_in_relation(rel) %}
+            {% set rel_cols = adapter.get_columns_in_relation(rel) %}
+            {% set rel_ns = namespace(has_col=false) %}
+            {% for col in rel_cols %}
                 {% if col.name | lower == '_ingested_at' %}
+                    {% set rel_ns.has_col = true %}
                     {% set ns.has_ingested_at = true %}
                 {% endif %}
             {% endfor %}
+            {# Zero columns means the relation isn't built yet (fresh
+               database, dbt compile, partial selection) -- unverifiable now,
+               and execution-time rendering re-checks once upstreams exist.
+               Only a BUILT relation lacking the column is an offense. #}
+            {% if rel_cols | length > 0 and not rel_ns.has_col %}
+                {% do relations_missing_ingested_at.append(rel | string) %}
+            {% endif %}
         {% endfor %}
+        {% if nexus.nexus_incremental_enabled() and relations_missing_ingested_at | length > 0 %}
+            {{ exceptions.raise_compiler_error(
+                "nexus incremental: every source feeding identity resolution must "
+                ~ "expose a stable, non-null _ingested_at column (real ingestion/"
+                ~ "load time -- never occurred_at, never now()). Missing from: "
+                ~ relations_missing_ingested_at | join(", ")
+                ~ ". Fix the source's entity_identifiers model, disable the "
+                ~ "source, or turn off nexus.incremental.enabled. For static/"
+                ~ "seed sources, stamp a data-vintage literal and bump it when "
+                ~ "the data changes (re-offering rows is idempotent). See "
+                ~ "docs/incremental-identity-resolution.md §4.7."
+            ) }}
+        {% endif %}
     {% endif %}
 
     {% if relations_to_union %}
@@ -62,7 +91,13 @@
                 role,
                 source,
                 occurred_at,
-                {% if ns.has_ingested_at %}
+                {% if nexus.nexus_incremental_enabled() %}
+                {# Hard edge: every relation was verified above to carry the
+                   column, and nulls are NOT masked -- a null here is a data
+                   bug surfaced by the packaged not-null test, not silently
+                   rewritten into event time. #}
+                _ingested_at
+                {% elif ns.has_ingested_at %}
                 coalesce(_ingested_at, occurred_at) as _ingested_at
                 {% else %}
                 occurred_at as _ingested_at
