@@ -352,6 +352,20 @@ DAG invocation as the resolver (the default `dbt run` does).
   distinct entities/identifiers linked in one batch would under-merge (the
   next batch touching them heals it, but don't rely on that — raise the var
   if batches are huge).
+- **BigQuery pruning needs literals and a rebuild.** Watermark predicates
+  are inlined as timestamp literals fetched at render time
+  (`nexus_incremental_watermark_literal`) because BigQuery only reliably
+  prunes partitions on constants — a scalar-subquery watermark forces a
+  full scan every run. The incremental tables carry
+  `partition_by(month(_ingested_at | resolved_at_watermark))` +
+  `cluster_by(merge keys)` via the standard `nexus_bq_partition_by` /
+  `nexus_cluster_by` toggles (no-ops off BigQuery). Note dbt cannot
+  repartition an existing table in place: tables built before these configs
+  keep their old layout (and its full-scan merges) until a one-time
+  `--full-refresh` rebuilds them — the upgrade guards do NOT catch this
+  case since no columns are missing. Measured motivation: a zero-row
+  steady-state merge into the unpartitioned SRT identifiers table scanned
+  ~280 MiB.
 - **Full refresh renumbers.** By design (§2.1). Downstream systems holding
   entity_ids must treat a full refresh as an id-migration event; the log's
   new epoch is the migration record.

@@ -1,6 +1,8 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('google_calendar', {}).get('enabled', false),
     materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['event_id']),
     unique_key='event_id',
     on_schema_change='append_new_columns',
     tags=['nexus', 'events', 'google_calendar']
@@ -29,4 +31,3 @@ qualify row_number() over (
     order by _ingested_at desc
 ) = 1
 {% endif %}
-order by occurred_at desc

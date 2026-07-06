@@ -1,6 +1,8 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
     materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['entity_trait_id']),
     unique_key='entity_trait_id',
     on_schema_change='append_new_columns',
     tags=['nexus', 'entity_traits', 'gmail']
@@ -39,4 +41,3 @@ QUALIFY ROW_NUMBER() OVER (
     ORDER BY occurred_at DESC, _ingested_at DESC
 ) = 1
 
-ORDER BY occurred_at DESC

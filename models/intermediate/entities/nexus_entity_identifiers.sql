@@ -1,5 +1,7 @@
 {{ config(
     materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['entity_identifier_id']),
     unique_key='entity_identifier_id',
     on_schema_change='append_new_columns',
     tags=['identity-resolution', 'event-processing', 'entities']
