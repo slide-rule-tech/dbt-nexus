@@ -1,0 +1,39 @@
+name: Guard — no client data in analyses/
+
+# dbt-nexus is a PUBLIC framework repo. `analyses/` must stay empty (only
+# .gitkeep). Client-specific analyses / customer confidential data must never
+# be committed here — they belong in the client's private repo or are run
+# directly against the warehouse. This check fails loudly if anything else
+# shows up under analyses/, on both pull_request and push.
+#
+# Note: on pull_request this runs *after* the PR is opened, so it is a
+# detective/blocking gate, not a preventive one — the authoring-side rule in
+# CLAUDE.md is what stops the file being created in the first place.
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  no-client-analyses:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail if analyses/ contains anything but .gitkeep
+        run: |
+          set -euo pipefail
+          offending=$(git ls-files analyses/ | grep -v '^analyses/\.gitkeep$' || true)
+          if [ -n "$offending" ]; then
+            echo "::error::Client analyses / customer data must never be committed to the public dbt-nexus repo."
+            echo "Only analyses/.gitkeep is permitted. Offending files:"
+            echo "$offending" | sed 's/^/  - /'
+            echo ""
+            echo "Move client-specific analyses to the client's PRIVATE repo, or run them"
+            echo "directly against the warehouse (e.g. the Nexus MCP query_warehouse tool)."
+            echo "See CLAUDE.md for the rule."
+            exit 1
+          fi
+          echo "OK: analyses/ contains only .gitkeep."
