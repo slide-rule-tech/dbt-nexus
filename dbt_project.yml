@@ -41,6 +41,10 @@ vars:
   # Nexus source configuration
 
   nexus:
+    # Incremental identity resolution (experimental, default off).
+    # See docs/incremental-identity-resolution.md before enabling.
+    incremental:
+      enabled: false
     max_recursion: 5
     edge_quality:
       critical_threshold: 50
