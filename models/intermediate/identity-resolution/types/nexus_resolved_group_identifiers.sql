@@ -8,6 +8,7 @@
 {# Uses the unified entity_identifiers/edges tables, filtered to
    entity_type='group' inside the macros. See
    nexus_resolved_person_identifiers.sql for the full/incremental split. #}
+{{ nexus.nexus_incremental_upgrade_guard(['resolved_at_watermark', 'resolution_reason', 'previous_entity_id']) }}
 {% if is_incremental() %}
 {{ nexus.incremental_resolve_identifiers('group', 'nexus_entity_identifiers', 'nexus_entity_identifiers_edges', var('nexus', {}).get('max_recursion') or var('nexus_max_recursion', 5)) }}
 {% else %}

@@ -94,7 +94,8 @@ SELECT
     relationship_type,
     relationship_direction,
     is_active,
-    source
+    source,
+    _ingested_at
 FROM deduplicated_relationships
 WHERE rn = 1
 ORDER BY occurred_at DESC

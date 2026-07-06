@@ -234,8 +234,11 @@ monotonicity + idempotency make the worst case a redundant no-op.
 ### 4.3 Upstream plumbing
 
 - `process_entity_identifiers` / `nexus_entity_identifiers`: now emits
-  `_ingested_at` (falling back to `occurred_at` for sources that lack it) and
-  appends only rows past the watermark in incremental mode.
+  `_ingested_at` and appends only rows past the watermark in incremental
+  mode. In incremental mode every ER-feeding source MUST expose the column —
+  the build fails at compile time naming offenders (§4.7); the legacy
+  `occurred_at` fallback survives only in table mode, where no watermark
+  exists to corrupt.
 - `create_identifier_edges` / `nexus_entity_identifiers_edges`: emits
   `_ingested_at` and `edge_uniqueness_hash`; in incremental mode derives
   edges only from new identifier rows (both endpoints of an edge arrive with
@@ -293,8 +296,17 @@ DAG invocation as the resolver (the default `dbt run` does).
   discovered at compile time (dynamic schema), and the entity dimension is
   small next to the event-grain tables. Spend the incrementality budget where
   the rows are.
-- **Source event-log models**: still full rebuilds. Straightforward
-  append-only incrementals, but orthogonal to identity resolution.
+- **Source event-log models**: the *final* source models for gmail and
+  google_calendar (`<source>_events`, `_entity_identifiers`,
+  `_entity_traits`, `_relationship_declarations`) are now flag-gated
+  incrementals — watermark append via `nexus_incremental_source_filter()`
+  with a unique-key merge (re-synced upstream records overwrite their prior
+  row) and an incremental-only batch dedup (warehouse merges reject
+  duplicate keys within one batch). The base/intermediate layers underneath
+  stay full rebuilds: that is where the raw-scan cost still lives, and
+  incrementalizing them (especially the windowed dedup in `*_base_dedupped`)
+  is a separate cost project. Other package sources (segment) and
+  consumer-local sources follow the same recipe when wanted.
 - **Quarantine / connection-count maintenance** (§7).
 
 ### 4.7 Known edge cases and assumptions
@@ -304,12 +316,29 @@ DAG invocation as the resolver (the default `dbt run` does).
   stragglers sharing the boundary timestamp are skipped. Mitigations: run
   after loads complete, or add a lookback (reprocessing is idempotent).
   A configurable lookback is future work.
-- **The `occurred_at` fallback is a backfill hazard.** Sources without
-  `_ingested_at` use `occurred_at` as the watermark column. For those sources
-  a backfilled old event (old `occurred_at`, arriving today) lands *behind*
-  the watermark and is never processed by the resolver. Safe only if such a
-  source's data arrives in roughly event-time order; give real sources a real
-  `_ingested_at`.
+- **`_ingested_at` is a hard, all-or-nothing requirement across ER
+  sources.** The core union keeps ONE watermark across every
+  `entities: true` source, so the discipline is collective: a source
+  emitting rows *behind* the shared watermark silently loses them (the
+  backfill case — why an `occurred_at` fallback is forbidden in incremental
+  mode), and a source stamping *ahead* of real time (`now()` stamps, clock
+  skew) drags the watermark past every OTHER source's upcoming rows.
+  Enforcement is two-layered: `process_entity_identifiers` fails at compile
+  time naming any enabled ER source whose identifiers model lacks the
+  column, and the packaged
+  `test_incremental_sources_ingested_at_not_null` test catches null values
+  at the sources (a null would fail the watermark predicate and vanish
+  silently — the core table can never witness its own missing rows).
+  Note this is about *timestamp discipline*, not materialization: a source
+  model may stay a full-rebuild `table` forever; only its rows' stamps must
+  be truthful. For static/seed sources with no loader timestamp, stamp a
+  **data-vintage literal** (e.g. the export date, held in a var) and bump it
+  when the data changes — every row is re-offered and monotonicity makes
+  that an idempotent no-op for already-absorbed rows. Package sources:
+  gmail/google_calendar comply; segment does not yet (`segment_events`
+  stamps `current_timestamp()` and the identifiers unpivot drops the column
+  entirely) — enabling segment with incremental mode fails loudly until its
+  real `loaded_at`/`received_at` is threaded through.
 - **The edges table's watermark can idle on pair-free batches.** A batch
   containing only single-identifier events produces no edges, so the edge
   model's own high-water mark doesn't advance and those identifier rows are
@@ -442,3 +471,11 @@ mostly avoid.
   webhooks / reverse-ETL merge calls (trait-change events belong to the same
   pattern once traits are incremental).
 - **Configurable watermark lookback** for loaders with coarse `_ingested_at`.
+- **Per-source watermarks in the core union**, containing a lagging or
+  clock-skewed source's blast radius to itself instead of the shared clock —
+  only fully effective if also threaded through the resolver's watermark,
+  which needs per-source bookkeeping in the mapping; until then, truthful
+  wall-clock stamps are the enforced assumption.
+- **Segment `_ingested_at` compliance**: thread `loaded_at`/`received_at`
+  through `segment_events` and the identifiers unpivot, validated against a
+  real segment warehouse.

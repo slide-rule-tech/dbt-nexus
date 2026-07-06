@@ -16,7 +16,8 @@ participants_with_nexus_event_id AS (
         start_time,
         email,
         domain,
-        role
+        role,
+        _ingested_at
     FROM participants
 ),
 
@@ -28,7 +29,8 @@ participants_with_domains AS (
         start_time,
         email as entity_a_identifier,
         domain as entity_b_identifier,
-        role
+        role,
+        _ingested_at
     FROM participants_with_nexus_event_id
     WHERE email IS NOT NULL
       AND domain IS NOT NULL
@@ -52,7 +54,8 @@ relationships AS (
         'membership' as relationship_type,
         'a_to_b' as relationship_direction,
         true as is_active,
-        'google_calendar' as source
+        'google_calendar' as source,
+        _ingested_at
     FROM participants_with_domains
 )
 
@@ -71,6 +74,7 @@ SELECT
     relationship_type,
     relationship_direction,
     is_active,
-    source
+    source,
+    _ingested_at
 FROM relationships
 ORDER BY occurred_at DESC

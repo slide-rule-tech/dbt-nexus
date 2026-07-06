@@ -1,0 +1,13 @@
+# Scratch DuckDB target for the integration harness. The runner points
+# IT_DB_PATH at a per-scenario file under target/scenarios/ so scenarios are
+# fully isolated and the databases stay around for inspection afterwards.
+nexus_integration_tests:
+  target: duck
+  outputs:
+    duck:
+      type: duckdb
+      path: "{{ env_var('IT_DB_PATH', 'target/it.duckdb') }}"
+      schema: main
+      threads: 4
+      settings:
+        TimeZone: "UTC"
