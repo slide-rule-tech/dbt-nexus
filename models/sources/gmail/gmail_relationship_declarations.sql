@@ -30,4 +30,3 @@ qualify row_number() over (
     order by _ingested_at desc
 ) = 1
 {% endif %}
-order by occurred_at desc

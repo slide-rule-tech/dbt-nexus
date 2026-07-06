@@ -41,4 +41,3 @@ QUALIFY ROW_NUMBER() OVER (
     ORDER BY occurred_at DESC, _ingested_at DESC
 ) = 1
 
-ORDER BY occurred_at DESC
