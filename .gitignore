@@ -239,3 +239,10 @@ pyrightconfig.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,visualstudiocode,dbt,python.DS_Store
+
+# DuckDB databases (integration test harness, local dev targets)
+*.duckdb
+*.duckdb.wal
+
+# dbt user cookie
+.user.yml

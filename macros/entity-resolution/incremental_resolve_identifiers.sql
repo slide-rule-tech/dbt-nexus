@@ -38,6 +38,38 @@
 -- history -- prior components are single nodes here), so the default of 5 is
 -- generous.
 
+{# Empty-delta short-circuit. On BigQuery the unrolled label-propagation
+   pyramid gets fully inlined and planned even when the delta is empty
+   (~70s of slot orchestration for zero rows, observed on the SRT dev
+   drill). A batch with no new identifier rows cannot have new edges either
+   (an edge's endpoints arrive with the same event, and re-derived edges
+   keep their first sighting's _ingested_at), so probe the delta with one
+   cheap count and emit a schema-preserving empty change-set when there is
+   nothing to do. #}
+{% set delta_probe_sql %}
+  select count(*) from {{ ref(identifiers_table) }} ei
+  where ei.entity_type = '{{ entity_type }}'
+    and ei.identifier_value is not null
+    and ei._ingested_at > (
+      select coalesce(max(resolved_at_watermark), cast('1970-01-01' as timestamp))
+      from {{ this }}
+    )
+{% endset %}
+{% if execute %}
+  {% set delta_rows = run_query(delta_probe_sql).columns[0].values()[0] %}
+  {% if delta_rows == 0 %}
+select * from {{ this }} where 1 = 0
+  {% else %}
+{{ nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations) }}
+  {% endif %}
+{% else %}
+{{ nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations) }}
+{% endif %}
+{% endmacro %}
+
+
+{% macro nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations=5) %}
+
 with prior_state as (
   select
     identifier_type,
@@ -111,9 +143,16 @@ contracted_edges as (
 ),
 
 sym_edges as (
-  select node_a, node_b from contracted_edges
-  union
-  select node_b as node_a, node_a as node_b from contracted_edges
+  -- select distinct over union all rather than bare UNION: BigQuery requires
+  -- an explicit ALL/DISTINCT keyword and Snowflake doesn't accept DISTINCT,
+  -- so this is the only spelling all three adapters share. (Duplicate edges
+  -- would be harmless anyway -- min-label propagation aggregates -- but
+  -- distinct keeps the working set tight.)
+  select distinct node_a, node_b from (
+    select node_a, node_b from contracted_edges
+    union all
+    select node_b as node_a, node_a as node_b from contracted_edges
+  ) both_directions
 ),
 
 -- Min-label propagation over the contracted graph, unrolled at compile time.
