@@ -1,6 +1,8 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
     materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['relationship_declaration_id']),
     unique_key='relationship_declaration_id',
     on_schema_change='append_new_columns',
     tags=['nexus', 'relationship_declarations', 'gmail']

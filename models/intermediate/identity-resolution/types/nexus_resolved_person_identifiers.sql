@@ -1,5 +1,7 @@
 {{ config(
     materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('resolved_at_watermark', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['identifier_type', 'identifier_value']),
     unique_key=['identifier_type', 'identifier_value'],
     on_schema_change='append_new_columns',
     tags=['identity-resolution', 'persons'],

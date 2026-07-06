@@ -1,6 +1,8 @@
 {{ config(
     enabled=nexus.nexus_incremental_enabled(),
     materialized='incremental',
+    partition_by=nexus.nexus_bq_partition_by('resolved_at_watermark', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['entity_type', 'resolution_reason']),
     full_refresh=false,
     tags=['identity-resolution'],
 ) }}
@@ -54,8 +56,5 @@ from changes
 -- reobserved-only batches.
 where resolution_reason != 'reobserved'
 {% if is_incremental() %}
-  and resolved_at_watermark > coalesce(
-    (select max(resolved_at_watermark) from {{ this }}),
-    cast('1970-01-01' as timestamp)
-)
+  and resolved_at_watermark > {{ nexus.nexus_incremental_watermark_literal('resolved_at_watermark') }}
 {% endif %}

@@ -44,11 +44,29 @@
    events must still enter (docs/incremental-identity-resolution.md §2.6). #}
 {% macro nexus_incremental_source_filter(column='_ingested_at') %}
   {%- if is_incremental() %}
-where {{ column }} > coalesce(
-    (select max({{ column }}) from {{ this }}),
-    cast('1970-01-01' as timestamp)
-)
+where {{ column }} > {{ nexus.nexus_incremental_watermark_literal(column) }}
   {%- endif %}
+{% endmacro %}
+
+{# Fetch max(column) from a relation (default: {{ this }}) at render time and
+   inline it as a timestamp LITERAL. BigQuery only reliably prunes partitions
+   on constant predicates -- the previous scalar-subquery watermark forced a
+   full scan of the (partitioned) table on every incremental run. The value
+   comes from the table, never the clock, so renders stay deterministic and
+   re-runs idempotent. Falls back to the epoch on empty tables and during
+   parse. #}
+{% macro nexus_incremental_watermark_literal(column, relation=none) %}
+  {%- set rel = relation if relation is not none else this -%}
+  {%- if execute -%}
+    {%- set wm = run_query("select max(" ~ column ~ ") from " ~ rel).columns[0].values()[0] -%}
+    {%- if wm is none -%}
+cast('1970-01-01' as timestamp)
+    {%- else -%}
+cast('{{ wm }}' as timestamp)
+    {%- endif -%}
+  {%- else -%}
+cast('1970-01-01' as timestamp)
+  {%- endif -%}
 {% endmacro %}
 
 {# Upgrade guard for enabling incremental mode over an EXISTING deployment.

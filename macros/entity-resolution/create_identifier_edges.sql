@@ -29,10 +29,7 @@ with unpivoted as (
   -- mark. Both endpoints of an edge come from the same event (same edge_id),
   -- so they always arrive in the same batch -- filtering the unpivoted rows
   -- filters whole edges, never half of one.
-  where _ingested_at > coalesce(
-      (select max(_ingested_at) from {{ this }}),
-      cast('1970-01-01' as timestamp)
-  )
+  where _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
   {% endif %}
 ),
 

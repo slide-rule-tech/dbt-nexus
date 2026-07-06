@@ -46,29 +46,31 @@
    keep their first sighting's _ingested_at), so probe the delta with one
    cheap count and emit a schema-preserving empty change-set when there is
    nothing to do. #}
+{# The watermark is fetched once at render time and inlined as a literal
+   everywhere (probe, delta filters): BigQuery only reliably prunes
+   partitions on constant predicates, and a single read also guarantees the
+   probe and the body agree on the cutoff. #}
+{% set wm_literal = nexus.nexus_incremental_watermark_literal('resolved_at_watermark') %}
 {% set delta_probe_sql %}
   select count(*) from {{ ref(identifiers_table) }} ei
   where ei.entity_type = '{{ entity_type }}'
     and ei.identifier_value is not null
-    and ei._ingested_at > (
-      select coalesce(max(resolved_at_watermark), cast('1970-01-01' as timestamp))
-      from {{ this }}
-    )
+    and ei._ingested_at > {{ wm_literal }}
 {% endset %}
 {% if execute %}
   {% set delta_rows = run_query(delta_probe_sql).columns[0].values()[0] %}
   {% if delta_rows == 0 %}
 select * from {{ this }} where 1 = 0
   {% else %}
-{{ nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations) }}
+{{ nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations, wm_literal) }}
   {% endif %}
 {% else %}
-{{ nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations) }}
+{{ nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations, wm_literal) }}
 {% endif %}
 {% endmacro %}
 
 
-{% macro nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations=5) %}
+{% macro nexus_incremental_resolve_identifiers_body(entity_type, identifiers_table, edges_table, max_iterations=5, wm_literal="cast('1970-01-01' as timestamp)") %}
 
 with prior_state as (
   select
@@ -78,17 +80,12 @@ with prior_state as (
   from {{ this }}
 ),
 
-prior_watermark as (
-  select coalesce(max(resolved_at_watermark), cast('1970-01-01' as timestamp)) as wm
-  from {{ this }}
-),
-
 delta_identifiers as (
   select ei.*
   from {{ ref(identifiers_table) }} ei
   where ei.entity_type = '{{ entity_type }}'
     and ei.identifier_value is not null
-    and ei._ingested_at > (select wm from prior_watermark)
+    and ei._ingested_at > {{ wm_literal }}
 ),
 
 batch_watermark as (
@@ -100,7 +97,7 @@ delta_edges as (
   from {{ ref(edges_table) }} e
   where e.entity_type_a = '{{ entity_type }}'
     and e.entity_type_b = '{{ entity_type }}'
-    and e._ingested_at > (select wm from prior_watermark)
+    and e._ingested_at > {{ wm_literal }}
 ),
 
 -- Contraction: every distinct identifier in the batch becomes a graph node.

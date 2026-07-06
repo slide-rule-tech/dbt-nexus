@@ -122,10 +122,7 @@
         -- Incremental mode: only rows ingested after the high-water mark.
         -- Watermark is on ingestion time, never occurred_at -- late-arriving
         -- events (old occurred_at, new _ingested_at) must still enter.
-        where _ingested_at > coalesce(
-            (select max(_ingested_at) from {{ this }}),
-            cast('1970-01-01' as timestamp)
-        )
+        where _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
         -- Batch-level dedup: warehouse merges reject duplicate unique_key
         -- values within one batch.
         qualify row_number() over (
