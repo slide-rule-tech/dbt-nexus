@@ -7,7 +7,7 @@
 -- Extract calendar events from normalized google_calendar_events
 SELECT
     {{ nexus.create_nexus_id('event', ['event_id']) }} as event_id,
-    start_time as occurred_at,
+    instance_start as occurred_at,
     CASE 
         WHEN has_external_attendees THEN 'external_meeting'
         ELSE 'internal_meeting'

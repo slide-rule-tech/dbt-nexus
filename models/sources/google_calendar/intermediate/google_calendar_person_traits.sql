@@ -15,7 +15,7 @@ participants_with_event_id AS (
         event_id,
         email,
         name,
-        start_time,
+        instance_start,
         _ingested_at,
         role
     FROM participants
@@ -32,7 +32,7 @@ name_traits AS (
         'name' as trait_name,
         name as trait_value,
         'google_calendar' as source,
-        start_time as occurred_at,
+        instance_start as occurred_at,
         _ingested_at
     FROM participants_with_event_id
     WHERE name IS NOT NULL
@@ -49,7 +49,7 @@ name_traits AS (
         'email' as trait_name,
         email as trait_value,
         'google_calendar' as source,
-        start_time as occurred_at,
+        instance_start as occurred_at,
         _ingested_at
     FROM participants_with_event_id
     WHERE email IS NOT NULL

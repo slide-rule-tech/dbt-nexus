@@ -13,7 +13,7 @@ participants_with_nexus_event_id AS (
     SELECT
         {{ nexus.create_nexus_id('event', ['event_id']) }} as nexus_event_id,
         event_id,
-        start_time,
+        instance_start,
         _ingested_at,
         domain
     FROM participants
@@ -24,7 +24,7 @@ domains_filtered AS (
     SELECT DISTINCT
         nexus_event_id,
         event_id,
-        start_time,
+        instance_start,
         _ingested_at,
         domain
     FROM participants_with_nexus_event_id
@@ -44,7 +44,7 @@ domain_traits AS (
         'domain' as trait_name,
         domain as trait_value,
         'google_calendar' as source,
-        start_time as occurred_at,
+        instance_start as occurred_at,
         _ingested_at
     FROM domains_filtered
     WHERE domain IS NOT NULL
