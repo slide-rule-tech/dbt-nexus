@@ -13,7 +13,7 @@ participants_with_nexus_event_id AS (
     SELECT
         {{ nexus.create_nexus_id('event', ['event_id']) }} as nexus_event_id,
         event_id,
-        start_time,
+        instance_start,
         _ingested_at,
         domain,
         role
@@ -25,7 +25,7 @@ domains_filtered AS (
     SELECT DISTINCT
         nexus_event_id,
         event_id,
-        start_time,
+        instance_start,
         _ingested_at,
         domain,
         role
@@ -37,14 +37,14 @@ domains_filtered AS (
 -- Create domain identifiers
 domain_identifiers AS (
     SELECT
-        {{ nexus.create_nexus_id('entity_identifier', ['nexus_event_id', 'domain', "'group'", 'role', 'start_time']) }} as entity_identifier_id,
+        {{ nexus.create_nexus_id('entity_identifier', ['nexus_event_id', 'domain', "'group'", 'role', 'instance_start']) }} as entity_identifier_id,
         nexus_event_id as event_id,
         {{ nexus.create_nexus_id('edge', ['nexus_event_id', 'domain', "'group'", 'role']) }} as edge_id,
         'group' as entity_type,
         'domain' as identifier_type,
         domain as identifier_value,
         'google_calendar' as source,
-        start_time as occurred_at,
+        instance_start as occurred_at,
         _ingested_at,
         role
     FROM domains_filtered
@@ -54,14 +54,14 @@ domain_identifiers AS (
 -- Add redirected domains (www. versions)
 redirected_domains AS (
     SELECT
-        {{ nexus.create_nexus_id('entity_identifier', ['nexus_event_id', nexus.redirected_domain('domain'), "'group'", 'role', 'start_time']) }} as entity_identifier_id,
+        {{ nexus.create_nexus_id('entity_identifier', ['nexus_event_id', nexus.redirected_domain('domain'), "'group'", 'role', 'instance_start']) }} as entity_identifier_id,
         nexus_event_id as event_id,
         {{ nexus.create_nexus_id('edge', ['nexus_event_id', nexus.redirected_domain('domain'), "'group'", 'role']) }} as edge_id,
         'group' as entity_type,
         'domain' as identifier_type,
         {{ nexus.redirected_domain('domain') }} as identifier_value,
         'google_calendar' as source,
-        start_time as occurred_at,
+        instance_start as occurred_at,
         _ingested_at,
         role
     FROM domains_filtered

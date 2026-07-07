@@ -14,7 +14,7 @@ participants_with_event_id AS (
         {{ nexus.create_nexus_id('event', ['event_id']) }} as nexus_event_id,
         event_id,
         email,
-        start_time,
+        instance_start,
         _ingested_at,
         role
     FROM participants
@@ -30,7 +30,7 @@ identifiers AS (
         'email' as identifier_type,
         email as identifier_value,
         'google_calendar' as source,
-        start_time as occurred_at,
+        instance_start as occurred_at,
         _ingested_at,
         role
     FROM participants_with_event_id

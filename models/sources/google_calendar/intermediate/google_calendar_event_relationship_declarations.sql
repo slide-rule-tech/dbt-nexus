@@ -13,7 +13,7 @@ participants_with_nexus_event_id AS (
     SELECT
         {{ nexus.create_nexus_id('event', ['event_id']) }} as nexus_event_id,
         event_id,
-        start_time,
+        instance_start,
         email,
         domain,
         role,
@@ -26,7 +26,7 @@ participants_with_domains AS (
     SELECT
         nexus_event_id,
         event_id,
-        start_time,
+        instance_start,
         email as entity_a_identifier,
         domain as entity_b_identifier,
         role,
@@ -42,7 +42,7 @@ participants_with_domains AS (
 relationships AS (
     SELECT DISTINCT
         nexus_event_id as event_id,
-        start_time as occurred_at,
+        instance_start as occurred_at,
         entity_a_identifier,
         'email' as entity_a_identifier_type,
         'person' as entity_a_type,
