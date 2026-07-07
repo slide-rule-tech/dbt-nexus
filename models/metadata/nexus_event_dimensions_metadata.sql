@@ -69,18 +69,9 @@ WITH yaml_dimensions AS (
             initcap(replace(d.value:name::string, '_', ' '))
         ) as label,
         d.value:description::string as description,
-        nullif(
-            (select listagg(f.value::string, ', ') from lateral flatten(input => d.value:aliases) f),
-            ''
-        ) as aliases,
-        nullif(
-            (select listagg(f.value::string, ', ') from lateral flatten(input => d.value:tags) f),
-            ''
-        ) as tags,
-        nullif(
-            (select listagg(f.value::string, '; ') from lateral flatten(input => d.value:example_questions) f),
-            ''
-        ) as example_questions
+        nullif(array_to_string(d.value:aliases::array, ', '), '') as aliases,
+        nullif(array_to_string(d.value:tags::array, ', '), '') as tags,
+        nullif(array_to_string(d.value:example_questions::array, '; '), '') as example_questions
     from latest,
          lateral flatten(input => _raw_record:layer:dimensions) d
     {% endif %}
