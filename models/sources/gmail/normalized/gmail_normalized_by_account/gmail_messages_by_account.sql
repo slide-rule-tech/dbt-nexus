@@ -1,12 +1,25 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['gmail_message_id']),
+    unique_key=['gmail_message_id', '_account'],
+    on_schema_change='append_new_columns',
     tags=['gmail', 'normalized', 'by_account']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'gmail_message_id']) }}
 
 {% set internal_domains = var('internal_domains', []) %}
 {% set filter_internal_only_messages = var('nexus', {}).get('sources', {}).get('gmail', {}).get('filter_internal_only_messages', false) %}
 {% set should_filter_internal_only_messages = filter_internal_only_messages and (internal_domains | length > 0) %}
+{% if is_incremental() %}
+{# ONE literal shared by both batch filters below: source_data and
+   participant_domain_summary propagate the same base row's _ingested_at,
+   so a single watermark guarantees the domain summary covers exactly the
+   batch's messages. #}
+{% set wm = nexus.nexus_incremental_watermark_literal('_ingested_at') %}
+{% endif %}
 
 -- Per-account normalization: Clean messages using gmail_message_id (not cross-account)
 -- Extracts data from new STANDARD_TABLE_SCHEMA with _raw_record and headers array
@@ -21,6 +34,9 @@ WITH source_data AS (
         _sync_metadata,
         _raw_record
     FROM {{ ref('gmail_messages_base_dedupped') }}
+    {% if is_incremental() %}
+    WHERE _ingested_at > {{ wm }}
+    {% endif %}
 ),
 
 -- Extract headers for message-level data only
@@ -92,6 +108,9 @@ participant_domain_summary AS (
         COUNT(*) as external_participant_count
         {% endif %}
     FROM {{ ref('gmail_message_participants_by_account') }}
+    {% if is_incremental() %}
+    WHERE _ingested_at > {{ wm }}
+    {% endif %}
     GROUP BY gmail_message_id, _account
 ),
 
@@ -207,5 +226,4 @@ filtered_message AS (
 
 
 SELECT * FROM filtered_message
-ORDER BY sent_at ASC
 

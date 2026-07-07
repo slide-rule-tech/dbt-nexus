@@ -1,12 +1,21 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('google_calendar', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['entity_trait_id']),
+    unique_key='entity_trait_id',
+    on_schema_change='append_new_columns',
     tags=['nexus', 'google_calendar', 'intermediate', 'person_traits']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'entity_trait_id']) }}
 
 -- Extract person traits from google calendar event participants
 WITH participants AS (
     SELECT * FROM {{ ref('google_calendar_event_participants') }}
+    {% if is_incremental() %}
+    WHERE _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+    {% endif %}
 ),
 
 participants_with_event_id AS (
@@ -72,4 +81,3 @@ deduplicated AS (
 )
 
 SELECT * FROM deduplicated
-ORDER BY occurred_at DESC

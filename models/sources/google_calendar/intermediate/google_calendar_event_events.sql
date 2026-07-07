@@ -1,8 +1,14 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('google_calendar', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['event_id']),
+    unique_key='event_id',
+    on_schema_change='append_new_columns',
     tags=['nexus', 'google_calendar', 'intermediate', 'events']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'event_id']) }}
 
 -- Extract calendar events from normalized google_calendar_events
 SELECT
@@ -35,3 +41,6 @@ SELECT
     is_recurring
 FROM {{ ref('google_calendar_events_normalized') }}
 WHERE start_time IS NOT NULL
+{% if is_incremental() %}
+  AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+{% endif %}

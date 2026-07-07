@@ -62,6 +62,7 @@ SCENARIO_DB_DIR = IT_DIR / "target" / "scenarios"
 RUN_SELECT = [
     "--select",
     "+nexus_resolution_log",
+    "+nexus_entity_participants",
     "+it_shadow_resolved_person",
     "+it_shadow_resolved_group",
 ]

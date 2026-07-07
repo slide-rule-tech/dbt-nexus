@@ -1,13 +1,38 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['gmail_thread_id', '_account']),
+    unique_key=['gmail_thread_id', '_account', '_stream_id'],
+    on_schema_change='append_new_columns',
     tags=['gmail', 'normalized', 'by_account']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_watermark_ingested_at', 'gmail_thread_id']) }}
+
+{% set group_keys = ['gmail_thread_id', '_account', '_stream_id'] %}
+
 -- Per-account normalized threads: Aggregate messages by gmail_thread_id (per account)
 -- Uses Gmail's native thread_id for per-account threading
-WITH messages AS (
-    SELECT * FROM {{ ref('gmail_messages_by_account') }}
+--
+-- Touched-group rollup (see nexus_incremental_touched_groups.sql): children
+-- are append-only, so touched groups can only grow; recomputing them from
+-- full upstream and merging on the output grain needs no delete leg. Two
+-- scans by design: (1) batch scan for touched keys (partition-pruned via
+-- the constant watermark literal), (2) full-history scan joined to touched
+-- keys — compute and write shrink to the touched groups' children.
+WITH
+{% if is_incremental() %}
+touched_groups AS (
+    {{ nexus.nexus_incremental_touched_groups(ref('gmail_messages_by_account'), group_keys) }}
+),
+{% endif %}
+messages AS (
+    SELECT m.* FROM {{ ref('gmail_messages_by_account') }} m
+    {% if is_incremental() %}
+    INNER JOIN touched_groups tg
+    {{ nexus.nexus_incremental_touched_join('m', 'tg', group_keys) }}
+    {% endif %}
 ),
 
 thread_summary AS (
@@ -79,6 +104,7 @@ SELECT
     ts.root_gmail_message_id,
     ts.first_message_id_header,
     ts.first_ingested_at as _ingested_at,
+    ts.last_ingested_at as _watermark_ingested_at,
     ts._account,
     ts._stream_id,
     tl.label_ids
@@ -87,5 +113,4 @@ LEFT JOIN thread_labels tl
     ON ts.gmail_thread_id = tl.gmail_thread_id
     AND ts._account = tl._account
     AND ts._stream_id = tl._stream_id
-ORDER BY ts.last_message_sent_at DESC
 

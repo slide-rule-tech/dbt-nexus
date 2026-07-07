@@ -1,10 +1,23 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['event_id']),
+    unique_key='event_id',
+    on_schema_change='append_new_columns',
     tags=['gmail', 'intermediate', 'events']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'event_id']) }}
+
 {% set bodies_enabled = var('nexus', {}).get('sources', {}).get('gmail', {}).get('bodies', false) %}
+{% if bodies_enabled and nexus.nexus_incremental_enabled() %}
+{# A body fetched AFTER its message was absorbed never re-offers the row
+   (bodies ride fetched_at, not _ingested_at), so the joined body columns
+   would freeze as NULL forever. No client runs this combination; make it
+   impossible to hit silently. #}
+{{ exceptions.raise_compiler_error("gmail bodies + nexus.incremental.enabled is not supported yet: late-fetched bodies never re-offer their message row. Disable one of the two.") }}
+{% endif %}
 
 -- Extract message events from normalized gmail messages
 SELECT
@@ -59,5 +72,8 @@ FROM {{ ref('gmail_messages') }} m
 {% if bodies_enabled %}
 LEFT JOIN {{ ref('gmail_message_bodies') }} b
     ON m.message_id = b.message_id_header
+{% endif %}
+{% if is_incremental() %}
+WHERE m._ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
 {% endif %}
 

@@ -471,7 +471,72 @@ supported via `install_duckdb_compat`); a thin nightly cross-adapter smoke
 run on BigQuery/Snowflake covers dialect quirks the algorithm's plain joins
 mostly avoid.
 
-## 7. Future work
+## 7. v0.13: incremental source layers + core event log
+
+v0.12 made identity resolution incremental; v0.13 extends the same watermark
+discipline to everything around it. The package is now **incremental-native**:
+converted models are written the clean way (no trailing ORDER BYs, watermark
+columns emitted unconditionally); `nexus.incremental.enabled` remains only as
+the materialization switch and the ER-mode switch. **Upgrade contract:** a
+client bumping to v0.13 runs one `--full-refresh` (the upgrade guards turn any
+missed model into a loud error naming the fix).
+
+### 7.1 Append-class conversions
+
+Per-row source models (gmail/gcal normalized + intermediates) follow the
+finals recipe verbatim: `nexus_incremental_materialization()` + `unique_key` +
+`nexus_incremental_upgrade_guard` + a single `_ingested_at >` watermark filter
+in the first CTE that reads the upstream + batch-scoped dedup. One shared
+watermark literal must filter EVERY upstream read in the model (see
+`gmail_messages_by_account`, which filters both its message scan and its
+same-grain participant summary with one literal).
+
+### 7.2 Touched-group rollups
+
+GROUP BY models (`gmail_threads_by_account`, `gmail_messages`,
+`gmail_thread_participants`, …) can't append: a new child invalidates its
+whole group, and the rollup's own `_ingested_at` is MIN/MAX of the group.
+Pattern (macros in `nexus_incremental_touched_groups.sql`;
+`gmail_threads_by_account` is the reference conversion):
+
+1. every rollup emits `_watermark_ingested_at = MAX(child _ingested_at)` per
+   group — the reliable cursor;
+2. incremental runs compute the distinct touched group keys (upstream rows
+   past the cursor), widened where group attributes route through other
+   rollups (`gmail_messages` unions in ALL messages of touched threads);
+3. the unchanged aggregation runs over full upstream inner-joined to the
+   touched keys; dbt merges on the OUTPUT-grain unique key. No delete leg:
+   children are append-only, so groups only grow. Known caveat: a
+   late-arriving thread root re-keys its group — the old-key row lingers
+   until the next full refresh.
+
+**Rollup-child clock rule:** any model consuming a rollup must use the
+rollup's `_watermark_ingested_at` as its batch clock and re-stamp its own
+`_ingested_at` from it (`gmail_thread_events` — this also fixed a live v0.12
+bug where thread events froze at first sight).
+
+### 7.3 Core event log
+
+- `nexus_events`, `nexus_event_measurements_unioned`,
+  `nexus_event_dimensions_unioned`: the finals recipe over the source unions,
+  with `nexus_incremental_require_ingested_at()` enforcing at compile time
+  that every unioned client model exposes `_ingested_at` (a union sharing one
+  watermark silently drops rows from a source without it). The dimension/
+  measurement pivot finals stay full rebuilds (small, and rebuilding avoids
+  NULL-backfill divergence when new `is_*` columns appear).
+- `nexus_entity_participants`: two legs (macros in
+  `incremental_finalize_participants.sql`). The APPEND leg processes batch
+  identifier rows against the current resolved mapping;
+  `entity_participant_id` is stable at birth. The REPOINT leg consumes
+  `nexus_resolution_log` `repointed` rows past the table's own
+  `_resolution_log_watermark` cursor and updates `entity_id` in place —
+  joining log rows to the CURRENT resolved tables makes it self-healing
+  across batches (an unconsumed A→B followed by B→C resolves A directly to
+  C). Accepted divergence: post-merge, a (event, entity, role) grain can
+  briefly hold two rows under distinct ids; parity checks compare on the
+  DISTINCT grain (`it_participants_mapping_parity`).
+
+## 8. Future work
 
 - **Quarantine-on-entry noise filtering**: an incrementally-maintained
   per-identifier connection-count aggregate; identifiers crossing thresholds

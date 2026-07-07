@@ -1,9 +1,18 @@
 {{ config(
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
     partition_by=nexus.nexus_bq_partition_by('occurred_at', granularity='month'),
     cluster_by=nexus.nexus_cluster_by(['event_name', 'source']),
+    unique_key='event_id',
+    on_schema_change='append_new_columns',
     post_hook=nexus.nexus_bq_informational_constraints(primary_key='event_id'),
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'event_id']) }}
+
+{# Partitioning stays on occurred_at (downstream reads prune on event time).
+   The incremental watermark predicate prunes the UPSTREAM source finals,
+   which are partitioned on _ingested_at — this table's own scan cost is the
+   merge target only. #}
 
 {# Monthly (not daily) partitioning on occurred_at: event history in
    real tenants commonly spans more than the 4000-partition BigQuery
@@ -111,6 +120,8 @@
     {% endif %}
 {% endfor %}
 
+{{ nexus.nexus_incremental_require_ingested_at(relations_to_union, 'nexus_events') }}
+
 WITH unioned AS (
     {{ dbt_utils.union_relations(
         relations=relations_to_union,
@@ -140,11 +151,7 @@ SELECT
     {{ processed_columns | join(',\n    ') }},
     current_timestamp() as _processed_at
 FROM unioned
-{# BigQuery rejects `ORDER BY` in a CTAS that uses `partition_by`.
-   The ORDER BY at write time was never load-bearing for downstream
-   consumers — BigQuery and Snowflake both re-sort at read time when
-   needed — so we drop it whenever partitioning is on. Without
-   partitioning, preserve the historical ordering hint. #}
-{% if not (nexus.nexus_warehouse_optimization_enabled() and target.type == 'bigquery') %}
-ORDER BY occurred_at DESC
+{% if is_incremental() %}
+WHERE _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+QUALIFY row_number() OVER (PARTITION BY event_id ORDER BY _ingested_at DESC) = 1
 {% endif %}

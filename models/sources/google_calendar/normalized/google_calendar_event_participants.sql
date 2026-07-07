@@ -1,8 +1,14 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('google_calendar', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['event_id']),
+    unique_key=['event_id', 'email', 'role'],
+    on_schema_change='append_new_columns',
     tags=['google_calendar', 'normalized']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'event_id']) }}
 
 -- Normalized participants: Extract, parse, and normalize all participants (organizer, creator, attendees) from Google Calendar events
 -- Creates one row per participant per event, with role indicating "organizer", "creator", or "attendee"
@@ -39,6 +45,9 @@ WITH source_data AS (
         _raw_record
     FROM {{ ref('google_calendar_events_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+    {% if is_incremental() %}
+      AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+    {% endif %}
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
 ),
 
@@ -232,11 +241,8 @@ SELECT
     start_time,
     _ingested_at
 FROM participants_combined
-ORDER BY event_id, 
-    CASE role 
-        WHEN 'organizer' THEN 1
-        WHEN 'creator' THEN 2
-        WHEN 'attendee' THEN 3
-    END,
-    normalized_email
-
+{# The raw feed can repeat an attendee within one event (no dedup existed
+   here historically); the merge needs one row per unique_key per batch. #}
+{% if is_incremental() %}
+QUALIFY row_number() OVER (PARTITION BY event_id, normalized_email, role ORDER BY _ingested_at DESC) = 1
+{% endif %}

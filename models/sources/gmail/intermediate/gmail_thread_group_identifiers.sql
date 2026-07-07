@@ -1,12 +1,22 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['entity_identifier_id']),
+    unique_key='entity_identifier_id',
+    on_schema_change='append_new_columns',
     tags=['gmail', 'intermediate', 'group_identifiers']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'entity_identifier_id']) }}
 
 -- Extract group (domain) identifiers from gmail thread participants
 WITH participants AS (
     SELECT * FROM {{ ref('gmail_thread_participants') }}
+    {% if is_incremental() %}
+    -- rollup-child clock: the upstream's _ingested_at is a frozen MIN
+    WHERE _watermark_ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+    {% endif %}
 ),
 
 -- Filter out generic domains
@@ -15,7 +25,7 @@ domains_filtered AS (
         {{ nexus.create_nexus_id('event', ['thread_id', "'thread started'"]) }} as event_id,
         thread_id,
         first_participated_at,
-        _ingested_at,
+        _watermark_ingested_at as _ingested_at,
         domain,
         roles
     FROM participants
@@ -33,7 +43,7 @@ domains_with_roles AS (
         domain,
         role
     FROM domains_filtered,
-    UNNEST(roles) as role
+    UNNEST(roles) as {% if target.type == 'duckdb' %}t(role){% else %}role{% endif %}
 ),
 
 -- Create domain identifiers
@@ -109,5 +119,3 @@ SELECT
     role
 FROM deduplicated_identifiers
 WHERE rn = 1
-ORDER BY occurred_at DESC
-

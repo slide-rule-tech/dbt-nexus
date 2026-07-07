@@ -47,6 +47,13 @@
   {%- set statements = [] -%}
 
   {%- if primary_key -%}
+    {# PRIMARY KEY has no IF NOT EXISTS in BigQuery (unlike named FK
+       constraints), and on incremental models the table persists across
+       runs — a bare ADD collides on run 2. DROP IF EXISTS + ADD is the
+       idempotent pair. #}
+    {%- do statements.append(
+      'ALTER TABLE {{ this }} DROP PRIMARY KEY IF EXISTS'
+    ) -%}
     {%- do statements.append(
       'ALTER TABLE {{ this }} ADD PRIMARY KEY (' ~ primary_key ~ ') NOT ENFORCED'
     ) -%}
