@@ -89,33 +89,18 @@ select
     m.value:model::string as model,
     m.value:name::string as metric_name,
     m.value:label::string as label,
-    nullif(
-        (select listagg(f.value::string, ', ') from lateral flatten(input => m.value:aliases) f),
-        ''
-    ) as aliases,
+    nullif(array_to_string(m.value:aliases::array, ', '), '') as aliases,
     m.value:type::string as metric_type,
-    nullif(
-        (select listagg(f.value::string, ', ') from lateral flatten(input => m.value:tables) f),
-        ''
-    ) as tables,
+    nullif(array_to_string(m.value:tables::array, ', '), '') as tables,
     m.value:metric_sql::string as metric_sql,
-    nullif(
-        (select listagg(f.value::string, ' AND ') from lateral flatten(input => m.value:filter) f),
-        ''
-    ) as filter,
+    nullif(array_to_string(m.value:filter::array, ' AND '), '') as filter,
     m.value:format::string as format,
     m.value:unit::string as unit,
     m.value:polarity::string as polarity,
     m.value:precision::integer as precision,
-    nullif(
-        (select listagg(f.value::string, ', ') from lateral flatten(input => m.value:tags) f),
-        ''
-    ) as tags,
+    nullif(array_to_string(m.value:tags::array, ', '), '') as tags,
     m.value:description::string as description,
-    nullif(
-        (select listagg(f.value::string, '; ') from lateral flatten(input => m.value:example_questions) f),
-        ''
-    ) as example_questions
+    nullif(array_to_string(m.value:example_questions::array, '; '), '') as example_questions
 from latest,
      lateral flatten(input => _raw_record:layer:metrics) m
 
