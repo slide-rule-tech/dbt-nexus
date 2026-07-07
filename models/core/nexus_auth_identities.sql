@@ -18,6 +18,12 @@
   override this default.
 #}
 
+{#
+  Both ref('nexus_entities') uses below live inside conditional blocks, so
+  dbt can't statically infer the dependency — declare it explicitly.
+#}
+-- depends_on: {{ ref('nexus_entities') }}
+
 {% set entity_columns = [] %}
 {% if execute %}
     {% set entity_columns = adapter.get_columns_in_relation(ref('nexus_entities'))
