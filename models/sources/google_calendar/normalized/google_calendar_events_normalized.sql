@@ -1,8 +1,14 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('google_calendar', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['event_id']),
+    unique_key='event_id',
+    on_schema_change='append_new_columns',
     tags=['google_calendar', 'normalized']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'event_id']) }}
 
 -- Normalized layer: Clean, deduplicated events with explicit columns
 -- Extracts data from new STANDARD_TABLE_SCHEMA with _raw_record
@@ -22,6 +28,9 @@ WITH source_data AS (
     FROM {{ ref('google_calendar_events_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
+    {% if is_incremental() %}
+      AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+    {% endif %}
 ),
 
 extracted AS (
@@ -156,5 +165,3 @@ SELECT
 FROM with_composite_key
 -- Deduplication: keep latest event per event_key (iCalUID for single, iCalUID + instanceStart for recurring)
 QUALIFY row_number() OVER (PARTITION BY event_key ORDER BY _ingested_at DESC) = 1
-ORDER BY start_time DESC
-

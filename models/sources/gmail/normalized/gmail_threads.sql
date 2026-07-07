@@ -1,12 +1,40 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['thread_id']),
+    unique_key='thread_id',
+    on_schema_change='append_new_columns',
     tags=['gmail', 'normalized']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_watermark_ingested_at', 'thread_id']) }}
+
 -- Cross-account normalized threads: Group per-account threads by first_message_id_header
-WITH per_account_threads AS (
+--
+-- Touched-group rollup. Child clock = the upstream rollup's
+-- _watermark_ingested_at (its _ingested_at is a frozen MIN). Known no-delete
+-- caveat: the group key IS first_message_id_header, so a late-arriving
+-- earlier message re-keys its thread — the new-key row is emitted correctly
+-- and the stale old-key row lingers until the next --full-refresh.
+WITH per_account_threads_all AS (
     SELECT * FROM {{ ref('gmail_threads_by_account') }}
+),
+
+{% if is_incremental() %}
+touched_thread_keys AS (
+    SELECT DISTINCT first_message_id_header
+    FROM per_account_threads_all
+    WHERE _watermark_ingested_at > {{ nexus.nexus_incremental_watermark_literal('_watermark_ingested_at') }}
+      AND first_message_id_header IS NOT NULL
+),
+{% endif %}
+
+per_account_threads AS (
+    SELECT t.* FROM per_account_threads_all t
+    {% if is_incremental() %}
+    INNER JOIN touched_thread_keys tk ON t.first_message_id_header = tk.first_message_id_header
+    {% endif %}
 ),
 
 grouped as (
@@ -43,6 +71,7 @@ grouped as (
             '}'
         ) as label_ids,
         MIN(_ingested_at) as _ingested_at,
+        MAX(_watermark_ingested_at) as _watermark_ingested_at,
     FROM per_account_threads
     WHERE first_message_id_header IS NOT NULL
     GROUP BY first_message_id_header
@@ -76,8 +105,8 @@ SELECT
     g.gmail_thread_ids,
     g.label_ids,
     al.all_label_ids,
-    g._ingested_at
+    g._ingested_at,
+    g._watermark_ingested_at
 FROM grouped g
 LEFT JOIN all_labels al
     ON g.thread_id = al.first_message_id_header
-ORDER BY g.last_message_sent_at DESC

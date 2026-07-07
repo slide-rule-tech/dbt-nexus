@@ -1,12 +1,21 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['relationship_declaration_id']),
+    unique_key='relationship_declaration_id',
+    on_schema_change='append_new_columns',
     tags=['gmail', 'intermediate', 'relationship_declarations']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'relationship_declaration_id']) }}
 
 -- Extract person→group relationships from gmail message participants
 WITH participants AS (
     SELECT * FROM {{ ref('gmail_message_participants') }}
+    {% if is_incremental() %}
+    WHERE _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+    {% endif %}
 ),
 
 -- Extract participants with valid email and domain (filter generic domains)
@@ -98,4 +107,3 @@ SELECT
     _ingested_at
 FROM deduplicated_relationships
 WHERE rn = 1
-ORDER BY occurred_at DESC

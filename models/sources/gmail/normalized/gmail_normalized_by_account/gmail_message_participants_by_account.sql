@@ -1,8 +1,14 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['gmail_message_id']),
+    unique_key=['gmail_message_id', '_account', 'email', 'role'],
+    on_schema_change='append_new_columns',
     tags=['gmail', 'normalized', 'by_account']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'gmail_message_id']) }}
 
 -- Per-account normalized participants: Extract, parse, and normalize all participants (senders and recipients) from Gmail messages
 -- Creates one row per participant per message, with role indicating "sender", "recipient", "cced", or "bcced"
@@ -16,6 +22,9 @@ WITH source_data AS (
         _raw_record
     FROM {{ ref('gmail_messages_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+    {% if is_incremental() %}
+    AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+    {% endif %}
 ),
 
 -- Extract headers (message-id, from, to, cc, bcc)
@@ -257,4 +266,3 @@ ORDER BY gmail_message_id,
 )
 
 select * from final
-order by sent_at desc

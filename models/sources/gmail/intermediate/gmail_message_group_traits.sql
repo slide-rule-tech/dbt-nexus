@@ -1,12 +1,21 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['entity_trait_id']),
+    unique_key='entity_trait_id',
+    on_schema_change='append_new_columns',
     tags=['gmail', 'intermediate', 'group_traits']
 ) }}
+
+{{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'entity_trait_id']) }}
 
 -- Extract group (domain) traits from gmail message participants
 WITH participants AS (
     SELECT * FROM {{ ref('gmail_message_participants') }}
+    {% if is_incremental() %}
+    WHERE _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+    {% endif %}
 ),
 
 -- Filter out generic domains
@@ -64,4 +73,3 @@ SELECT
     _ingested_at
 FROM deduplicated_traits
 WHERE rn = 1
-ORDER BY occurred_at DESC

@@ -1,10 +1,20 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['gmail_thread_id', '_account']),
+    unique_key=['gmail_thread_id', '_account', 'email'],
+    on_schema_change='append_new_columns',
     tags=['gmail', 'normalized', 'by_account']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_watermark_ingested_at', 'gmail_thread_id']) }}
+
 -- Per-account normalized thread participants: Aggregate participants by gmail_thread_id
+--
+-- Touched-group rollup (see nexus_incremental_touched_groups.sql). The
+-- touched-set unions BOTH upstreams' batches: a new participant row touches
+-- its thread, and a re-synced message can change thread linkage.
 WITH messages AS (
     SELECT * FROM {{ ref('gmail_messages_by_account') }}
 ),
@@ -12,6 +22,21 @@ WITH messages AS (
 participants AS (
     SELECT * FROM {{ ref('gmail_message_participants_by_account') }}
 ),
+
+{% if is_incremental() %}
+touched_threads AS (
+    SELECT DISTINCT m.gmail_thread_id, m._account
+    FROM messages m
+    INNER JOIN participants p
+        ON p.gmail_message_id = m.gmail_message_id
+        AND p._account = m._account
+    WHERE p._ingested_at > {{ nexus.nexus_incremental_watermark_literal('_watermark_ingested_at') }}
+    UNION DISTINCT
+    SELECT DISTINCT gmail_thread_id, _account
+    FROM messages
+    WHERE _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_watermark_ingested_at') }}
+),
+{% endif %}
 
 participants_with_threads AS (
     SELECT 
@@ -29,6 +54,10 @@ participants_with_threads AS (
     INNER JOIN messages m 
         ON p.gmail_message_id = m.gmail_message_id 
         AND p._account = m._account
+    {% if is_incremental() %}
+    INNER JOIN touched_threads tt
+    {{ nexus.nexus_incremental_touched_join('m', 'tt', ['gmail_thread_id', '_account']) }}
+    {% endif %}
     WHERE m.gmail_thread_id IS NOT NULL
       AND p.email IS NOT NULL
 ),
@@ -45,6 +74,7 @@ thread_participants AS (
         MIN(sent_at) as first_participated_at,
         MAX(sent_at) as last_participated_at,
         MIN(_ingested_at) as _ingested_at,
+        MAX(_ingested_at) as _watermark_ingested_at,
     FROM participants_with_threads
     GROUP BY gmail_thread_id, _account, email, domain
 ),
@@ -70,7 +100,8 @@ SELECT
     ) as     roles,
     first_participated_at,
     last_participated_at,
-    _ingested_at
+    _ingested_at,
+    _watermark_ingested_at
 FROM thread_participants
 ORDER BY gmail_thread_id, 
     CASE 
@@ -85,4 +116,3 @@ ORDER BY gmail_thread_id,
 )
 
 select * from final
-ORDER BY last_participated_at desc

@@ -1,17 +1,56 @@
 {{ config(
     enabled=var('nexus', {}).get('sources', {}).get('gmail', {}).get('enabled', false),
-    materialized='table',
+    materialized=nexus.nexus_incremental_materialization(),
+    partition_by=nexus.nexus_bq_partition_by('_ingested_at', granularity='month'),
+    cluster_by=nexus.nexus_cluster_by(['message_id']),
+    unique_key='message_id',
+    on_schema_change='append_new_columns',
     tags=['gmail', 'normalized']
 ) }}
 
+{{ nexus.nexus_incremental_upgrade_guard(['_watermark_ingested_at', 'message_id']) }}
+
+{% if is_incremental() %}
+{% set wm = nexus.nexus_incremental_watermark_literal('_watermark_ingested_at') %}
+{% endif %}
+
 -- Cross-account normalized messages: Group per-account messages by message_id_header
 -- Join with per-account threads to get thread_id from first_message_id_header
-WITH per_account_messages AS (
+--
+-- Touched-group rollup, WIDENED touched-set: thread_id routes through the
+-- per-account thread's first_message_id_header, so when a thread gains a
+-- message, every message of that thread must be recomputed — touched
+-- headers = batch messages UNION all messages of touched threads. A
+-- batch-only touched-set would leave the thread's other messages stale.
+WITH per_account_messages_all AS (
     SELECT * FROM {{ ref('gmail_messages_by_account') }}
 ),
 
 per_account_threads AS (
     SELECT * FROM {{ ref('gmail_threads_by_account') }}
+),
+
+{% if is_incremental() %}
+touched_headers AS (
+    SELECT DISTINCT message_id_header
+    FROM per_account_messages_all
+    WHERE _ingested_at > {{ wm }}
+      AND message_id_header IS NOT NULL
+    UNION DISTINCT
+    SELECT DISTINCT m.message_id_header
+    FROM per_account_messages_all m
+    INNER JOIN per_account_threads t
+    {{ nexus.nexus_incremental_touched_join('m', 't', ['gmail_thread_id', '_account', '_stream_id']) }}
+    WHERE t._watermark_ingested_at > {{ wm }}
+      AND m.message_id_header IS NOT NULL
+),
+{% endif %}
+
+per_account_messages AS (
+    SELECT m.* FROM per_account_messages_all m
+    {% if is_incremental() %}
+    INNER JOIN touched_headers th ON m.message_id_header = th.message_id_header
+    {% endif %}
 ),
 
 -- Cross-account deduplication: group by message_id_header, keep latest
@@ -36,6 +75,7 @@ grouped_messages AS (
         {% if target.type == 'bigquery' %}ARRAY_AGG(size_estimate ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(size_estimate ORDER BY sent_at DESC){% endif %} as size_estimate,
         'gmail' as source,
         MAX(_ingested_at) as _ingested_at,
+        MAX(_ingested_at) as _watermark_ingested_at,
         -- Get the latest gmail_thread_id and _account for joining with threads
         {% if target.type == 'bigquery' %}ARRAY_AGG(gmail_thread_id ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(gmail_thread_id ORDER BY sent_at DESC){% endif %} as last_gmail_thread_id,
         {% if target.type == 'bigquery' %}ARRAY_AGG(_account ORDER BY sent_at DESC LIMIT 1)[OFFSET(0)]{% else %}first(_account ORDER BY sent_at DESC){% endif %} as _account,
@@ -120,6 +160,7 @@ joined as (
         gm.size_estimate,
         gm.source,
         gm._ingested_at,
+        gm._watermark_ingested_at,
         gm.gmail_message_ids,
         gm.gmail_thread_ids,
         gm.label_ids,
@@ -133,4 +174,3 @@ joined as (
 )
 
 select * from joined
-ORDER BY sent_at desc
