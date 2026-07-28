@@ -340,11 +340,13 @@ models:
     description:
       "Maps events to resolved entities, enabling entity-level event queries"
     tests:
-      # entity_participant_id is a NOT ENFORCED informational PK. Its uniqueness
-      # currently holds only because occurred_at is functionally determined by
-      # event_id (the id hashes event_id+entity_id+role, the SQL groups by those
-      # plus occurred_at). This error-severity test guards that invariant so the
-      # optimizer never does join elimination on a PK that has silently drifted.
+      # entity_participant_id is a NOT ENFORCED informational PK, so the
+      # optimizer trusts it for join elimination and this error-severity test is
+      # what makes that trust safe. The id hashes event_id+entity_id+role and
+      # the SQL now groups by exactly those, so uniqueness no longer rests on
+      # occurred_at being functionally determined by event_id — an assumption
+      # that does not hold for sources modelling a thread or session as one
+      # event (see finalize_participants.sql).
       - unique:
           column_name: entity_participant_id
           config:

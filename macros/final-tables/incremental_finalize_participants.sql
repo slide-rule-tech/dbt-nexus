@@ -36,6 +36,12 @@ joined as (
     on ei.identifier_value = ri.identifier_value
     and ei.identifier_type = ri.identifier_type
 ),
+{# Group by exactly the three columns the id hashes. Several identifier rows
+   can carry one entity into one event at different timestamps (a thread or
+   session modelled as a single event), and including occurred_at here would
+   emit two rows sharing an entity_participant_id — which this model's
+   unique_key merge cannot resolve: BigQuery MERGE rejects a source offering
+   more than one row per target key. #}
 grouped as (
   select
     {{ nexus.create_nexus_id('entity_participant', ['event_id', entity_type ~ '_id', 'role']) }} as entity_participant_id,
@@ -43,10 +49,10 @@ grouped as (
     event_id,
     {{ entity_type }}_id as entity_id,
     role,
-    occurred_at,
+    min(occurred_at) as occurred_at,
     max(_ingested_at) as _ingested_at
   from joined
-  group by event_id, {{ entity_type }}_id, role, occurred_at
+  group by event_id, {{ entity_type }}_id, role
 )
 select g.*
 from grouped g
@@ -94,16 +100,17 @@ joined as (
   inner join registered_entities reg
     on ei.identifier_value = reg.source_id
 )
+{# Same grain rule as the ER append leg above. #}
 select
   {{ nexus.create_nexus_id('entity_participant', ['event_id', 'entity_id', 'role']) }} as entity_participant_id,
   '{{ entity_type }}' as entity_type,
   event_id,
   entity_id,
   role,
-  occurred_at,
+  min(occurred_at) as occurred_at,
   max(_ingested_at) as _ingested_at
 from joined
-group by event_id, entity_id, role, occurred_at
+group by event_id, entity_id, role
 {% else %}
 select
   cast(null as {{ dbt.type_string() }}) as entity_participant_id,

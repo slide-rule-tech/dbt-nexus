@@ -140,6 +140,22 @@ EXPECT = {
             "group": [["domain|xg.test", "name|x-corp", "domain|yg.test", "name|y-corp"]]
         },
     },
+    "thread_multi_timestamp": {
+        # One event carrying the SAME person twice under two addresses at two
+        # different occurred_at — the shape a source produces when it models a
+        # thread or session as a single event. Batch 2 merges the addresses, so
+        # afterwards one entity reaches ev_tmt_1 at two timestamps.
+        #
+        # NOTE: this harness runs incremental-on, where the participant id is
+        # minted at birth and the two rows keep distinct ids (the documented
+        # duplicate-grain divergence). The full-resolution path is where the
+        # grain matters — see finalize_participants.sql; to exercise it, flip
+        # nexus.incremental.enabled to false in this project and rebuild
+        # +nexus_entity_participants.
+        "entities": {"person": 1},
+        "log": {"born": 0, "accreted": 0, "repointed": 1},
+        "same_entity": {"person": [["email|personal@tmt.test", "email|work@tmt.test"]]},
+    },
 }
 
 FAR_FUTURE = "2030-01-01 00:00:00"
