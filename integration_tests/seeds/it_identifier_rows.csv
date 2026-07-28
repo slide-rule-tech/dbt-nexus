@@ -51,3 +51,7 @@ groups_merge,gm_r04,ev_gm_2,edg_gm_2,group,name,y-corp,participant,it,2024-01-01
 groups_merge,gm_r05,ev_gm_3,edg_gm_3,group,domain,xg.test,participant,it,2024-01-02 00:00:00,2024-01-02 00:00:00
 groups_merge,gm_r06,ev_gm_3,edg_gm_3,group,domain,yg.test,participant,it,2024-01-02 00:00:00,2024-01-02 00:00:00
 groups_merge,gm_r07,ev_gm_3,edg_gm_3,person,email,cross@gm.test,participant,it,2024-01-02 00:00:00,2024-01-02 00:00:00
+thread_multi_timestamp,tmt_r01,ev_tmt_1,edg_tmt_1a,person,email,personal@tmt.test,participant,it,2024-01-01 00:00:00,2024-01-01 00:00:00
+thread_multi_timestamp,tmt_r02,ev_tmt_1,edg_tmt_1b,person,email,work@tmt.test,participant,it,2024-01-05 00:00:00,2024-01-01 00:00:00
+thread_multi_timestamp,tmt_r03,ev_tmt_2,edg_tmt_2,person,email,personal@tmt.test,participant,it,2024-01-06 00:00:00,2024-01-02 00:00:00
+thread_multi_timestamp,tmt_r04,ev_tmt_2,edg_tmt_2,person,email,work@tmt.test,participant,it,2024-01-06 00:00:00,2024-01-02 00:00:00

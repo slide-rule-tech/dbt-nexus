@@ -29,15 +29,19 @@ joined as (
     on ei.identifier_value = reg.source_id
 )
 
+-- One row per (event, entity, role) — the same three columns the id hashes, and
+-- for the same reason as the resolved-entity path in finalize_participants.sql:
+-- one entity can reach one event through several identifier rows that need not
+-- share a timestamp, so grouping on occurred_at would emit duplicate ids.
 select
   {{ nexus.create_nexus_id('entity_participant', ['event_id', 'entity_id', 'role']) }} as entity_participant_id,
   '{{ entity_type }}' as entity_type,
   event_id,
   entity_id,
   role,
-  occurred_at
+  min(occurred_at) as occurred_at
 from joined
-group by event_id, entity_id, role, occurred_at
+group by event_id, entity_id, role
 {% else %}
 select
   cast(null as string) as entity_participant_id,
