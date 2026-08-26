@@ -1,17 +1,34 @@
-{# Google Calendar instance identity — the single definition of the key.
+{# Google Calendar occurrence attributes.
 
-    Three models need the same key and MUST agree: the base dedup view, the
-    normalized event model, and the participants model. When they disagree the
-    participant -> event join silently loses every edge (participants carry the
-    raw key, events carry its hash, and nothing tests the join), so the
-    expression lives here rather than being copy-pasted three times.
+    NOTE ON IDENTITY: there is deliberately no key macro here. The occurrence
+    key is Google's own `id`, used verbatim.
+
+    This replaced an iCalUID-derived composite key. That key existed on the
+    reasoning that iCalUID is to Calendar what Message-ID is to Gmail — the
+    thing that recognises one record across several mailboxes. The analogy does
+    not hold. Gmail mints a distinct per-mailbox message id, so Message-ID is
+    genuinely required; Google Calendar propagates ONE event id to every
+    attendee's copy within a tenant. Verified against a multi-calendar tenant:
+    of the occurrences appearing on more than one synced calendar, all but a
+    handful carried an identical `id`. The problem the composite key solved is
+    almost entirely absent.
+
+    What the composite key did cost was a branch — recurring occurrences keyed
+    on uid+instance_start, single ones on uid alone — and every payload that
+    made that branch guess wrong collapsed a whole series onto one row. Using
+    `id` removes the branch, and with it that class of bug.
+
+    `id` is also stable under exactly the mutations that matter: rescheduling a
+    single event, dragging a recurring instance (the id encodes the ORIGINAL
+    slot), and re-cutting a series with "this and following" (the id keeps the
+    base master while iCalUID and recurringEventId are both reissued).
 #}
 
 {# instance_start: the occurrence this row describes.
 
     originalStartTime wins for a recurring instance -- it names the slot the
-    instance belongs to, which survives the instance being dragged to a new
-    time. Falls back to the event's own start, then to an all-day date.
+    instance belongs to, and survives the instance being dragged elsewhere.
+    Falls back to the event's own start, then to an all-day date.
 
     ISO 8601 with fractional seconds + tz offset. BQ needs PARSE_TIMESTAMP with
     %E*S/%Ez format codes (duck strptime doesn't recognize). try_cast on both
@@ -34,99 +51,45 @@ try_cast(COALESCE(
 {% endmacro %}
 
 
-{# is_recurring: does this row describe one occurrence of a series?
+{# series_id: which recurring series this occurrence belongs to, or NULL.
 
-    Gates the event_key branch below, so getting it wrong silently collapses a
-    whole series onto one key.
+    Read off the instance id, which Google mints as
 
-    The obvious tests -- recurringEventId, or a recurrence array on the master
-    -- are NOT sufficient. Google omits recurringEventId from some payloads,
-    notably bulk cancellations of a series' future instances: hundreds of rows
-    arrive carrying distinct instance ids and start times but no recurrence
-    metadata at all. Trusting those two fields alone makes every one of them
-    look like the same single event.
+        <masterId>_<YYYYMMDDTHHMMSSZ>   timed occurrence
+        <masterId>_<YYYYMMDD>           all-day occurrence
 
-    The instance id itself is the dependable signal. Google mints a recurring
-    instance's id as <masterId>_<YYYYMMDDTHHMMSSZ>, and that suffix is present
-    whatever else the payload omits. Single-event ids are opaque hex/base32 and
-    never carry it.
+    Both suffix shapes must be matched. Handling only the timed one is the bug
+    this rewrite fixes: all-day series fell through and collapsed.
+
+    Preferred over recurringEventId for two reasons. It is present even on the
+    stripped payloads Google sends for bulk cancellations, where
+    recurringEventId is omitted. And it is stable across series re-cuts, where
+    recurringEventId is reissued as <masterId>_R<timestamp> — verified against
+    live data: wherever the two differ, they differ by exactly that _R suffix
+    and never otherwise. So series_id identifies the series; recurring_event_id
+    (kept as its own column) identifies which cut of it.
 #}
-{% macro google_calendar_is_recurring(raw_record='_raw_record') %}
-(
-    JSON_EXTRACT_SCALAR({{ raw_record }}, '$.recurringEventId') IS NOT NULL
-    OR (
-        JSON_EXTRACT_ARRAY({{ raw_record }}, '$.recurrence') IS NOT NULL
-        AND ARRAY_LENGTH(JSON_EXTRACT_ARRAY({{ raw_record }}, '$.recurrence')) > 0
-    )
-    OR {% if target.type == 'bigquery' -%}
-    REGEXP_CONTAINS(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.id'), r'_[0-9]{8}T[0-9]{6}Z$')
-    {%- else -%}
-    regexp_matches(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.id'), '_[0-9]{8}T[0-9]{6}Z$')
-    {%- endif %}
-)
-{% endmacro %}
-
-
-{# normalized_ical_uid: iCalUID with the recurrence-split suffix stripped.
-
-    Editing a recurring series with "this and following" makes Google re-cut
-    the series: it issues a NEW iCalUID of the form
-
-        <master>_R<YYYYMMDDTHHMMSSZ>@google.com
-
-    while the instance's own `id` stays put. The same real occurrence therefore
-    accumulates two or three iCalUIDs over its lifetime, and keying on the raw
-    value splits one meeting into several rows that disagree about `status` --
-    the old series' future instances go `cancelled` when the series is re-cut,
-    the new series' copies stay `confirmed`.
-
-    Stripping the _R suffix collapses every variant back onto the base master,
-    which restores the invariant the key depends on: one occurrence, one key.
-
-    We normalize rather than switching to Google's `id` because iCalUID is also
-    what dedups the same meeting across calendars/accounts (like Message-ID for
-    Gmail). An occurrence that appears on more than one synced calendar has a
-    different `id` per copy but one shared uid, so keying on `id` would trade
-    this bug for the mirror-image one.
-
-    Character class is [0-9] rather than \d: the pattern travels through Jinja
-    to both BigQuery and duckdb, and avoiding the backslash avoids an escaping
-    hazard in every hop.
-#}
-{% macro google_calendar_normalized_ical_uid(ical_uid='ical_uid') %}
+{% macro google_calendar_series_id(raw_record='_raw_record') %}
 {%- if target.type == 'bigquery' -%}
-REGEXP_REPLACE({{ ical_uid }}, r'_R[0-9]{8}T[0-9]{6}Z?@', '@')
+REGEXP_EXTRACT(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.id'), r'^(.+)_[0-9]{8}(?:T[0-9]{6}Z)?$')
 {%- else -%}
-regexp_replace({{ ical_uid }}, '_R[0-9]{8}T[0-9]{6}Z?@', '@')
+regexp_extract(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.id'), '^(.+)_[0-9]{8}(T[0-9]{6}Z)?$', 1)
 {%- endif -%}
 {% endmacro %}
 
 
-{# event_key: the normalized uid, plus the occurrence it names when recurring.
+{# is_recurring: purely descriptive now — nothing keys off it.
 
-    The instance_start half applies to RECURRING EVENTS ONLY, and the
-    distinction is load-bearing in both directions:
+    A miss here is a wrong label on one row, not a collapsed series, which is
+    why this can be a simple OR rather than the load-bearing branch it was.
 
-    - A recurring instance needs it, because one uid covers every occurrence in
-      the series. originalStartTime names the slot and survives the instance
-      being dragged to a new time, so the key is stable under rescheduling.
-
-    - A single event must NOT have it. There is no originalStartTime to fall
-      back on, so instance_start is just the event's current start -- and
-      rescheduling a one-off meeting would mint a brand new key, leaving the
-      old start sitting in the warehouse as a phantom second occurrence.
-
-    Callers must already have filtered iCalUID IS NOT NULL. Rows without a uid
-    also have no start at all (they are the stripped deletion tombstones), so
-    that one guard covers both halves of the key.
+    No recurrence[] test: the sync expands instances (singleEvents), so a
+    series master with a recurrence array is never landed. That arm of the old
+    condition was dead code.
 #}
-{% macro google_calendar_event_key(ical_uid='ical_uid', instance_start='instance_start', is_recurring='is_recurring') %}
-CASE
-    WHEN {{ is_recurring }} THEN CONCAT(
-        {{ nexus.google_calendar_normalized_ical_uid(ical_uid) }},
-        '|',
-        CAST({{ instance_start }} AS {% if target.type == 'bigquery' %}STRING{% else %}VARCHAR{% endif %})
-    )
-    ELSE {{ nexus.google_calendar_normalized_ical_uid(ical_uid) }}
-END
+{% macro google_calendar_is_recurring(raw_record='_raw_record') %}
+(
+    {{ nexus.google_calendar_series_id(raw_record) }} IS NOT NULL
+    OR JSON_EXTRACT_SCALAR({{ raw_record }}, '$.recurringEventId') IS NOT NULL
+)
 {% endmacro %}

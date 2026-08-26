@@ -12,10 +12,9 @@
 
 -- Normalized layer: Clean, deduplicated events with explicit columns
 -- Extracts data from new STANDARD_TABLE_SCHEMA with _raw_record
--- Uses iCalUID for cross-account deduplication (like Message-ID for Gmail),
--- normalized to survive recurring-series re-cuts -- see
--- nexus.google_calendar_event_key. event_key is computed once in the base
--- dedup view and carried through here.
+-- Identity is Google's own event `id`, carried through from the base dedup
+-- view as event_key. See macros/sources/google_calendar/
+-- google_calendar_event_key.sql for why that replaced an iCalUID composite.
 WITH source_data AS (
     SELECT
         _raw_record,
@@ -31,7 +30,6 @@ WITH source_data AS (
         _sync_metadata
     FROM {{ ref('google_calendar_events_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
-      AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
     {% if is_incremental() %}
       AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
     {% endif %}
@@ -45,9 +43,14 @@ extracted AS (
         ical_uid,
         event_key,
 
-        -- The recurring master this instance belongs to. Note Google reissues
-        -- this alongside the iCalUID when a series is re-cut, so it identifies
-        -- the current series version, not a stable series identity.
+        -- Which series this occurrence belongs to (NULL for one-offs), read
+        -- off the instance id so it survives both stripped payloads and series
+        -- re-cuts.
+        {{ nexus.google_calendar_series_id('_raw_record') }} as series_id,
+
+        -- Which CUT of that series. Google reissues this as <master>_R<ts>
+        -- when a series is re-cut, so it is the series version, not a stable
+        -- series identity -- use series_id for the latter.
         JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') as recurring_event_id,
 
         -- Determine instanceStart for recurring events
@@ -99,9 +102,7 @@ extracted AS (
             ELSE false
         END as is_all_day,
         
-        -- Check if it's a recurring event -- recurringEventId, a recurrence
-        -- array, or an instance-shaped id. See the macro for why the third
-        -- test is not optional.
+        -- Descriptive only -- nothing keys off this any more.
         {{ nexus.google_calendar_is_recurring('_raw_record') }} as is_recurring,
         
         -- Determine if meeting has external attendees (for event classification)
@@ -147,11 +148,7 @@ extracted AS (
 -- happened.
 version_history AS (
     SELECT
-        {{ nexus.google_calendar_event_key(
-            "JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID')",
-            nexus.google_calendar_instance_start('_raw_record'),
-            nexus.google_calendar_is_recurring('_raw_record')
-        ) }} AS event_key,
+        JSON_EXTRACT_SCALAR(_raw_record, '$.id') AS event_key,
         JSON_EXTRACT_SCALAR(_raw_record, '$.status') AS status,
         SAFE_CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.sequence') AS {% if target.type == 'bigquery' %}INT64{% else %}BIGINT{% endif %}) AS sequence_number,
         {% if target.type == 'bigquery' %}SAFE_CAST{% else %}try_cast{% endif %}(JSON_EXTRACT_SCALAR(_raw_record, '$.updated') AS TIMESTAMP) AS updated_at,
@@ -165,7 +162,6 @@ version_history AS (
         _ingested_at
     FROM {{ ref('google_calendar_events_base') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
-      AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
 ),
 
 -- The last version written at or before the occurrence's start time: what the
@@ -185,6 +181,7 @@ SELECT
     calendar_id,
     ical_uid,
     calendar_event_id,
+    series_id,
     recurring_event_id,
     instance_start,
     summary,

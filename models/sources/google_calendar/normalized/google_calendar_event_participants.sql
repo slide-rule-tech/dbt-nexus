@@ -12,12 +12,10 @@
 
 -- Normalized participants: Extract, parse, and normalize all participants (organizer, creator, attendees) from Google Calendar events
 -- Creates one row per participant per event, with role indicating "organizer", "creator", or "attendee"
--- Uses iCalUID + instanceStart for cross-account deduplication (like Message-ID
--- for Gmail), normalized against recurring-series re-cuts. The key itself is
--- computed once in the base dedup view and selected here -- it MUST match the
--- one google_calendar_events_normalized carries, because the downstream
--- intermediates join participants to events by re-hashing this value, and
--- nothing tests that join.
+-- event_id is Google's own event `id`, carried through from the base dedup
+-- view. It MUST match what google_calendar_events_normalized carries: the
+-- downstream intermediates join participants to events by re-hashing this
+-- value, and nothing tests that join.
 WITH source_data AS (
     SELECT
         event_key as event_id,
@@ -39,7 +37,6 @@ WITH source_data AS (
     {% if is_incremental() %}
       AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
     {% endif %}
-      AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
 ),
 
 -- Extract and normalize organizer
