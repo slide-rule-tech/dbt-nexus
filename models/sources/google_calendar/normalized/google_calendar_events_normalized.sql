@@ -135,6 +135,49 @@ extracted AS (
         _sync_metadata,
         'google_calendar' as source
     FROM source_data
+),
+
+-- Version replay, for meeting_status below.
+--
+-- Reads the base view (EVERY version ever ingested) rather than the dedup,
+-- because the whole point is the history the dedup discards. Google stamps each
+-- version with `sequence` (its own revision counter) and `updated` (when that
+-- revision was made); ordering by those recovers the sequence of edits, which
+-- _ingested_at cannot do -- it records when we synced, not when the change
+-- happened.
+version_history AS (
+    SELECT
+        {{ nexus.google_calendar_event_key(
+            "JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID')",
+            nexus.google_calendar_instance_start('_raw_record'),
+            nexus.google_calendar_is_recurring('_raw_record')
+        ) }} AS event_key,
+        JSON_EXTRACT_SCALAR(_raw_record, '$.status') AS status,
+        SAFE_CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.sequence') AS {% if target.type == 'bigquery' %}INT64{% else %}BIGINT{% endif %}) AS sequence_number,
+        {% if target.type == 'bigquery' %}SAFE_CAST{% else %}try_cast{% endif %}(JSON_EXTRACT_SCALAR(_raw_record, '$.updated') AS TIMESTAMP) AS updated_at,
+        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
+                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
+                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
+            ) AS TIMESTAMP){% endif %} AS start_time,
+        _ingested_at
+    FROM {{ ref('google_calendar_events_base') }}
+    WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+      AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
+),
+
+-- The last version written at or before the occurrence's start time: what the
+-- calendar said when the slot actually arrived.
+status_at_start AS (
+    SELECT event_key, status AS status_when_slot_arrived
+    FROM version_history
+    WHERE updated_at <= start_time
+    QUALIFY row_number() OVER (
+        PARTITION BY event_key
+        ORDER BY sequence_number DESC, updated_at DESC, _ingested_at DESC
+    ) = 1
 )
 
 SELECT
@@ -148,6 +191,27 @@ SELECT
     description,
     location,
     status,
+
+    -- Did this meeting happen? A calendar is a plan, so a past-dated event is
+    -- not evidence on its own -- a series retired months ago still leaves
+    -- instances on every date it used to cover. `status` alone only says what
+    -- the calendar reads NOW; replaying the versions says what it read when the
+    -- slot arrived, which is the closest observable proxy.
+    --
+    -- Exact-vs-observed: 'occurred' means "still on the calendar when its time
+    -- came", NOT "humans attended". Attendee responseStatus is available in
+    -- google_calendar_event_participants for anyone who needs to go further.
+    --
+    -- coalesce: an occurrence with no version written before its start time
+    -- (created retroactively, or first synced after the fact) has no replay
+    -- row; fall back to its current status.
+    CASE
+        WHEN start_time > current_timestamp()
+            THEN CASE WHEN status = 'confirmed' THEN 'scheduled' ELSE 'cancelled' END
+        WHEN COALESCE(status_when_slot_arrived, status) = 'confirmed' THEN 'occurred'
+        ELSE 'cancelled'
+    END as meeting_status,
+
     calendar_event_type,
     sequence_number,
     updated_at,
@@ -166,6 +230,7 @@ SELECT
     _sync_metadata,
     source
 FROM extracted
+LEFT JOIN status_at_start USING (event_key)
 -- Belt-and-braces: the base dedup view already reduces to one row per
 -- event_key, but an incremental batch can still carry two versions of the same
 -- occurrence (a re-synced record inside the lookback window), and the merge

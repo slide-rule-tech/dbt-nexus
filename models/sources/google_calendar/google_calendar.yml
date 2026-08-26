@@ -56,61 +56,18 @@ models:
           - not_null:
               config:
                 severity: error
-
-  # Dimensions
-  - name: google_calendar_event_dimensions
-    description: "Union layer - All event dimensions from Google Calendar"
-    tests:
-      - unique:
-          column_name: event_dimension_id
-          config:
-            severity: error
-    columns:
-      - name: event_dimension_id
-        tests:
-          - not_null:
-              config:
-                severity: error
-          - dbt_utils.expression_is_true:
-              expression: "like 'evt_dim_%'"
-              config:
-                severity: warn
-      - name: dimension_name
+      - name: meeting_status
+        description:
+          "Did this meeting happen? Derived by replaying the occurrence's raw
+          version history and taking the last version written at or before
+          start_time. 'occurred' means it was still on the calendar when its
+          time came -- not that anyone attended."
         tests:
           - not_null:
               config:
                 severity: error
           - accepted_values:
-              values: ["meeting_status", "is_series"]
-              config:
-                severity: error
-      - name: dimension_value
-        tests:
-          - not_null:
-              config:
-                severity: error
-      - name: _ingested_at
-        description:
-          "Required by process_event_dimensions - the unioned model's
-          incremental watermark and partition key"
-        tests:
-          - not_null:
-              config:
-                severity: error
-
-  - name: google_calendar_meeting_dimensions
-    description:
-      "meeting_status (scheduled|occurred|cancelled) and is_series, derived by
-      replaying each occurrence's raw version history"
-    columns:
-      - name: dimension_value
-        description:
-          "is_series rows are only ever emitted as 'true' - the is_ prefix
-          makes the pivot COALESCE absence to FALSE, so a 'false' row would
-          double-count"
-        tests:
-          - accepted_values:
-              values: ["scheduled", "occurred", "cancelled", "true"]
+              values: ["scheduled", "occurred", "cancelled"]
               config:
                 severity: error
 

@@ -36,6 +36,7 @@ SELECT
     description,
     location,
     status,
+    meeting_status,
     calendar_event_type,
     sequence_number,
     updated_at,
