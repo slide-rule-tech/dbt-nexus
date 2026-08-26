@@ -32,6 +32,45 @@ sources:
         description: "Raw Google Calendar calendars from Nango sync"
 
 models:
+  # Normalized Layer - one row per calendar occurrence
+  #
+  # The unique test here is the guard on the dedup key. Historically the only
+  # uniqueness test lived on google_calendar_events, one hop downstream and
+  # after the id is hashed -- so a key that over-split (minting a second id for
+  # one occurrence) still passed, because both ids were distinct. Testing the
+  # natural key at the layer that computes it is what actually catches it.
+  - name: google_calendar_events_normalized
+    description:
+      "Normalized layer - one row per calendar occurrence, latest version wins"
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description:
+          "Natural occurrence key: normalized iCalUID, plus instance start for
+          recurring events"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: meeting_status
+        description:
+          "Did this meeting happen? Derived by replaying the occurrence's raw
+          version history and taking the last version written at or before
+          start_time. 'occurred' means it was still on the calendar when its
+          time came -- not that anyone attended."
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["scheduled", "occurred", "cancelled"]
+              config:
+                severity: error
+
   # Union Layer - Events
   - name: google_calendar_events
     description:
