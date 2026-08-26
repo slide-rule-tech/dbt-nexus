@@ -93,21 +93,28 @@ models:
               config:
                 severity: warn
       - name: _last_merged_at
-        description: "When entity identifiers were last merged (max of edge timestamps). Only applicable to ER entity types."
-        tests:
-          - not_null:
-              config:
-                severity: warn
-                where: >
-                  1 = 1
-                  {% set et_val = var('nexus', {}).get('entity_types', {}) %}
-                  {% if et_val is mapping %}
-                    {% for et_name, et_cfg in et_val.items() %}
-                      {% if et_cfg is mapping and not et_cfg.get('entity_resolution', true) %}
-                        AND entity_type != '{{ et_name }}'
-                      {% endif %}
-                    {% endfor %}
-                  {% endif %}
+        description: >
+          When entity identifiers were last merged (max of edge timestamps).
+          Only applicable to ER entity types, and NULLABLE even for those: an
+          entity that has never been merged with another has nothing to stamp.
+          Deliberately untested for null — see the note below.
+        # No not_null test. It was wrong under either reading of the column:
+        #
+        #  * Under the column's stated meaning, NULL is the correct value for
+        #    an entity that was never merged, so asserting not-null asserts
+        #    something the semantics deny (the MCP docs already describe this
+        #    column as "may be null").
+        #  * Under the current implementation, the `edge_id is not null`
+        #    predicate that is supposed to isolate merge edges never filters
+        #    anything — sources populate edge_id on every identifier row they
+        #    emit from an event, merged or not. That makes _last_merged_at
+        #    numerically identical to last_interaction_at, which carries its
+        #    own not_null test. A second test on the same quantity only
+        #    double-reports one condition.
+        #
+        # Either way the test produced no signal of its own, and its warnings
+        # sent readers looking for a merge-bookkeeping bug that was really a
+        # dangling event reference upstream.
       - name: last_interaction_at
         description: "Most recent event timestamp for this entity"
         tests:
