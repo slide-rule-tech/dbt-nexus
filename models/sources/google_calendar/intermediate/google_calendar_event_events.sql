@@ -30,6 +30,7 @@ SELECT
     calendar_id,
     ical_uid,
     calendar_event_id,
+    series_id,
     recurring_event_id,
     instance_start,
     summary,

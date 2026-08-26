@@ -39,6 +39,9 @@ models:
   # after the id is hashed -- so a key that over-split (minting a second id for
   # one occurrence) still passed, because both ids were distinct. Testing the
   # natural key at the layer that computes it is what actually catches it.
+  #
+  # series_id is NULL for one-off events by design, so it carries no not_null
+  # test; use `is_recurring` to filter.
   - name: google_calendar_events_normalized
     description:
       "Normalized layer - one row per calendar occurrence, latest version wins"
@@ -50,8 +53,7 @@ models:
     columns:
       - name: event_id
         description:
-          "Natural occurrence key: normalized iCalUID, plus instance start for
-          recurring events"
+          "Natural occurrence key: Google's own event `id`, used verbatim"
         tests:
           - not_null:
               config:

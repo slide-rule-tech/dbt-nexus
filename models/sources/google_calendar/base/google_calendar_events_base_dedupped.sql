@@ -6,51 +6,38 @@
 
 -- Base dedup: one row per calendar occurrence, latest version wins.
 --
--- The key comes from nexus.google_calendar_event_key so this model, the
--- normalized model and the participants model cannot drift apart; it also
--- strips the _R<timestamp> suffix Google issues when a recurring series is
--- re-cut, which previously split one occurrence across two or three keys that
--- disagreed about `status`. See the macro for the full story.
+-- The occurrence key is Google's own `id`, verbatim. See
+-- macros/sources/google_calendar/google_calendar_event_key.sql for why that
+-- replaced an iCalUID-derived composite key, and why `id` is stable under
+-- rescheduling, instance drags and series re-cuts.
 --
--- event_key is emitted here so downstream models select it rather than
--- rebuilding it from _raw_record.
+-- event_key is emitted so downstream models select it rather than re-deriving
+-- identity from _raw_record.
 WITH source_data AS (
     SELECT
         *,
+        JSON_EXTRACT_SCALAR(_raw_record, '$.id') AS event_key,
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') AS calendar_event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') AS ical_uid,
         {{ nexus.google_calendar_instance_start('_raw_record') }} AS instance_start,
         -- A deletion tombstone: Google returns {id, status:"cancelled"} with
         -- the payload stripped -- no summary, no attendees, no eventType,
         -- sequence or updated. Never a usable event on its own.
-        JSON_EXTRACT_SCALAR(_raw_record, '$.eventType') IS NULL AS is_tombstone,
-        {{ nexus.google_calendar_is_recurring('_raw_record') }} AS is_recurring
+        JSON_EXTRACT_SCALAR(_raw_record, '$.eventType') IS NULL AS is_tombstone
     FROM {{ ref('google_calendar_events_base') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
-      AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
-),
-
-with_event_key AS (
-    SELECT
-        *,
-        {{ nexus.google_calendar_event_key('ical_uid', 'instance_start') }} AS event_key
-    FROM source_data
-    WHERE ical_uid IS NOT NULL
 ),
 
 deduplicated AS (
     SELECT
         *,
         -- Full records outrank tombstones so a stripped payload can never
-        -- clobber summary/attendees. On today's data the two never share a key
-        -- (an uid-less tombstone is already filtered above), so this only
-        -- matters if Google starts emitting tombstones that carry a uid.
+        -- clobber summary/attendees.
         ROW_NUMBER() OVER (
             PARTITION BY event_key
             ORDER BY is_tombstone ASC, _ingested_at DESC
         ) AS rn
-    FROM with_event_key
-    WHERE event_key IS NOT NULL
+    FROM source_data
 )
 
 SELECT
