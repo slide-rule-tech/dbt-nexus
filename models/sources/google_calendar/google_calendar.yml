@@ -32,6 +32,88 @@ sources:
         description: "Raw Google Calendar calendars from Nango sync"
 
 models:
+  # Normalized Layer - one row per calendar occurrence
+  #
+  # The unique test here is the guard on the dedup key. Historically the only
+  # uniqueness test lived on google_calendar_events, one hop downstream and
+  # after the id is hashed -- so a key that over-split (minting a second id for
+  # one occurrence) still passed, because both ids were distinct. Testing the
+  # natural key at the layer that computes it is what actually catches it.
+  - name: google_calendar_events_normalized
+    description:
+      "Normalized layer - one row per calendar occurrence, latest version wins"
+    tests:
+      - unique:
+          column_name: event_id
+          config:
+            severity: error
+    columns:
+      - name: event_id
+        description:
+          "Natural occurrence key: normalized iCalUID, plus instance start for
+          recurring events"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  # Dimensions
+  - name: google_calendar_event_dimensions
+    description: "Union layer - All event dimensions from Google Calendar"
+    tests:
+      - unique:
+          column_name: event_dimension_id
+          config:
+            severity: error
+    columns:
+      - name: event_dimension_id
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.expression_is_true:
+              expression: "like 'evt_dim_%'"
+              config:
+                severity: warn
+      - name: dimension_name
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["meeting_status", "is_series"]
+              config:
+                severity: error
+      - name: dimension_value
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: _ingested_at
+        description:
+          "Required by process_event_dimensions - the unioned model's
+          incremental watermark and partition key"
+        tests:
+          - not_null:
+              config:
+                severity: error
+
+  - name: google_calendar_meeting_dimensions
+    description:
+      "meeting_status (scheduled|occurred|cancelled) and is_series, derived by
+      replaying each occurrence's raw version history"
+    columns:
+      - name: dimension_value
+        description:
+          "is_series rows are only ever emitted as 'true' - the is_ prefix
+          makes the pivot COALESCE absence to FALSE, so a 'false' row would
+          double-count"
+        tests:
+          - accepted_values:
+              values: ["scheduled", "occurred", "cancelled", "true"]
+              config:
+                severity: error
+
   # Union Layer - Events
   - name: google_calendar_events
     description:

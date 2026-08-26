@@ -12,21 +12,18 @@
 
 -- Normalized participants: Extract, parse, and normalize all participants (organizer, creator, attendees) from Google Calendar events
 -- Creates one row per participant per event, with role indicating "organizer", "creator", or "attendee"
--- Uses iCalUID + instanceStart for cross-account deduplication (like Message-ID for Gmail)
+-- Uses iCalUID + instanceStart for cross-account deduplication (like Message-ID
+-- for Gmail), normalized against recurring-series re-cuts. The key itself is
+-- computed once in the base dedup view and selected here -- it MUST match the
+-- one google_calendar_events_normalized carries, because the downstream
+-- intermediates join participants to events by re-hashing this value, and
+-- nothing tests that join.
 WITH source_data AS (
     SELECT
+        event_key as event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
-        -- Determine instanceStart for recurring events
-        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
-                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
-                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
-                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
-                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
-                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
-                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP){% endif %} as instance_start,
+        {{ nexus.google_calendar_instance_start('_raw_record') }} as instance_start,
         -- Parse start_time for event timing
         {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
@@ -35,12 +32,6 @@ WITH source_data AS (
                 JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
                 CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
             ) AS TIMESTAMP){% endif %} as start_time,
-        -- Check if it's a recurring event
-        CASE 
-            WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') IS NOT NULL THEN true
-            WHEN JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence') IS NOT NULL AND ARRAY_LENGTH(JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence')) > 0 THEN true
-            ELSE false
-        END as is_recurring,
         _ingested_at,
         _raw_record
     FROM {{ ref('google_calendar_events_base_dedupped') }}
@@ -49,19 +40,6 @@ WITH source_data AS (
       AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
     {% endif %}
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') IS NOT NULL
-),
-
--- Create composite key matching events table
-with_event_key AS (
-    SELECT
-        *,
-        -- Use iCalUID as primary key for single events
-        -- Use iCalUID + instanceStart for recurring events
-        CASE 
-            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS STRING))
-            ELSE ical_uid
-        END as event_id
-    FROM source_data
 ),
 
 -- Extract and normalize organizer
@@ -82,7 +60,7 @@ organizer_raw AS (
         'organizer' as role,
         JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.displayName') as display_name,
         CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.self') AS BOOL) as is_self
-    FROM with_event_key
+    FROM source_data
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') != ''
 ),
@@ -130,7 +108,7 @@ creator_raw AS (
         CAST(NULL AS STRING) as response_status,
         CAST(NULL AS BOOL) as is_optional,
         CAST(NULL AS BOOL) as is_organizer
-    FROM with_event_key
+    FROM source_data
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.creator.email') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(_raw_record, '$.creator.email') != ''
 ),
@@ -178,7 +156,7 @@ attendees_raw AS (
         JSON_EXTRACT_SCALAR(attendee, '$.responseStatus') as response_status,
         CAST(JSON_EXTRACT_SCALAR(attendee, '$.optional') AS BOOL) as is_optional,
         CAST(JSON_EXTRACT_SCALAR(attendee, '$.organizer') AS BOOL) as is_organizer
-    FROM with_event_key s,
+    FROM source_data s,
     UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.attendees')) as {% if target.type == 'duckdb' %}t(attendee){% else %}attendee{% endif %}
     WHERE JSON_EXTRACT_SCALAR(attendee, '$.email') IS NOT NULL
       AND JSON_EXTRACT_SCALAR(attendee, '$.email') != ''

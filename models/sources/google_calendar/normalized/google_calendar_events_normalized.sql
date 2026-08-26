@@ -12,10 +12,14 @@
 
 -- Normalized layer: Clean, deduplicated events with explicit columns
 -- Extracts data from new STANDARD_TABLE_SCHEMA with _raw_record
--- Uses iCalUID for cross-account deduplication (like Message-ID for Gmail)
+-- Uses iCalUID for cross-account deduplication (like Message-ID for Gmail),
+-- normalized to survive recurring-series re-cuts -- see
+-- nexus.google_calendar_event_key. event_key is computed once in the base
+-- dedup view and carried through here.
 WITH source_data AS (
     SELECT
         _raw_record,
+        event_key,
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
         JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') as organizer_email,
@@ -39,19 +43,33 @@ extracted AS (
         null as calendar_id,
         calendar_event_id,
         ical_uid,
-        
+        event_key,
+
+        -- The recurring master this instance belongs to. Note Google reissues
+        -- this alongside the iCalUID when a series is re-cut, so it identifies
+        -- the current series version, not a stable series identity.
+        JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') as recurring_event_id,
+
         -- Determine instanceStart for recurring events
         -- Priority: originalStartTime.dateTime > start.dateTime > start.date
-        {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
-                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
-                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
-                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP){% else %}try_cast(COALESCE(
-                JSON_EXTRACT_SCALAR(_raw_record, '$.originalStartTime.dateTime'),
-                JSON_EXTRACT_SCALAR(_raw_record, '$.start.dateTime'),
-                CONCAT(JSON_EXTRACT_SCALAR(_raw_record, '$.start.date'), 'T00:00:00Z')
-            ) AS TIMESTAMP){% endif %} as instance_start,
-        
+        {{ nexus.google_calendar_instance_start('_raw_record') }} as instance_start,
+
+        -- Google's own classification: default | outOfOffice | focusTime |
+        -- workingLocation | birthday. 'default' is the only value that means
+        -- "a meeting"; the rest are blocks and markers. Cheaper and more
+        -- reliable than inferring it from attendees or titles.
+        JSON_EXTRACT_SCALAR(_raw_record, '$.eventType') as calendar_event_type,
+
+        -- Revision metadata. `sequence` is Google's own revision counter and
+        -- `updated` the wall-clock of that revision -- together they order an
+        -- occurrence's versions, which _ingested_at cannot do (it records when
+        -- we synced, not when the change was made). Replaying them against
+        -- start_time is what tells you whether a meeting was still on the
+        -- calendar when its time arrived.
+        SAFE_CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.sequence') AS {% if target.type == 'bigquery' %}INT64{% else %}BIGINT{% endif %}) as sequence_number,
+        {% if target.type == 'bigquery' %}SAFE_CAST{% else %}try_cast{% endif %}(JSON_EXTRACT_SCALAR(_raw_record, '$.updated') AS TIMESTAMP) as updated_at,
+        {% if target.type == 'bigquery' %}SAFE_CAST{% else %}try_cast{% endif %}(JSON_EXTRACT_SCALAR(_raw_record, '$.created') AS TIMESTAMP) as created_at,
+
         -- Event details
         JSON_EXTRACT_SCALAR(_raw_record, '$.summary') as summary,
         JSON_EXTRACT_SCALAR(_raw_record, '$.description') as description,
@@ -81,15 +99,10 @@ extracted AS (
             ELSE false
         END as is_all_day,
         
-        -- Check if it's a recurring event
-        -- Event is recurring if:
-        -- 1. recurringEventId exists (it's an instance of a recurring event), OR
-        -- 2. recurrence array exists (it's the master recurring event)
-        CASE 
-            WHEN JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') IS NOT NULL THEN true
-            WHEN JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence') IS NOT NULL AND ARRAY_LENGTH(JSON_EXTRACT_ARRAY(_raw_record, '$.recurrence')) > 0 THEN true
-            ELSE false
-        END as is_recurring,
+        -- Check if it's a recurring event -- recurringEventId, a recurrence
+        -- array, or an instance-shaped id. See the macro for why the third
+        -- test is not optional.
+        {{ nexus.google_calendar_is_recurring('_raw_record') }} as is_recurring,
         
         -- Determine if meeting has external attendees (for event classification)
         (
@@ -122,33 +135,23 @@ extracted AS (
         _sync_metadata,
         'google_calendar' as source
     FROM source_data
-),
-
--- Create composite key for deduplication
--- For recurring events: ical_uid + instance_start
--- For single events: ical_uid (or ical_uid + start_time + end_time for extra safety)
-with_composite_key AS (
-    SELECT
-        *,
-        -- Use iCalUID as primary key for single events
-        -- Use iCalUID + instanceStart for recurring events
-        CASE 
-            WHEN is_recurring THEN CONCAT(ical_uid, '|', CAST(instance_start AS {% if target.type == 'bigquery' %}STRING{% else %}VARCHAR{% endif %}))
-            ELSE ical_uid
-        END as event_key
-    FROM extracted
 )
 
-SELECT 
+SELECT
     event_key as event_id,
     calendar_id,
     ical_uid,
     calendar_event_id,
+    recurring_event_id,
     instance_start,
     summary,
     description,
     location,
     status,
+    calendar_event_type,
+    sequence_number,
+    updated_at,
+    created_at,
     start_time,
     end_time,
     is_all_day,
@@ -162,6 +165,9 @@ SELECT
     _account,
     _sync_metadata,
     source
-FROM with_composite_key
--- Deduplication: keep latest event per event_key (iCalUID for single, iCalUID + instanceStart for recurring)
+FROM extracted
+-- Belt-and-braces: the base dedup view already reduces to one row per
+-- event_key, but an incremental batch can still carry two versions of the same
+-- occurrence (a re-synced record inside the lookback window), and the merge
+-- rejects duplicate keys within one batch.
 QUALIFY row_number() OVER (PARTITION BY event_key ORDER BY _ingested_at DESC) = 1

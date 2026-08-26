@@ -30,15 +30,21 @@ SELECT
     calendar_id,
     ical_uid,
     calendar_event_id,
+    recurring_event_id,
     instance_start,
     summary,
     description,
     location,
     status,
+    calendar_event_type,
+    sequence_number,
+    updated_at,
+    created_at,
     start_time,
     end_time,
     is_all_day,
-    is_recurring
+    is_recurring,
+    has_external_attendees
 FROM {{ ref('google_calendar_events_normalized') }}
 WHERE start_time IS NOT NULL
 {% if is_incremental() %}
