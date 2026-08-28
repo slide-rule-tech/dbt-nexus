@@ -22,6 +22,7 @@ WITH source_data AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
         JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') as organizer_email,
+        is_deleted,
         _ingested_at,
         _connection_id,
         _stream_id,
@@ -77,7 +78,16 @@ extracted AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.summary') as summary,
         JSON_EXTRACT_SCALAR(_raw_record, '$.description') as description,
         JSON_EXTRACT_SCALAR(_raw_record, '$.location') as location,
-        JSON_EXTRACT_SCALAR(_raw_record, '$.status') as status,
+        -- A deleted occurrence reads `cancelled` even though the record we
+        -- kept is the last FULL one, which still says "confirmed". Google
+        -- signals a deletion by sending a stripped tombstone rather than an
+        -- updated record, so the payload never learns it was deleted -- the
+        -- dedup view works that out across versions and hands it down here.
+        CASE
+            WHEN is_deleted THEN 'cancelled'
+            ELSE JSON_EXTRACT_SCALAR(_raw_record, '$.status')
+        END as status,
+        is_deleted,
         
         -- Parse start and end times
         {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
@@ -208,6 +218,11 @@ SELECT
         WHEN COALESCE(status_when_slot_arrived, status) = 'confirmed' THEN 'occurred'
         ELSE 'cancelled'
     END as meeting_status,
+
+    -- Exposed so a consumer can tell "cancelled because Google said so in a
+    -- full record" from "cancelled because the occurrence was deleted", which
+    -- read identically in `status` by design.
+    is_deleted,
 
     calendar_event_type,
     sequence_number,
