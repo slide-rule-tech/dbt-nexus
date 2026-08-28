@@ -219,9 +219,14 @@ SELECT
         ELSE 'cancelled'
     END as meeting_status,
 
-    -- Exposed so a consumer can tell "cancelled because Google said so in a
-    -- full record" from "cancelled because the occurrence was deleted", which
-    -- read identically in `status` by design.
+    -- Exposed so a consumer can tell "cancelled in a full record Google sent"
+    -- from "gone from the calendar we sync", which read identically in
+    -- `status` by design.
+    --
+    -- Not proof a meeting was called off: Google returns the same `cancelled`
+    -- for a deleted event, a skipped occurrence, a re-cut series, and the
+    -- syncing account being uninvited from a meeting that still goes ahead.
+    -- See google_calendar_events_base_dedupped for the full breakdown.
     is_deleted,
 
     calendar_event_type,

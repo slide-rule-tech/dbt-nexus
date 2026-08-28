@@ -55,8 +55,22 @@ deduplicated AS (
             ORDER BY is_tombstone ASC, _ingested_at DESC
         ) AS rn,
 
-        -- The occurrence has been DELETED from the calendar: the newest signal
+        -- The occurrence is GONE FROM THE CALENDAR WE SYNC: the newest signal
         -- Google sent for it was a tombstone.
+        --
+        -- Read that literally, because Google overloads `cancelled` across
+        -- four different real-world events and does not distinguish them:
+        --   - the event was deleted outright,
+        --   - one occurrence of a series was deleted or skipped,
+        --   - the series was re-cut or shortened, so old instances cease to
+        --     exist,
+        --   - the syncing account was UNINVITED -- the meeting still happens
+        --     for everyone else, it is simply no longer on this calendar.
+        -- A tombstone carrying `recurringEventId` is an instance-level
+        -- cancellation and one without it is a standalone event, but the last
+        -- case is not recoverable from the tombstone at all. So this means
+        -- "not on our calendar any more", never "this meeting did not happen"
+        -- -- which is also why meeting_status keeps its version replay.
         --
         -- This exists because the ordering above, on its own, made deletion
         -- unobservable. A tombstone can never win the row, so an occurrence
