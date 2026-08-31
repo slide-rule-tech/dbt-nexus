@@ -22,7 +22,7 @@ WITH source_data AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') as calendar_event_id,
         JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') as ical_uid,
         JSON_EXTRACT_SCALAR(_raw_record, '$.organizer.email') as organizer_email,
-        is_deleted,
+        all_calendars_cancelled,
         _ingested_at,
         _connection_id,
         _stream_id,
@@ -39,7 +39,34 @@ WITH source_data AS (
 extracted AS (
     SELECT
         -- Event identifiers
-        null as calendar_id,
+
+        -- WHICH CALENDAR this copy was read from -- not which event it is.
+        --
+        -- One Google event `id` is shared by every attendee's copy of an
+        -- invite, so a row is really (occurrence, calendar). Losing the
+        -- calendar is what makes a per-attendee fact inexpressible: when one
+        -- person removes a meeting from their calendar their copy comes back
+        -- `cancelled` while everyone else's stays `confirmed`, and nothing in
+        -- the payload distinguishes that from the meeting itself being called
+        -- off. Only comparing calendars can.
+        --
+        -- Google never puts calendarId in the item -- it lives in the request
+        -- path -- so only the caller knows it. `_calendar_id` is stamped on by
+        -- the ingestion handler for exactly that reason; `_stream_id` is the
+        -- envelope's copy of the same value and covers every row landed before
+        -- that. Verified equal to Google's own `self` attendee on 315,402 of
+        -- 315,738 copies with zero mismatches (the remainder being copies
+        -- where Google marked no attendee as self).
+        --
+        -- CAVEAT: this model is one row per OCCURRENCE, and the dedup picks
+        -- one winning copy (a live calendar's, while the occurrence is live
+        -- anywhere). So this names the copy you are looking at; it is not
+        -- "the calendars this meeting is on" -- that question needs a row per
+        -- (occurrence, calendar).
+        COALESCE(
+            JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+            _stream_id
+        ) as calendar_id,
         calendar_event_id,
         ical_uid,
         event_key,
@@ -78,16 +105,18 @@ extracted AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.summary') as summary,
         JSON_EXTRACT_SCALAR(_raw_record, '$.description') as description,
         JSON_EXTRACT_SCALAR(_raw_record, '$.location') as location,
-        -- A deleted occurrence reads `cancelled` even though the record we
-        -- kept is the last FULL one, which still says "confirmed". Google
-        -- signals a deletion by sending a stripped tombstone rather than an
-        -- updated record, so the payload never learns it was deleted -- the
-        -- dedup view works that out across versions and hands it down here.
+        -- Status under the cross-calendar rule: an occurrence is cancelled
+        -- IFF every synced calendar's latest version says cancelled (rooms
+        -- excluded; see google_calendar_events_base_dedupped). One live copy
+        -- anywhere keeps it a real meeting, so a copy-level `cancelled` --
+        -- which can just mean one attendee dropped it -- never leaks through
+        -- as the meeting's status. The dedup view also prefers a live copy's
+        -- payload while the occurrence is live, so the ELSE branch reads the
+        -- status of a calendar that still holds it.
         CASE
-            WHEN is_deleted THEN 'cancelled'
+            WHEN all_calendars_cancelled THEN 'cancelled'
             ELSE JSON_EXTRACT_SCALAR(_raw_record, '$.status')
         END as status,
-        is_deleted,
         
         -- Parse start and end times
         {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
@@ -159,7 +188,16 @@ extracted AS (
 version_history AS (
     SELECT
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') AS event_key,
+        COALESCE(
+            JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+            _stream_id
+        ) AS calendar_key,
         JSON_EXTRACT_SCALAR(_raw_record, '$.status') AS status,
+        {% if target.type == 'bigquery' %}
+        SAFE_CAST(REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(_raw_record, '$.etag'), r'(\d+)') AS INT64)
+        {% else %}
+        try_cast(regexp_extract(JSON_EXTRACT_SCALAR(_raw_record, '$.etag'), '(\d+)', 1) AS BIGINT)
+        {% endif %} AS etag_num,
         SAFE_CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.sequence') AS {% if target.type == 'bigquery' %}INT64{% else %}BIGINT{% endif %}) AS sequence_number,
         {% if target.type == 'bigquery' %}SAFE_CAST{% else %}try_cast{% endif %}(JSON_EXTRACT_SCALAR(_raw_record, '$.updated') AS TIMESTAMP) AS updated_at,
         {% if target.type == 'bigquery' %}SAFE_CAST(COALESCE(
@@ -172,6 +210,10 @@ version_history AS (
         _ingested_at
     FROM {{ ref('google_calendar_events_base') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%resource.calendar.google.com'
 ),
 
 -- The last version written at or before the occurrence's start time: what the
@@ -184,6 +226,74 @@ status_at_start AS (
         PARTITION BY event_key
         ORDER BY sequence_number DESC, updated_at DESC, _ingested_at DESC
     ) = 1
+),
+
+-- Was the occurrence cancelled on EVERY calendar by the time its slot
+-- arrived? The dated replay above cannot answer this: deletion tombstones
+-- carry no `updated`, so a meeting deleted everywhere before its start is
+-- invisible to it and would replay as "still on the calendar".
+--
+-- A version counts as evidence-before-start when
+--   dated:    `updated` <= start (Google's clock, as in the replay), or
+--   undated:  `_ingested_at` <= start. This is NOT _ingested_at used as an
+--             ordering -- it is an existence bound: we OBSERVED the tombstone
+--             before the slot arrived, so that calendar had dropped the
+--             meeting by then. A tombstone first seen after start proves
+--             nothing about before (people delete old meetings that DID
+--             happen), so it is excluded and the meeting keeps `occurred`.
+--
+-- Within the evidence, each calendar's as-of verdict uses the same clock rule
+-- as the dedup view: an undated max-etag version (a tombstone after the last
+-- full record) wins, else the max-`updated` dated version.
+as_of_versions AS (
+    SELECT
+        version_history.*,
+        occ.start_time AS occ_start
+    FROM version_history
+    JOIN (SELECT event_key, start_time FROM extracted) occ USING (event_key)
+    WHERE (version_history.updated_at IS NOT NULL
+           AND version_history.updated_at <= occ.start_time)
+       OR (version_history.updated_at IS NULL
+           AND version_history._ingested_at <= occ.start_time)
+),
+
+as_of_ranked AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY event_key, calendar_key
+            ORDER BY etag_num DESC
+        ) AS rn_by_etag,
+        ROW_NUMBER() OVER (
+            PARTITION BY event_key, calendar_key
+            ORDER BY
+                CASE WHEN updated_at IS NULL THEN 1 ELSE 0 END ASC,
+                updated_at DESC,
+                etag_num DESC
+        ) AS rn_by_updated
+    FROM as_of_versions
+),
+
+as_of_verdicts AS (
+    SELECT
+        event_key,
+        calendar_key,
+        CASE
+            WHEN MAX(CASE WHEN rn_by_etag = 1 AND updated_at IS NULL THEN 1 ELSE 0 END) = 1
+                THEN MAX(CASE WHEN rn_by_etag = 1 THEN status END)
+            ELSE MAX(CASE WHEN rn_by_updated = 1 THEN status END)
+        END AS status_as_of_start
+    FROM as_of_ranked
+    GROUP BY 1, 2
+),
+
+cancelled_by_start AS (
+    SELECT
+        event_key,
+        MIN(CASE WHEN status_as_of_start = 'cancelled' THEN 1 ELSE 0 END) = 1
+            AS was_cancelled_by_start
+    FROM as_of_verdicts
+    GROUP BY 1
 )
 
 SELECT
@@ -215,19 +325,13 @@ SELECT
     CASE
         WHEN start_time > current_timestamp()
             THEN CASE WHEN status = 'confirmed' THEN 'scheduled' ELSE 'cancelled' END
+        -- Cancelled everywhere before the slot arrived: it did not happen,
+        -- however confident the dated replay is -- tombstone deletions are
+        -- invisible to `updated` and live only in this branch.
+        WHEN COALESCE(was_cancelled_by_start, FALSE) THEN 'cancelled'
         WHEN COALESCE(status_when_slot_arrived, status) = 'confirmed' THEN 'occurred'
         ELSE 'cancelled'
     END as meeting_status,
-
-    -- Exposed so a consumer can tell "cancelled in a full record Google sent"
-    -- from "gone from the calendar we sync", which read identically in
-    -- `status` by design.
-    --
-    -- Not proof a meeting was called off: Google returns the same `cancelled`
-    -- for a deleted event, a skipped occurrence, a re-cut series, and the
-    -- syncing account being uninvited from a meeting that still goes ahead.
-    -- See google_calendar_events_base_dedupped for the full breakdown.
-    is_deleted,
 
     calendar_event_type,
     sequence_number,
@@ -248,6 +352,7 @@ SELECT
     source
 FROM extracted
 LEFT JOIN status_at_start USING (event_key)
+LEFT JOIN cancelled_by_start USING (event_key)
 -- Belt-and-braces: the base dedup view already reduces to one row per
 -- event_key, but an incremental batch can still carry two versions of the same
 -- occurrence (a re-synced record inside the lookback window), and the merge

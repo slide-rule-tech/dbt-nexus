@@ -4,109 +4,175 @@
     tags=['google_calendar', 'base']
 ) }}
 
--- Base dedup: one row per calendar occurrence, latest version wins.
+-- Base dedup: one row per calendar occurrence, plus the one verdict only this
+-- layer can compute -- is the occurrence cancelled on EVERY calendar we sync?
 --
 -- The occurrence key is Google's own `id`, verbatim. See
 -- macros/sources/google_calendar/google_calendar_event_key.sql for why that
 -- replaced an iCalUID-derived composite key, and why `id` is stable under
 -- rescheduling, instance drags and series re-cuts.
 --
--- event_key is emitted so downstream models select it rather than re-deriving
--- identity from _raw_record.
+-- WHY CANCELLATION IS A CROSS-CALENDAR QUESTION
+--
+--   One event `id` is shared by every attendee's copy of an invite, so "is
+--   this meeting cancelled" and "is this meeting still on X's calendar" are
+--   different questions that read identically on a single copy. Google
+--   overloads `status: cancelled` across both -- an organizer calling the
+--   meeting off, one attendee deleting their copy, a skipped series instance,
+--   an uninvite -- and nothing in the payload distinguishes them. Only the
+--   population of copies can: the occurrence is CANCELLED iff every calendar's
+--   latest version says cancelled, and one live copy anywhere keeps it a real
+--   upcoming meeting. In the largest workspace we sync, 8,432 occurrences are
+--   exactly that case -- cancelled on some calendars, held live on others.
+--
+-- WHICH CLOCK ORDERS A CALENDAR'S VERSIONS
+--
+--   Never `_ingested_at` -- that is our sync clock, and backfills and
+--   re-syncs reorder it freely. Google gives two of its own:
+--
+--     `updated`   wall-clock of the revision. The best signal, but absent on
+--                 most deletion tombstones (a deleted object has no
+--                 modification time to report).
+--     `etag`      present on EVERY record, tombstones included, and increases
+--                 with `updated` on 99.96% of comparable version pairs.
+--
+--   So: compare by `updated` when both versions carry it, by `etag`
+--   otherwise. Concretely, the max-etag version wins when it is undated (a
+--   tombstone that arrived after the last full record -- 169,824 of the
+--   170,588 cases where the clocks disagree), else the max-`updated` dated
+--   version wins (which also corrects the 754 pairs where etag regresses
+--   against `updated`). The naive "updated DESC NULLS LAST" ordering silently
+--   reintroduces the original bug: a dated record then outranks every
+--   tombstone forever, and a deletion can never take effect.
+--
+-- ROOM CALENDARS ARE IGNORED ENTIRELY
+--
+--   Rooms (`...@resource.calendar.google.com`) mirror bookings; they are not
+--   participants, and their copies should neither hold a meeting live nor
+--   vote it cancelled. Every other synced calendar counts -- group, import
+--   and personal calendars included, stale ones too: a calendar that stopped
+--   syncing still holds a true last-known state.
+
 WITH source_data AS (
     SELECT
         *,
         JSON_EXTRACT_SCALAR(_raw_record, '$.id') AS event_key,
-        JSON_EXTRACT_SCALAR(_raw_record, '$.id') AS calendar_event_id,
-        JSON_EXTRACT_SCALAR(_raw_record, '$.iCalUID') AS ical_uid,
-        {{ nexus.google_calendar_instance_start('_raw_record') }} AS instance_start,
-        -- A deletion tombstone: Google returns {id, status:"cancelled"} with
-        -- the payload stripped -- no summary, no attendees, no eventType,
-        -- sequence or updated. Never a usable event on its own.
+        -- The calendar this copy was read from. Google puts calendarId in the
+        -- request path, never in the item, so only the caller knows it: the
+        -- ingestion handler stamps `_calendar_id` onto each record, and
+        -- `_stream_id` is the envelope's copy of the same value for rows
+        -- landed before that.
+        COALESCE(
+            JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+            _stream_id
+        ) AS calendar_key,
+        JSON_EXTRACT_SCALAR(_raw_record, '$.status') AS version_status,
+        -- Google's revision counter, parsed out of its quoted-string etag.
+        {% if target.type == 'bigquery' %}
+        SAFE_CAST(REGEXP_EXTRACT(JSON_EXTRACT_SCALAR(_raw_record, '$.etag'), r'(\d+)') AS INT64)
+        {% else %}
+        try_cast(regexp_extract(JSON_EXTRACT_SCALAR(_raw_record, '$.etag'), '(\d+)', 1) AS BIGINT)
+        {% endif %} AS etag_num,
+        {% if target.type == 'bigquery' %}SAFE_CAST{% else %}try_cast{% endif %}(
+            JSON_EXTRACT_SCALAR(_raw_record, '$.updated') AS TIMESTAMP
+        ) AS updated_at,
+        -- A stripped payload: no eventType, summary or attendees. Never a
+        -- usable record on its own -- deletion stubs even carry placeholder
+        -- 1999/2000 start and end dates that must never win the payload.
         JSON_EXTRACT_SCALAR(_raw_record, '$.eventType') IS NULL AS is_tombstone
     FROM {{ ref('google_calendar_events_base') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%resource.calendar.google.com'
 ),
 
-signalled AS (
+versioned AS (
     SELECT
         *,
-        -- When each KIND of signal last arrived for this occurrence. A
-        -- tombstone carries no payload, so it cannot be the winning row -- but
-        -- it is still the most recent thing Google told us, and that has to
-        -- survive the dedup somehow. These two are how.
-        MAX(IF(is_tombstone, _ingested_at, NULL)) OVER (
-            PARTITION BY event_key
-        ) AS last_tombstone_at,
-        MAX(IF(NOT is_tombstone, _ingested_at, NULL)) OVER (
-            PARTITION BY event_key
-        ) AS last_full_at
+        ROW_NUMBER() OVER (
+            PARTITION BY event_key, calendar_key
+            ORDER BY etag_num DESC
+        ) AS rn_by_etag,
+        -- Dated versions first, then by `updated`; etag breaks exact ties.
+        ROW_NUMBER() OVER (
+            PARTITION BY event_key, calendar_key
+            ORDER BY
+                CASE WHEN updated_at IS NULL THEN 1 ELSE 0 END ASC,
+                updated_at DESC,
+                etag_num DESC
+        ) AS rn_by_updated
     FROM source_data
+),
+
+-- One verdict per (occurrence, calendar): what its latest version says.
+calendar_verdicts AS (
+    SELECT
+        event_key,
+        calendar_key,
+        CASE
+            -- Newest version by etag is undated: a tombstone after the last
+            -- full record. It wins -- `updated` cannot arbitrate a version
+            -- that has none.
+            WHEN MAX(CASE WHEN rn_by_etag = 1 AND updated_at IS NULL THEN 1 ELSE 0 END) = 1
+                THEN MAX(CASE WHEN rn_by_etag = 1 THEN version_status END)
+            -- Otherwise the newest DATED version by Google's wall clock.
+            ELSE MAX(CASE WHEN rn_by_updated = 1 THEN version_status END)
+        END AS latest_status
+    FROM versioned
+    GROUP BY 1, 2
+),
+
+event_verdicts AS (
+    SELECT
+        event_key,
+        MIN(CASE WHEN latest_status = 'cancelled' THEN 1 ELSE 0 END) = 1
+            AS all_calendars_cancelled
+    FROM calendar_verdicts
+    GROUP BY 1
 ),
 
 deduplicated AS (
     SELECT
-        *,
-        -- Full records outrank tombstones so a stripped payload can never
-        -- clobber summary/attendees. See is_deleted below for why that
-        -- ordering does NOT mean a deletion is ignored.
+        source_data.*,
+        event_verdicts.all_calendars_cancelled,
+        -- The PAYLOAD winner, which is a different contest from the verdict:
+        --   1. full records outrank tombstones, so a stripped payload (and its
+        --      fake 1999 dates) can never clobber summary/attendees;
+        --   2. while the occurrence is live anywhere, a live copy outranks a
+        --      cancelled one, so the payload reflects the meeting as it
+        --      stands for the calendars still holding it;
+        --   3. then Google's clock, dated versions first.
         ROW_NUMBER() OVER (
-            PARTITION BY event_key
-            ORDER BY is_tombstone ASC, _ingested_at DESC
+            PARTITION BY source_data.event_key
+            ORDER BY
+                source_data.is_tombstone ASC,
+                CASE
+                    WHEN NOT event_verdicts.all_calendars_cancelled
+                         AND source_data.version_status = 'cancelled'
+                    THEN 1 ELSE 0
+                END ASC,
+                CASE WHEN source_data.updated_at IS NULL THEN 1 ELSE 0 END ASC,
+                source_data.updated_at DESC,
+                source_data.etag_num DESC
         ) AS rn,
-
-        -- The occurrence is GONE FROM THE CALENDAR WE SYNC: the newest signal
-        -- Google sent for it was a tombstone.
-        --
-        -- Read that literally, because Google overloads `cancelled` across
-        -- four different real-world events and does not distinguish them:
-        --   - the event was deleted outright,
-        --   - one occurrence of a series was deleted or skipped,
-        --   - the series was re-cut or shortened, so old instances cease to
-        --     exist,
-        --   - the syncing account was UNINVITED -- the meeting still happens
-        --     for everyone else, it is simply no longer on this calendar.
-        -- A tombstone carrying `recurringEventId` is an instance-level
-        -- cancellation and one without it is a standalone event, but the last
-        -- case is not recoverable from the tombstone at all. So this means
-        -- "not on our calendar any more", never "this meeting did not happen"
-        -- -- which is also why meeting_status keeps its version replay.
-        --
-        -- This exists because the ordering above, on its own, made deletion
-        -- unobservable. A tombstone can never win the row, so an occurrence
-        -- deleted in Google kept serving its last full record and read
-        -- `confirmed` forever -- 15,428 occurrences in one workspace, 42% of
-        -- the calendar, including meetings that a downstream consumer would
-        -- happily treat as upcoming.
-        --
-        -- Note what this is NOT: a cancellation delivered as a FULL record
-        -- (Google sends those too, with the payload intact) is not a tombstone
-        -- and never was affected -- it sorts normally by _ingested_at and its
-        -- status is simply read off the record.
-        --
-        -- `>=` not `>`: a tombstone and a full record ingested in the same
-        -- batch carry the same timestamp, and the tombstone is the later fact.
-        last_tombstone_at IS NOT NULL
-            AND (last_full_at IS NULL OR last_tombstone_at >= last_full_at)
-            AS is_deleted
-    FROM signalled
+        -- Watermark plumbing, NOT semantics: incremental consumers batch on
+        -- _ingested_at, and the payload winner for a cancelled-everywhere
+        -- occurrence is an old full record that would sit below the watermark
+        -- while a fresh tombstone flips the verdict. Advancing the row to the
+        -- occurrence's newest arrival is what puts it back in the next batch.
+        MAX(source_data._ingested_at) OVER (
+            PARTITION BY source_data.event_key
+        ) AS latest_ingested_at
+    FROM source_data
+    JOIN event_verdicts USING (event_key)
 )
 
 SELECT
     event_key,
-
-    -- The latest signal of ANY kind, not the winning row's own timestamp.
-    --
-    -- Load-bearing for incremental consumers. The winning row for a deleted
-    -- occurrence is an OLD full record, so with its original timestamp the
-    -- occurrence would sit below the watermark and its `is_deleted` would
-    -- never reach the incremental model -- the deletion would be computed
-    -- correctly here and then silently never applied. Advancing it to the
-    -- tombstone's arrival is what puts the occurrence back in the next batch.
-    GREATEST(_ingested_at, COALESCE(last_tombstone_at, _ingested_at))
-        AS _ingested_at,
-
-    is_deleted,
+    latest_ingested_at AS _ingested_at,
+    all_calendars_cancelled,
     _connection_id,
     _stream_id,
     _raw_record,
@@ -116,7 +182,7 @@ SELECT
 FROM deduplicated
 WHERE rn = 1
   -- Drop occurrences that only ever arrived as tombstones: no title, no
-  -- attendees, nobody to attribute them to. They would be contentless rows in
-  -- the event log. (An occurrence with a full record AND a later tombstone is
-  -- kept -- it is a real meeting that was deleted, and is_deleted says so.)
+  -- attendees, nobody to attribute them to. (An occurrence with a full record
+  -- AND later tombstones everywhere is kept -- it is a real meeting that was
+  -- cancelled, and all_calendars_cancelled says so.)
   AND NOT is_tombstone
