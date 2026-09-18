@@ -10,7 +10,17 @@
 
 {{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'event_id']) }}
 
--- Extract calendar events from normalized google_calendar_events
+-- Extract calendar events from normalized google_calendar_events.
+--
+-- Cancelled occurrences stay on the calendar models and do not become
+-- nexus events. A cancelled invite is a plan that was withdrawn, not our
+-- best understanding of what happened (or will happen). `meeting_status`
+-- is the verdict to filter on — not a single copy's payload `status`,
+-- which can mean "this attendee dropped it" while the meeting is still on.
+--
+-- Incremental merge will not delete a row that already landed as
+-- confirmed and later flipped to cancelled. That needs a one-time
+-- --full-refresh of this model + downstream event log / ER.
 SELECT
     {{ nexus.create_nexus_id('event', ['event_id']) }} as event_id,
     instance_start as occurred_at,
@@ -49,6 +59,7 @@ SELECT
     has_external_attendees
 FROM {{ ref('google_calendar_events_normalized') }}
 WHERE start_time IS NOT NULL
+  AND meeting_status != 'cancelled'
 {% if is_incremental() %}
   AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
 {% endif %}

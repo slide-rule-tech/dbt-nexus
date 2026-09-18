@@ -40,6 +40,7 @@
 -- here would fail the cross-source test the dimensions docs set out.
 
 WITH calendar_events AS (
+    -- Cancelled occurrences are already excluded upstream.
     SELECT * FROM {{ ref('google_calendar_event_events') }}
 ),
 

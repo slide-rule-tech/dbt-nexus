@@ -76,7 +76,9 @@ models:
   # Union Layer - Events
   - name: google_calendar_events
     description:
-      "Union layer - All Google Calendar events in nexus-compatible format"
+      "Union layer - Google Calendar occurrences that are nexus events
+      (scheduled or occurred). Cancelled occurrences stay on the calendar
+      models and are not emitted here."
     tests:
       - unique:
           column_name: event_id

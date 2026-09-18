@@ -31,6 +31,18 @@ WITH source_data AS (
         _sync_metadata
     FROM {{ ref('google_calendar_events_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+      -- Group calendars are dropped in the dedup view; keep the same gate
+      -- here so a payload that somehow still names one never becomes a
+      -- normalized occurrence. A meeting a person is actually on is already
+      -- on that person's calendar.
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%group.calendar.google.com'
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%group.v.calendar.google.com'
     {% if is_incremental() %}
       AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
     {% endif %}
@@ -107,7 +119,8 @@ extracted AS (
         JSON_EXTRACT_SCALAR(_raw_record, '$.location') as location,
         -- Status under the cross-calendar rule: an occurrence is cancelled
         -- IFF every synced calendar's latest version says cancelled (rooms
-        -- excluded; see google_calendar_events_base_dedupped). One live copy
+        -- and group calendars excluded; see google_calendar_events_base_dedupped).
+        -- One live copy
         -- anywhere keeps it a real meeting, so a copy-level `cancelled` --
         -- which can just mean one attendee dropped it -- never leaks through
         -- as the meeting's status. The dedup view also prefers a live copy's
@@ -214,6 +227,14 @@ version_history AS (
               JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
               _stream_id
           ) NOT LIKE '%resource.calendar.google.com'
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%group.calendar.google.com'
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%group.v.calendar.google.com'
 ),
 
 -- The last version written at or before the occurrence's start time: what the

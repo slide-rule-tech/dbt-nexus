@@ -10,11 +10,16 @@
 
 {{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'entity_identifier_id']) }}
 
--- Extract person identifiers from google calendar event participants
+-- Extract person identifiers from google calendar event participants.
+-- Same gate as google_calendar_event_events: cancelled is not a nexus event.
 WITH participants AS (
-    SELECT * FROM {{ ref('google_calendar_event_participants') }}
+    SELECT p.*
+    FROM {{ ref('google_calendar_event_participants') }} p
+    INNER JOIN {{ ref('google_calendar_events_normalized') }} e
+        ON e.event_id = p.event_id
+       AND e.meeting_status != 'cancelled'
     {% if is_incremental() %}
-    WHERE _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
+    WHERE p._ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
     {% endif %}
 ),
 
