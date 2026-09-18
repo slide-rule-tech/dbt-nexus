@@ -34,6 +34,16 @@ WITH source_data AS (
         _raw_record
     FROM {{ ref('google_calendar_events_base_dedupped') }}
     WHERE JSON_EXTRACT_SCALAR(_raw_record, '$.id') IS NOT NULL
+      -- Same gate as google_calendar_events_normalized: group calendars
+      -- are not person calendars, so they do not emit participants.
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%group.calendar.google.com'
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%group.v.calendar.google.com'
     {% if is_incremental() %}
       AND _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
     {% endif %}

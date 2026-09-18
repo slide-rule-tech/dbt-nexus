@@ -45,13 +45,20 @@
 --   reintroduces the original bug: a dated record then outranks every
 --   tombstone forever, and a deletion can never take effect.
 --
--- ROOM CALENDARS ARE IGNORED ENTIRELY
+-- ROOM AND GROUP CALENDARS ARE IGNORED ENTIRELY
 --
 --   Rooms (`...@resource.calendar.google.com`) mirror bookings; they are not
 --   participants, and their copies should neither hold a meeting live nor
---   vote it cancelled. Every other synced calendar counts -- group, import
---   and personal calendars included, stale ones too: a calendar that stopped
---   syncing still holds a true last-known state.
+--   vote it cancelled.
+--
+--   Group calendars (`...@group.calendar.google.com`, including Google's
+--   `group.v` holiday/birthday calendars) are the same kind of non-person:
+--   a hold that exists only on a shared calendar is not a meeting, and a
+--   real invite that a person is on already lives on that person's
+--   calendar. Counting them lets a stale or test group calendar keep an
+--   occurrence "live" after every person has dropped it. Import and
+--   personal calendars still count, stale ones too: a calendar that
+--   stopped syncing still holds a true last-known state.
 
 WITH source_data AS (
     SELECT
@@ -86,6 +93,14 @@ WITH source_data AS (
               JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
               _stream_id
           ) NOT LIKE '%resource.calendar.google.com'
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%group.calendar.google.com'
+      AND COALESCE(
+              JSON_EXTRACT_SCALAR(_raw_record, '$._calendar_id'),
+              _stream_id
+          ) NOT LIKE '%group.v.calendar.google.com'
 ),
 
 versioned AS (
