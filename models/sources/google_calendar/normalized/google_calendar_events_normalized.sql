@@ -93,9 +93,15 @@ extracted AS (
         -- series identity -- use series_id for the latter.
         JSON_EXTRACT_SCALAR(_raw_record, '$.recurringEventId') as recurring_event_id,
 
-        -- Determine instanceStart for recurring events
-        -- Priority: originalStartTime.dateTime > start.dateTime > start.date
+        -- When the occurrence takes place: start.dateTime > start.date. NOT
+        -- originalStartTime -- Google holds that at the old slot when an
+        -- instance is moved, which is why this column used to freeze a
+        -- rescheduled meeting on its original day (see the macro).
         {{ nexus.google_calendar_instance_start('_raw_record') }} as instance_start,
+
+        -- The slot a series instance was originally cut for (NULL for
+        -- one-offs). instance_start <> original_start_time means "moved".
+        {{ nexus.google_calendar_original_start_time('_raw_record') }} as original_start_time,
 
         -- Google's own classification: default | outOfOffice | focusTime |
         -- workingLocation | birthday. 'default' is the only value that means
@@ -325,6 +331,7 @@ SELECT
     series_id,
     recurring_event_id,
     instance_start,
+    original_start_time,
     summary,
     description,
     location,
