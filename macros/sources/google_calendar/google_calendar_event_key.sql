@@ -24,11 +24,24 @@
     base master while iCalUID and recurringEventId are both reissued).
 #}
 
-{# instance_start: the occurrence this row describes.
+{# instance_start: WHEN the occurrence this row describes takes place.
 
-    originalStartTime wins for a recurring instance -- it names the slot the
-    instance belongs to, and survives the instance being dragged elsewhere.
-    Falls back to the event's own start, then to an all-day date.
+    The event's own start -- the timed start, else the all-day date -- and
+    only as a last resort originalStartTime (a payload with no start at all,
+    which Google does not send for a live occurrence).
+
+    This used to prefer originalStartTime, on the reasoning that it "names the
+    slot the instance belongs to and survives the instance being dragged
+    elsewhere". That is exactly the property an EVENT TIME must not have: when
+    one instance of a weekly series is moved from Monday to Tuesday, Google
+    keeps originalStartTime at Monday and moves start to Tuesday, so every
+    consumer of instance_start (occurred_at on the calendar events,
+    identifiers, traits and relationship declarations) kept reporting the
+    meeting on Monday for as long as the row lived. Identity does not need the
+    original slot either: the occurrence key has been Google's own `id` since
+    v0.14.3, and that id already encodes the original slot in its suffix. The
+    original slot is still available as `original_start_time` on the
+    normalized model for anyone asking "was this moved".
 
     ISO 8601 with fractional seconds + tz offset. BQ needs PARSE_TIMESTAMP with
     %E*S/%Ez format codes (duck strptime doesn't recognize). try_cast on both
@@ -37,15 +50,36 @@
 {% macro google_calendar_instance_start(raw_record='_raw_record') %}
 {%- if target.type == 'bigquery' -%}
 SAFE_CAST(COALESCE(
-    JSON_EXTRACT_SCALAR({{ raw_record }}, '$.originalStartTime.dateTime'),
     JSON_EXTRACT_SCALAR({{ raw_record }}, '$.start.dateTime'),
-    CONCAT(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.start.date'), 'T00:00:00Z')
+    CONCAT(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.start.date'), 'T00:00:00Z'),
+    JSON_EXTRACT_SCALAR({{ raw_record }}, '$.originalStartTime.dateTime')
+) AS TIMESTAMP)
+{%- else -%}
+try_cast(COALESCE(
+    JSON_EXTRACT_SCALAR({{ raw_record }}, '$.start.dateTime'),
+    CONCAT(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.start.date'), 'T00:00:00Z'),
+    JSON_EXTRACT_SCALAR({{ raw_record }}, '$.originalStartTime.dateTime')
+) AS TIMESTAMP)
+{%- endif -%}
+{% endmacro %}
+
+
+{# original_start_time: the slot a recurring instance was cut for, or NULL.
+
+    Google's originalStartTime -- set only on instances of a series, and held
+    at the ORIGINAL slot when the instance is moved. Differs from
+    instance_start exactly when an occurrence was rescheduled.
+#}
+{% macro google_calendar_original_start_time(raw_record='_raw_record') %}
+{%- if target.type == 'bigquery' -%}
+SAFE_CAST(COALESCE(
+    JSON_EXTRACT_SCALAR({{ raw_record }}, '$.originalStartTime.dateTime'),
+    CONCAT(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.originalStartTime.date'), 'T00:00:00Z')
 ) AS TIMESTAMP)
 {%- else -%}
 try_cast(COALESCE(
     JSON_EXTRACT_SCALAR({{ raw_record }}, '$.originalStartTime.dateTime'),
-    JSON_EXTRACT_SCALAR({{ raw_record }}, '$.start.dateTime'),
-    CONCAT(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.start.date'), 'T00:00:00Z')
+    CONCAT(JSON_EXTRACT_SCALAR({{ raw_record }}, '$.originalStartTime.date'), 'T00:00:00Z')
 ) AS TIMESTAMP)
 {%- endif -%}
 {% endmacro %}
