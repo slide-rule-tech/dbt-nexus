@@ -72,7 +72,11 @@ headers_extracted AS (
          LIMIT 1) as x_autoreply_header,
         (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as {% if target.type == 'duckdb' %}t(header){% else %}header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'x-autorespond'
-         LIMIT 1) as x_autorespond_header
+         LIMIT 1) as x_autorespond_header,
+        -- Delivery status notifications (bounces) name the address that
+        -- failed here — it is in no From/To/Cc header, since the DSN itself
+        -- is FROM mailer-daemon TO our mailbox.
+        {{ nexus.gmail_header_value('_raw_record', 'x-failed-recipients') }} as x_failed_recipients_header
     FROM source_data
 ),
 
@@ -130,6 +134,7 @@ cleaned_message AS (
         x_auto_response_suppress_header,
         x_autoreply_header,
         x_autorespond_header,
+        x_failed_recipients_header,
         
         -- Timestamps
         TIMESTAMP_MILLIS(CAST(JSON_EXTRACT_SCALAR(_raw_record, '$.internalDate') AS INT64)) as sent_at,
@@ -190,6 +195,20 @@ cleaned_message AS (
 filtered_message AS (
     SELECT
         cm.*,
+        -- Bounce (DSN) classification. A message is a bounce notification when
+        -- it carries X-Failed-Recipients; whether the failure is PERMANENT is
+        -- judged from the snippet (the API payload has no body) — see
+        -- macros/helpers/gmail_bounce_classification.sql for the allow/deny
+        -- lists and why a 5.x.x-only gate would miss most real failures.
+        (cm.x_failed_recipients_header IS NOT NULL) as is_bounce_notification,
+        (
+            cm.x_failed_recipients_header IS NOT NULL
+            AND {{ nexus.gmail_bounce_is_permanent('cm.snippet') }}
+        ) as is_permanent_bounce,
+        CASE
+            WHEN cm.x_failed_recipients_header IS NOT NULL
+            THEN {{ nexus.gmail_bounce_smtp_status('cm.snippet') }}
+        END as bounce_smtp_status,
         COALESCE(pds.participant_domains, {% if target.type == 'bigquery' %}CAST([] AS ARRAY<STRING>){% else %}CAST([] AS VARCHAR[]){% endif %}) as participant_domains,
         (
             COALESCE(pds.participant_count, 0) > 0

@@ -100,6 +100,7 @@ SELECT
                 WHEN 'recipient' THEN 2
                 WHEN 'cced' THEN 3
                 WHEN 'bcced' THEN 4
+                WHEN 'failed_recipient' THEN 5
             END
     ) as roles,
     first_participated_at,
