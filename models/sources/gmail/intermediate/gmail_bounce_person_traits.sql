@@ -17,22 +17,31 @@
       with role 'failed_recipient', parsed from that header.
   This model only joins the two and emits traits.
 
+  TWO TRAIT FAMILIES. `is_email_deliverable` is the STANDARD, source-agnostic
+  verdict — "can we send to this address?" — and any source that detects
+  bounces (Gmail DSNs here; an ESP's bounce webhooks, Exchange NDRs, … later)
+  emits the same trait name so downstream reads one column regardless of who
+  saw the bounce. `email_address_invalid` / `_at` / `_reason` are this source's
+  evidence for that verdict and stay for auditability.
+
   SEMANTICS — a VERDICT, NOT A TOMBSTONE. `nexus_resolved_entity_traits` keeps
   the latest value per (entity, trait_name) ordered by `occurred_at`, so the
-  newest signal wins. Two signals are emitted:
+  newest signal wins — across sources too. Two signals are emitted:
 
-    email_address_invalid = 'true'   at the DSN's send time, for a permanent bounce.
-    email_address_invalid = 'false'  at the send time of any message the bounced
-                               address itself SENT us. Receiving mail from an
-                               address is positive evidence the mailbox is
-                               live, so a restored mailbox clears itself on the
-                               next inbound message with no manual step.
+    permanent bounce   is_email_deliverable = 'false', email_address_invalid = 'true'
+                       at the DSN's send time.
+    recovery           is_email_deliverable = 'true',  email_address_invalid = 'false'
+                       at the send time of any message the bounced address
+                       itself SENT us. Receiving mail from an address is
+                       positive evidence the mailbox is live, so a restored
+                       mailbox clears itself on the next inbound message with
+                       no manual step.
 
   Ordering by `occurred_at` does the work: inbound mail from BEFORE the bounce
   loses to it, inbound mail from after it wins. Recovery rows are only emitted
-  for addresses that have actually bounced, so downstream reads three states:
-  NULL = no bounce history, 'true' = exclude, 'false' = bounced once but has
-  written since.
+  for addresses that have actually bounced, so downstream reads three states
+  of is_email_deliverable: NULL = no evidence either way (fine to send),
+  'false' = exclude, 'true' = bounced once but has written since.
 
   `email_address_invalid_at` / `email_address_invalid_reason` are emitted ONLY on failure
   rows and are left standing after a recovery so the history stays auditable.
@@ -99,7 +108,39 @@ recoveries as (
 
 traits as (
 
-    -- Permanent failure: this address could not be reached.
+    -- STANDARD trait: not deliverable. Same name every bounce source emits.
+    select
+        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'is_email_deliverable'"]) }} as entity_trait_id,
+        event_id,
+        'person' as entity_type,
+        'email' as identifier_type,
+        email as identifier_value,
+        'is_email_deliverable' as trait_name,
+        'false' as trait_value,
+        'gmail' as source,
+        sent_at as occurred_at,
+        _ingested_at
+    from permanent_failures
+
+    union all
+
+    -- STANDARD trait: deliverable again — the address wrote to us after bouncing.
+    select
+        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'is_email_deliverable'"]) }} as entity_trait_id,
+        event_id,
+        'person' as entity_type,
+        'email' as identifier_type,
+        email as identifier_value,
+        'is_email_deliverable' as trait_name,
+        'true' as trait_value,
+        'gmail' as source,
+        sent_at as occurred_at,
+        _ingested_at
+    from recoveries
+
+    union all
+
+    -- Source evidence: this address could not be reached (Gmail DSN).
     select
         {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'email_address_invalid'"]) }} as entity_trait_id,
         event_id,
