@@ -5,7 +5,7 @@
 ) }}
 
 {#-
-  `address_invalid` traits for the FAILED RECIPIENT of a delivery status
+  `email_address_invalid` traits for the FAILED RECIPIENT of a delivery status
   notification (DSN).
 
   All the parsing lives upstream in the normalized layer:
@@ -21,8 +21,8 @@
   the latest value per (entity, trait_name) ordered by `occurred_at`, so the
   newest signal wins. Two signals are emitted:
 
-    address_invalid = 'true'   at the DSN's send time, for a permanent bounce.
-    address_invalid = 'false'  at the send time of any message the bounced
+    email_address_invalid = 'true'   at the DSN's send time, for a permanent bounce.
+    email_address_invalid = 'false'  at the send time of any message the bounced
                                address itself SENT us. Receiving mail from an
                                address is positive evidence the mailbox is
                                live, so a restored mailbox clears itself on the
@@ -34,7 +34,7 @@
   NULL = no bounce history, 'true' = exclude, 'false' = bounced once but has
   written since.
 
-  `address_invalid_at` / `address_invalid_reason` are emitted ONLY on failure
+  `email_address_invalid_at` / `email_address_invalid_reason` are emitted ONLY on failure
   rows and are left standing after a recovery so the history stays auditable.
   The reason carries the enhanced status code when the snippet exposed one plus
   the snippet verbatim — the raw sentence is what a human needs to second-guess
@@ -101,12 +101,12 @@ traits as (
 
     -- Permanent failure: this address could not be reached.
     select
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'address_invalid'"]) }} as entity_trait_id,
+        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'email_address_invalid'"]) }} as entity_trait_id,
         event_id,
         'person' as entity_type,
         'email' as identifier_type,
         email as identifier_value,
-        'address_invalid' as trait_name,
+        'email_address_invalid' as trait_name,
         'true' as trait_value,
         'gmail' as source,
         sent_at as occurred_at,
@@ -117,12 +117,12 @@ traits as (
 
     -- When that failure was reported.
     select
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'address_invalid_at'"]) }} as entity_trait_id,
+        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'email_address_invalid_at'"]) }} as entity_trait_id,
         event_id,
         'person' as entity_type,
         'email' as identifier_type,
         email as identifier_value,
-        'address_invalid_at' as trait_name,
+        'email_address_invalid_at' as trait_name,
         cast(sent_at as {{ dbt.type_string() }}) as trait_value,
         'gmail' as source,
         sent_at as occurred_at,
@@ -134,12 +134,12 @@ traits as (
     -- Why, in the mail system's own words, with the enhanced status code in
     -- front when the snippet exposed one.
     select
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'address_invalid_reason'"]) }} as entity_trait_id,
+        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'email_address_invalid_reason'"]) }} as entity_trait_id,
         event_id,
         'person' as entity_type,
         'email' as identifier_type,
         email as identifier_value,
-        'address_invalid_reason' as trait_name,
+        'email_address_invalid_reason' as trait_name,
         TRIM(COALESCE(bounce_smtp_status || ' ', '') || SUBSTR(snippet, 1, 200)) as trait_value,
         'gmail' as source,
         sent_at as occurred_at,
@@ -151,12 +151,12 @@ traits as (
     -- Recovery: a previously-bouncing address sent us mail, so the mailbox is
     -- live again. Wins only if it is more recent than the failure.
     select
-        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'address_invalid'"]) }} as entity_trait_id,
+        {{ nexus.create_nexus_id('entity_trait', ['event_id', 'email', "'person'", "'email_address_invalid'"]) }} as entity_trait_id,
         event_id,
         'person' as entity_type,
         'email' as identifier_type,
         email as identifier_value,
-        'address_invalid' as trait_name,
+        'email_address_invalid' as trait_name,
         'false' as trait_value,
         'gmail' as source,
         sent_at as occurred_at,

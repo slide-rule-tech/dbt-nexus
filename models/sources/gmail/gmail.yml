@@ -178,12 +178,12 @@ models:
   # Intermediate Layer Tests - Bounce Traits
   - name: gmail_bounce_person_traits
     description: >
-      `address_invalid` traits for the `failed_recipient` participant of a
+      `email_address_invalid` traits for the `failed_recipient` participant of a
       permanent delivery status notification (`gmail_messages.is_permanent_bounce`),
-      plus the recovery signal that clears them. Emits `address_invalid`
+      plus the recovery signal that clears them. Emits `email_address_invalid`
       ('true' on a permanent bounce, 'false' when the address later sends us
-      mail), `address_invalid_at` and `address_invalid_reason`. Only addresses
-      with bounce history appear, so `address_invalid IS NULL` downstream means
+      mail), `email_address_invalid_at` and `email_address_invalid_reason`. Only addresses
+      with bounce history appear, so `email_address_invalid IS NULL` downstream means
       "no bounce evidence", not "valid". All parsing (the X-Failed-Recipients
       header, the permanent/transient classification) lives in the normalized
       layer; this model only joins participants to messages.
@@ -209,7 +209,7 @@ models:
         tests:
           - accepted_values:
               values:
-                ["address_invalid", "address_invalid_at", "address_invalid_reason"]
+                ["email_address_invalid", "email_address_invalid_at", "email_address_invalid_reason"]
               config:
                 severity: error
       - name: trait_value
