@@ -11,11 +11,16 @@
 {{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'entity_trait_id']) }}
 
 -- Union all person and group traits using dbt_utils for column handling
+--
+-- gmail_bounce_person_traits is keyed on the FAILED RECIPIENT of a delivery
+-- status notification, who is never a participant of the DSN itself, so it
+-- cannot be derived from gmail_message_participants like the other two.
 WITH unioned_traits AS (
     {{ dbt_utils.union_relations(
         relations=[
             ref('gmail_message_person_traits'),
-            ref('gmail_message_group_traits')
+            ref('gmail_message_group_traits'),
+            ref('gmail_bounce_person_traits')
         ]
     ) }}
 )

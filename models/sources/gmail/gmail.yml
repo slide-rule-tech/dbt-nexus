@@ -175,6 +175,59 @@ models:
               config:
                 severity: error
 
+  # Intermediate Layer Tests - Bounce Traits
+  - name: gmail_bounce_person_traits
+    description: >
+      Permanent delivery-failure traits for the FAILED RECIPIENT of a delivery
+      status notification (DSN), plus the recovery signal that clears them.
+      Emits `address_invalid` ('true' on a permanent failure, 'false' when the
+      address later sends us mail), `address_invalid_at` and
+      `address_invalid_reason`. Only addresses with bounce history appear, so
+      `address_invalid IS NULL` downstream means "no bounce evidence", not
+      "valid". Transient (4.x.x / delay) failures and permanent-looking but
+      ambiguous ones (policy blocks, mailbox-full, Google Groups permission
+      notices) are excluded.
+    tests:
+      - unique:
+          column_name: entity_trait_id
+          config:
+            severity: error
+    columns:
+      - name: entity_trait_id
+        description: "Unique nexus entity trait ID"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: identifier_value
+        description: "Email address that failed (or recovered)"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: trait_name
+        tests:
+          - accepted_values:
+              values:
+                ["address_invalid", "address_invalid_at", "address_invalid_reason"]
+              config:
+                severity: error
+      - name: trait_value
+        description: "Trait value; never null or empty"
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: occurred_at
+        description:
+          "Send time of the DSN (failure) or of the inbound message (recovery).
+          Resolution downstream is latest-wins on this column, so it is
+          load-bearing."
+        tests:
+          - not_null:
+              config:
+                severity: error
+
   # Union Layer Tests - Relationship Declarations
   - name: gmail_relationship_declarations
     description: "Union layer - All relationship declarations from Gmail"
