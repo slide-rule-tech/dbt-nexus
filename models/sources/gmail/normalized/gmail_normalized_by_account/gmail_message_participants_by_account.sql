@@ -11,7 +11,8 @@
 {{ nexus.nexus_incremental_upgrade_guard(['_ingested_at', 'gmail_message_id']) }}
 
 -- Per-account normalized participants: Extract, parse, and normalize all participants (senders and recipients) from Gmail messages
--- Creates one row per participant per message, with role indicating "sender", "recipient", "cced", or "bcced"
+-- Creates one row per participant per message, with role indicating "sender", "recipient", "cced", "bcced",
+-- or "failed_recipient" (the address a delivery status notification says could not be reached)
 -- Uses gmail_message_id (per-account) instead of message_id_header (cross-account)
 WITH source_data AS (
     SELECT
@@ -48,7 +49,8 @@ headers_extracted AS (
          LIMIT 1) as cc_header,
         (SELECT JSON_EXTRACT_SCALAR(header, '$.value') FROM {% if target.type == 'duckdb' %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as t(header){% else %}UNNEST(JSON_EXTRACT_ARRAY(_raw_record, '$.headers')) as header{% endif %}
          WHERE LOWER(JSON_EXTRACT_SCALAR(header, '$.name')) = 'bcc'
-         LIMIT 1) as bcc_header
+         LIMIT 1) as bcc_header,
+        {{ nexus.gmail_header_value('_raw_record', 'x-failed-recipients') }} as x_failed_recipients_header
     FROM source_data
 ),
 
@@ -174,7 +176,46 @@ bcc_recipients_normalized AS (
     WHERE {{ nexus.validate_and_normalize_email('parsed_email') }} IS NOT NULL
 ),
 
--- Union all participants (senders and recipients)
+-- Extract and normalize failed recipients (from "X-Failed-Recipients")
+--
+-- A delivery status notification (DSN) is a message FROM mailer-daemon TO one
+-- of our mailboxes, so From/To/Cc only ever name the mail system and the
+-- mailbox that was told. The address that actually bounced is in
+-- X-Failed-Recipients — a comma-separated address list per RFC (Gmail sends
+-- one DSN per failed recipient in practice, but do not rely on that). Putting
+-- it on the event as a participant with its own role is what lets the
+-- identifier / trait / relationship models treat it like any other person.
+failed_recipients_parsed AS (
+    SELECT
+        h.gmail_message_id,
+        h.sent_at,
+        h._ingested_at,
+        h._account,
+        TRIM(recipient) as participant_raw,
+        {{ nexus.parse_gmail_email('TRIM(recipient)') }} as parsed_email,
+        {{ nexus.extract_gmail_name('TRIM(recipient)') }} as participant_name
+    FROM headers_extracted h,
+    UNNEST(SPLIT(COALESCE(h.x_failed_recipients_header, ''), ',')) as {% if target.type == 'duckdb' %}t(recipient){% else %}recipient{% endif %}
+    WHERE h.x_failed_recipients_header IS NOT NULL
+    AND TRIM(recipient) != ''
+),
+
+failed_recipients_normalized AS (
+    SELECT
+        gmail_message_id,
+        sent_at,
+        _ingested_at,
+        _account,
+        participant_raw,
+        participant_name,
+        parsed_email,
+        {{ nexus.validate_and_normalize_email('parsed_email') }} as normalized_email,
+        'failed_recipient' as role
+    FROM failed_recipients_parsed
+    WHERE {{ nexus.validate_and_normalize_email('parsed_email') }} IS NOT NULL
+),
+
+-- Union all participants (senders, recipients, failed recipients)
 participants_combined AS (
     SELECT
         gmail_message_id,
@@ -229,6 +270,20 @@ participants_combined AS (
         normalized_email,
         role
     FROM bcc_recipients_normalized
+
+    UNION ALL
+
+    SELECT
+        gmail_message_id,
+        sent_at,
+        _ingested_at,
+        _account,
+        participant_raw,
+        participant_name,
+        parsed_email,
+        normalized_email,
+        role
+    FROM failed_recipients_normalized
 ),
 
 -- Per-account deduplication: same gmail_message_id, email, and role can appear multiple times
@@ -261,6 +316,7 @@ ORDER BY gmail_message_id,
         WHEN 'recipient' THEN 2
         WHEN 'cced' THEN 3
         WHEN 'bcced' THEN 4
+        WHEN 'failed_recipient' THEN 5
     END,
     email
 )

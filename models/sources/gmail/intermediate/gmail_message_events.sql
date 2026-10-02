@@ -50,6 +50,12 @@ SELECT
     m.x_autoreply_header,
     m.x_autorespond_header,
     m.is_automated_or_bulk_message,
+    -- Delivery status notifications (bounces), classified upstream in
+    -- gmail_messages_by_account. The bounced address is on this event as a
+    -- participant with role 'failed_recipient'.
+    m.is_bounce_notification,
+    m.is_permanent_bounce,
+    m.bounce_smtp_status,
     m.raw_subject,
     m.snippet,
     m.size_estimate,

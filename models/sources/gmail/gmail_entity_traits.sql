@@ -12,9 +12,9 @@
 
 -- Union all person and group traits using dbt_utils for column handling
 --
--- gmail_bounce_person_traits is keyed on the FAILED RECIPIENT of a delivery
--- status notification, who is never a participant of the DSN itself, so it
--- cannot be derived from gmail_message_participants like the other two.
+-- gmail_bounce_person_traits emits address_invalid for the 'failed_recipient'
+-- participant of a permanent delivery status notification, plus the recovery
+-- signal when that address later writes to us.
 WITH unioned_traits AS (
     {{ dbt_utils.union_relations(
         relations=[

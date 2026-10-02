@@ -178,15 +178,15 @@ models:
   # Intermediate Layer Tests - Bounce Traits
   - name: gmail_bounce_person_traits
     description: >
-      Permanent delivery-failure traits for the FAILED RECIPIENT of a delivery
-      status notification (DSN), plus the recovery signal that clears them.
-      Emits `address_invalid` ('true' on a permanent failure, 'false' when the
-      address later sends us mail), `address_invalid_at` and
-      `address_invalid_reason`. Only addresses with bounce history appear, so
-      `address_invalid IS NULL` downstream means "no bounce evidence", not
-      "valid". Transient (4.x.x / delay) failures and permanent-looking but
-      ambiguous ones (policy blocks, mailbox-full, Google Groups permission
-      notices) are excluded.
+      `address_invalid` traits for the `failed_recipient` participant of a
+      permanent delivery status notification (`gmail_messages.is_permanent_bounce`),
+      plus the recovery signal that clears them. Emits `address_invalid`
+      ('true' on a permanent bounce, 'false' when the address later sends us
+      mail), `address_invalid_at` and `address_invalid_reason`. Only addresses
+      with bounce history appear, so `address_invalid IS NULL` downstream means
+      "no bounce evidence", not "valid". All parsing (the X-Failed-Recipients
+      header, the permanent/transient classification) lives in the normalized
+      layer; this model only joins participants to messages.
     tests:
       - unique:
           column_name: entity_trait_id
@@ -281,12 +281,66 @@ models:
           column_name: message_id
           config:
             severity: error
+      # A permanent bounce is a bounce.
+      - dbt_utils.expression_is_true:
+          expression: "is_bounce_notification OR NOT is_permanent_bounce"
+          config:
+            severity: error
     columns:
       - name: message_id
         description:
           "Message ID from message-id header (cross-account identifier)"
         tests:
           - not_null:
+              config:
+                severity: error
+      - name: x_failed_recipients_header
+        description:
+          "Raw X-Failed-Recipients header — the comma-separated address list a
+          delivery status notification (DSN) is about. NULL for ordinary mail."
+      - name: is_bounce_notification
+        description:
+          "The message is a delivery status notification (it carries
+          X-Failed-Recipients). The bounced address is on the message as a
+          participant with role 'failed_recipient'."
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: is_permanent_bounce
+        description:
+          "A bounce notification whose snippet reports a PERMANENT failure
+          (Address not found / permanent error / 5.x.x), with transient and
+          ambiguous shapes (4.x.x, delays, policy blocks, mailbox-full, Google
+          Groups permission notices) denied. See
+          macros/helpers/gmail_bounce_classification.sql."
+        tests:
+          - not_null:
+              config:
+                severity: error
+      - name: bounce_smtp_status
+        description:
+          "5.x.x enhanced status code from the snippet, when it exposed one.
+          NULL for non-bounces and for bounces whose snippet truncates before
+          the code (most of them)."
+
+  # Normalized Layer Tests - Message Participants
+  - name: gmail_message_participants
+    description:
+      "Cross-account normalized participants, one row per message × email ×
+      role"
+    columns:
+      - name: role
+        description:
+          "sender / recipient / cced / bcced from the From/To/Cc/Bcc headers;
+          failed_recipient from X-Failed-Recipients on a delivery status
+          notification"
+        tests:
+          - not_null:
+              config:
+                severity: error
+          - accepted_values:
+              values: ["sender", "recipient", "cced", "bcced", "failed_recipient"]
               config:
                 severity: error
 
