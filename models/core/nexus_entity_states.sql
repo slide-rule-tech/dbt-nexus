@@ -93,10 +93,10 @@ pivoted_states AS (
         entity_type,
         change_timestamp as valid_from,
         {% for dim in dimension_names %}
-        MAX(CASE WHEN state_name = '{{ dim }}' THEN state_value END) as {{ dim }},
+        MAX(CASE WHEN state_name = '{{ dim }}' THEN state_value END) as {{ nexus.quote_dynamic_column(dim) }},
         {% endfor %}
         {% for msr in measurement_names %}
-        MAX(CASE WHEN state_name = '{{ msr }}' THEN state_numeric_value END) as {{ msr }}{{ "," if not loop.last }}
+        MAX(CASE WHEN state_name = '{{ msr }}' THEN state_numeric_value END) as {{ nexus.quote_dynamic_column(msr) }}{{ "," if not loop.last }}
         {% endfor %}
     FROM pivoted_states_raw
     GROUP BY entity_id, entity_type, change_timestamp
@@ -118,10 +118,10 @@ with_state_ids AS (
         entity_id,
         entity_type,
         {% for dim in dimension_names %}
-        {{ dim }},
+        {{ nexus.quote_dynamic_column(dim) }},
         {% endfor %}
         {% for msr in measurement_names %}
-        {{ msr }},
+        {{ nexus.quote_dynamic_column(msr) }},
         {% endfor %}
         valid_from,
         valid_to
@@ -134,14 +134,14 @@ final AS (
         entity_id,
         entity_type,
         {% for dim in dimension_names %}
-        {{ dim }},
+        {{ nexus.quote_dynamic_column(dim) }},
         {% endfor %}
         {% for msr in measurement_names %}
-        {{ msr }},
-        {{ msr }} - COALESCE(LAG({{ msr }}) OVER (
+        {{ nexus.quote_dynamic_column(msr) }},
+        {{ nexus.quote_dynamic_column(msr) }} - COALESCE(LAG({{ nexus.quote_dynamic_column(msr) }}) OVER (
             PARTITION BY entity_id
             ORDER BY valid_from
-        ), 0) as {{ msr }}_delta,
+        ), 0) as {{ nexus.quote_dynamic_column(msr ~ '_delta') }},
         {% endfor %}
         valid_from,
         valid_to,

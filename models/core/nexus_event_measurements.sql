@@ -48,7 +48,7 @@ SELECT
     occurred_at,
     source,
     {% for name in measurement_names %}
-    MAX(CASE WHEN measurement_name = '{{ name }}' THEN value END) as {{ name }}{{ "," if not loop.last }}
+    MAX(CASE WHEN measurement_name = '{{ name }}' THEN value END) as {{ nexus.quote_dynamic_column(name) }}{{ "," if not loop.last }}
     {% endfor %}
 FROM measurements_data
 GROUP BY event_id, occurred_at, source
