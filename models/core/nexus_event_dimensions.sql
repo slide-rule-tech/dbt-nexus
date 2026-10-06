@@ -49,9 +49,9 @@ SELECT
     source,
     {% for name in dimension_names %}
     {% if name.startswith('is_') %}
-    COALESCE(MAX(CASE WHEN dimension_name = '{{ name }}' THEN CAST(dimension_value AS BOOLEAN) END), FALSE) as {{ name }}{{ "," if not loop.last }}
+    COALESCE(MAX(CASE WHEN dimension_name = '{{ name }}' THEN CAST(dimension_value AS BOOLEAN) END), FALSE) as {{ nexus.quote_dynamic_column(name) }}{{ "," if not loop.last }}
     {% else %}
-    MAX(CASE WHEN dimension_name = '{{ name }}' THEN dimension_value END) as {{ name }}{{ "," if not loop.last }}
+    MAX(CASE WHEN dimension_name = '{{ name }}' THEN dimension_value END) as {{ nexus.quote_dynamic_column(name) }}{{ "," if not loop.last }}
     {% endif %}
     {% endfor %}
 FROM dimensions_data
