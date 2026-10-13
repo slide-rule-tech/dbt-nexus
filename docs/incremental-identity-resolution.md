@@ -524,6 +524,19 @@ bug where thread events froze at first sight).
   watermark silently drops rows from a source without it). The dimension/
   measurement pivot finals stay full rebuilds (small, and rebuilding avoids
   NULL-backfill divergence when new `is_*` columns appear).
+- **Retractions (v0.15.1).** A merge-only log has no delete leg: a source row
+  that vanishes stays in `nexus_events` until a full refresh. Sources that
+  write *expectations* (an application's "payment expected in November")
+  must be able to withdraw them, so a source retracts by stamping
+  `_deleted_at` on the row it keeps, and `nexus_events` carries the column
+  (NULL for sources without it). The incremental predicate admits a row
+  whose `_ingested_at` **or** `_deleted_at` passed the watermark, so a
+  tombstone lands even when the source did not bump `_ingested_at`.
+  Consumers that mean "what is currently claimed" filter `_deleted_at is
+  null`; the package does so for entity interaction timestamps and state
+  participants. Identifier, dimension and measurement unions are left as
+  they are — they are facts about the event row, and the event row is the
+  retraction. Attribution does not yet filter tombstones.
 - `nexus_entity_participants`: two legs (macros in
   `incremental_finalize_participants.sql`). The APPEND leg processes batch
   identifier rows against the current resolved mapping;

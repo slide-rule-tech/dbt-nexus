@@ -160,6 +160,10 @@ entity_interaction_timestamps as (
   inner join {{ ref('nexus_events') }} e
     on ep.event_id = e.event_id
   where e.occurred_at is not null
+    -- A retracted claim (e.g. a withdrawn future expectation) is not an
+    -- interaction; without this a tombstoned future event would pin
+    -- last_interaction_at into the future for good.
+    and e._deleted_at is null
   group by entity_id
 ),
 

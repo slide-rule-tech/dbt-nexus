@@ -25,6 +25,7 @@ WITH events_with_entities AS (
     INNER JOIN {{ ref('nexus_entity_participants') }} ep ON e.event_id = ep.event_id
     WHERE DATE(e.occurred_at) >= '{{ start_date }}'
         AND DATE(e.occurred_at) <= '{{ end_date }}'
+        AND e._deleted_at IS NULL  -- retracted claims are not events in a state
 ),
 
 -- Find active entity_state for each event-entity combination
