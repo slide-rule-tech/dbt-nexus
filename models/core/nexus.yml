@@ -37,6 +37,13 @@ models:
           - not_null:
               config:
                 severity: warn
+      - name: _deleted_at
+        description:
+          "When the source RETRACTED this event (a tombstone), else NULL. The
+          row stays so incremental consumers can see the retraction; filter
+          `_deleted_at is null` for what is currently claimed. Set by sources
+          that write expectations (e.g. an app's expected payments) and must
+          be able to withdraw them."
       - name: _processed_at
         description: "When the data was last run or built by dbt"
         tests:

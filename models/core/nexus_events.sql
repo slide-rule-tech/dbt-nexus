@@ -56,6 +56,7 @@
         'SOURCE': dbt.type_string(),
         'SOURCE_TABLE': dbt.type_string(),
         '_INGESTED_AT': dbt.type_timestamp(),
+        '_DELETED_AT': dbt.type_timestamp(),
         '_PROCESSED_AT': dbt.type_timestamp()
     } %}
 {% else %}
@@ -69,6 +70,7 @@
         'source': dbt.type_string(),
         'source_table': dbt.type_string(),
         '_ingested_at': dbt.type_timestamp(),
+        '_deleted_at': dbt.type_timestamp(),
         '_processed_at': dbt.type_timestamp()
     } %}
 {% endif %}
@@ -84,8 +86,17 @@
     {'name': 'source', 'type': 'string'},
     {'name': 'source_table', 'type': 'string'},
     {'name': '_ingested_at', 'type': 'timestamp'},
+    {'name': '_deleted_at', 'type': 'timestamp'},
     {'name': '_processed_at', 'type': 'timestamp'}
 ] %}
+
+{# `_deleted_at` is a RETRACTION. An event is a source's best understanding
+   of what happened or will happen; a source that writes expectations (an
+   app's "payment expected next month") must also be able to withdraw them.
+   The merge-only incremental log cannot see a row that vanished, so a source
+   retracts by stamping `_deleted_at` on the row it keeps, and this table
+   carries the stamp: consumers that mean "what is currently claimed" filter
+   `_deleted_at is null`. Sources without the column get NULL. #}
 
 {# Get all columns from all relations to check what exists #}
 {% set all_columns = {} %}
@@ -152,6 +163,16 @@ SELECT
     current_timestamp() as _processed_at
 FROM unioned
 {% if is_incremental() %}
-WHERE _ingested_at > {{ nexus.nexus_incremental_watermark_literal('_ingested_at') }}
-QUALIFY row_number() OVER (PARTITION BY event_id ORDER BY _ingested_at DESC) = 1
+{# One watermark, read once. A retraction re-enters the batch on its own
+   clock: a source may stamp `_deleted_at` without touching `_ingested_at`,
+   and the row must still land so the tombstone reaches this table. #}
+{% set watermark = nexus.nexus_incremental_watermark_literal('_ingested_at') %}
+WHERE _ingested_at > {{ watermark }}
+{% if '_deleted_at' in all_columns %}
+   OR _deleted_at > {{ watermark }}
+{% endif %}
+QUALIFY row_number() OVER (
+    PARTITION BY event_id
+    ORDER BY _ingested_at DESC{% if '_deleted_at' in all_columns %}, _deleted_at DESC{% endif %}
+) = 1
 {% endif %}
