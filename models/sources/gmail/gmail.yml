@@ -55,8 +55,11 @@ sources:
           {}).get('message_bodies', {}).get('identifier', 'gmail_message_bodies')
           }}"
         description:
-          "Gmail message bodies pulled on demand by the gmail_message_body BBP
-          enricher. Lean BBP envelope — the body fields live in `_raw_record`."
+          "Gmail message bodies. Landed either by the gmail_message_body BBP
+          enricher (on demand, lean BBP envelope) or by the Workspace Gmail
+          ingestion's gmailBodies option (nightly, standard ingestion envelope;
+          set `tables.message_bodies.identifier` to that table). The body fields
+          live in `_raw_record` either way."
 
 models:
   # Union Layer Tests - Events
