@@ -4,7 +4,9 @@
     tags=['gmail', 'base', 'bodies']
 ) }}
 
--- Base layer: raw collection, zero transformation overhead. The gmail_message_body
--- BBP enricher lands bodies here (lean BBP envelope; body fields in _raw_record).
--- JSON extraction + casting happen in the normalized layer.
+-- Base layer: raw collection, zero transformation overhead. Bodies land here
+-- from either the gmail_message_body BBP enricher (lean BBP envelope) or the
+-- Workspace Gmail ingestion's gmailBodies option (standard ingestion
+-- envelope); the body fields live in _raw_record either way. JSON extraction
+-- + casting happen in the normalized layer.
 select * from {{ source('gmail', 'message_bodies') }}
